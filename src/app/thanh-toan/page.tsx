@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { ArrowLeft, CheckCircle2, Loader2, MapPin, CreditCard, Phone, User, Search } from 'lucide-react';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
+import { useOrderQuote } from '@/lib/orders/useOrderQuote';
+import { useCart } from '@/context/CartContext';
 
 interface CheckoutData {
   items: {
@@ -26,8 +28,10 @@ interface CheckoutData {
 export default function ThanhToanPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { removeFromCart } = useCart();
   
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
+  const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(checkoutData?.items || [], checkoutData?.couponCode || '');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -76,15 +80,15 @@ export default function ThanhToanPage() {
       return;
     }
 
-    if (!checkoutData) return;
+    if (!checkoutData || !quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho.', 'info'); return; }
 
     setIsSubmitting(true);
+    let completed = false;
 
     try {
       const payload = {
         ...formData,
         items: checkoutData.items,
-        totalAmount: checkoutData.finalTotal,
         couponCode: checkoutData.couponCode
       };
 
@@ -98,13 +102,17 @@ export default function ThanhToanPage() {
 
       const result = await res.json();
 
-      if (result.status === 'success' || result.orderId) {
+      if (res.ok && result.status === 'success' && result.orderId) {
         // Lưu thông tin để hiển thị ở trang thành công
-        sessionStorage.setItem('order_success_id', result.orderId || 'TPE-SUCCESS');
+        sessionStorage.setItem('order_success_id', result.orderId);
         sessionStorage.setItem('order_success_total', String(result.totalAmount));
         sessionStorage.removeItem('checkout_idempotency');
+        sessionStorage.removeItem('checkout_data');
+        checkoutData.items.forEach((item) => removeFromCart(item.productId, item.selectedSize));
         
         // Thành công -> chuyển trang
+        completed = true;
+        window.dispatchEvent(new Event('tpetie:navigation-start'));
         router.push('/thanh-toan/thanh-cong');
       } else {
         throw new Error(result.message || 'Lỗi không xác định');
@@ -114,7 +122,7 @@ export default function ThanhToanPage() {
       const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra, vui lòng thử lại sau.';
       showToast(errorMessage, 'info');
     } finally {
-      setIsSubmitting(false);
+      if (!completed) setIsSubmitting(false);
     }
   };
 
@@ -287,7 +295,7 @@ export default function ThanhToanPage() {
                 <div key={idx} className="flex space-x-3">
                   <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-cream-100 shrink-0 border border-cream-200">
                     <Image
-                      src={item.thumbnail || '/placeholder.png'}
+                      src={item.thumbnail || '/images/logo.png'}
                       alt={item.productName}
                       fill
                       sizes="64px"
@@ -305,7 +313,9 @@ export default function ThanhToanPage() {
                   </div>
                   <div className="text-right py-1">
                     <span className="text-sm font-bold text-honey-600">
-                      {formatPriceCompact(item.price * item.quantity)}
+                      {quote?.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)?.totalPrice !== undefined
+                        ? formatPriceCompact(quote.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)!.totalPrice)
+                        : 'Đang cập nhật…'}
                     </span>
                   </div>
                 </div>
@@ -315,28 +325,28 @@ export default function ThanhToanPage() {
             <div className="space-y-3 text-sm text-charcoal-700 pt-4 border-t border-cream-100">
               <div className="flex justify-between">
                 <span>Tạm tính:</span>
-                <span className="font-semibold">{formatPriceCompact(checkoutData.subtotal)}</span>
+                <span className="font-semibold">{quote ? formatPriceCompact(quote.subtotal) : '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span>Phí vận chuyển:</span>
                 <span className="font-semibold">
-                  {checkoutData.shippingFee === 0 ? (
+                  {quote?.shippingFee === 0 ? (
                     <span className="text-sage-700 font-bold">Miễn Phí</span>
                   ) : (
-                    formatPriceCompact(checkoutData.shippingFee)
+                    quote ? formatPriceCompact(quote.shippingFee) : '—'
                   )}
                 </span>
               </div>
-              {checkoutData.discountAmount > 0 && (
+              {!!quote && quote.discountAmount > 0 && (
                 <div className="flex justify-between text-blush-600 font-semibold">
                   <span>Mã giảm giá ({checkoutData.couponCode}):</span>
-                  <span>-{formatPriceCompact(checkoutData.discountAmount)}</span>
+                  <span>-{formatPriceCompact(quote.discountAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-bold text-charcoal-900 pt-3 border-t border-cream-200">
                 <span>Tổng cộng:</span>
                 <span className="text-xl text-honey-600 font-heading">
-                  {formatPriceCompact(checkoutData.finalTotal)}
+                  {quote ? formatPriceCompact(quote.total) : '—'}
                 </span>
               </div>
             </div>
@@ -344,7 +354,7 @@ export default function ThanhToanPage() {
             <button
               type="submit"
               form="checkout-form"
-              disabled={isSubmitting}
+              disabled={isSubmitting || quoteLoading || !quote}
               className="w-full mt-6 py-4 rounded-full bg-honey-500 hover:bg-honey-600 disabled:bg-cream-300 disabled:cursor-not-allowed text-white font-bold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
             >
               {isSubmitting ? (
@@ -356,6 +366,8 @@ export default function ThanhToanPage() {
                 <span>Xác Nhận Đặt Hàng</span>
               )}
             </button>
+            {quoteError && <p role="alert" className="mt-3 text-center text-xs text-red-600">{quoteError}</p>}
+            {quoteLoading && <p role="status" className="mt-3 text-center text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
             <p className="text-xs text-center text-charcoal-400 mt-3 flex items-center justify-center space-x-1">
               <span>Bảo mật thông tin khách hàng tuyệt đối</span>
             </p>

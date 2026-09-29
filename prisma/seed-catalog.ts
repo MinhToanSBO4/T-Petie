@@ -42,7 +42,7 @@ async function main() {
         basePrice: BigInt(product.basePrice), originalPrice: product.originalPrice ? BigInt(product.originalPrice) : null,
         discountPercent: product.discountPercent || 0, saleCampaign: product.saleCampaign,
         isBestSeller: !!product.isBestSeller, isNewArrival: !!product.isNewArrival,
-        isSale: !!product.isSale, rating: product.rating, reviewCount: product.reviewCount,
+        isSale: !!product.isSale,
         categoryId: product.category === 'be-gai' ? 'be-gai' : null,
         collectionId: product.collectionId || null },
       create: { id: product.id, slug: product.id, sku: product.sku, name: product.name,
@@ -55,7 +55,7 @@ async function main() {
         basePrice: BigInt(product.basePrice), originalPrice: product.originalPrice ? BigInt(product.originalPrice) : null,
         discountPercent: product.discountPercent || 0, saleCampaign: product.saleCampaign,
         isBestSeller: !!product.isBestSeller, isNewArrival: !!product.isNewArrival,
-        isSale: !!product.isSale, rating: product.rating, reviewCount: product.reviewCount,
+        isSale: !!product.isSale,
         categoryId: product.category === 'be-gai' ? 'be-gai' : null,
         collectionId: product.collectionId || null },
     });

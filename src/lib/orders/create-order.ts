@@ -2,12 +2,11 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { priceOrder } from './pricing';
+import { quoteOrder, type QuoteItem } from './quote-order';
 
-type CheckoutItem = { productId: string; selectedSize: string; quantity: number };
 export type CheckoutInput = {
   fullName: string; phone: string; address: string; city: string; district: string; ward?: string;
-  note?: string; couponCode?: string; items: CheckoutItem[];
+  note?: string; couponCode?: string; items: QuoteItem[];
 };
 
 export async function createOrder(input: CheckoutInput, userId: string | undefined, idempotencyKey: string | null) {
@@ -20,32 +19,17 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
       return { orderId: existing.orderCode, totalAmount: Number(existing.totalAmount) };
     }
   }
-  const products = [...new Set(input.items.map((item) => item.productId))];
-  const variants = await prisma.productVariant.findMany({
-    where: { productId: { in: products }, isActive: true, product: { isActive: true } },
-    include: { product: true },
-  });
-  const requested = input.items.map((item) => {
-    const size = item.selectedSize.split(' (')[0].trim();
-    const found = variants.find((variant) => variant.productId === item.productId && variant.size === size);
-    return { variantId: found?.id || '', quantity: item.quantity };
-  });
-  const priced = priceOrder(requested, variants.map((variant) => ({
-    id: variant.id, productId: variant.productId, name: variant.product.name,
-    size: variant.size, price: Number(variant.price), stock: variant.stock,
-    active: variant.isActive && variant.product.isActive,
-  })));
-  const shippingFee = priced.subtotal >= 399000 ? 0 : 30000;
-  const code = input.couponCode?.trim().toUpperCase();
-  let discount = 0;
-  if (code === 'TPETIE20') discount = Math.min(20000, priced.subtotal);
-  else if (code === 'MEMBERVIP' && userId) discount = Math.round(priced.subtotal * 0.1);
-  else if (code) throw new Error('Mã giảm giá không hợp lệ');
-  const totalAmount = priced.subtotal + shippingFee - discount;
-  if (!Number.isSafeInteger(totalAmount) || totalAmount < 0) throw new Error('Tổng tiền không hợp lệ');
+  const quote = await quoteOrder(input.items, input.couponCode, !!userId);
 
   const order = await prisma.$transaction(async (tx) => {
-    for (const item of priced.items) {
+    if (quote.coupon) {
+      const claimed = await tx.coupon.updateMany({
+        where: { code: quote.coupon.code, usedCount: quote.coupon.usedCount, active: true },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (claimed.count !== 1) throw new Error('Mã giảm giá đã thay đổi, vui lòng thử lại');
+    }
+    for (const item of quote.items) {
       const updated = await tx.productVariant.updateMany({
         where: { id: item.variantId, stock: { gte: item.quantity }, isActive: true },
         data: { stock: { decrement: item.quantity } },
@@ -64,13 +48,14 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
         district: input.district,
         ward: input.ward || null,
         orderNote: input.note || null,
-        subtotal: BigInt(priced.subtotal), shippingFee: BigInt(shippingFee),
-        discountAmount: BigInt(discount), totalAmount: BigInt(totalAmount),
-        items: { create: priced.items.map((item) => ({
+        subtotal: BigInt(quote.subtotal), shippingFee: BigInt(quote.shippingFee),
+        discountAmount: BigInt(quote.discount), totalAmount: BigInt(quote.total),
+        couponCode: quote.couponCode,
+        items: { create: quote.items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
           productName: item.productName,
-          sku: variants.find((variant) => variant.id === item.variantId)!.sku,
+          sku: quote.variants.find((variant) => variant.id === item.variantId)!.sku,
           size: item.size,
           quantity: item.quantity,
           unitPrice: BigInt(item.unitPrice),
@@ -80,5 +65,5 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
     });
   });
   revalidateTag('products');
-  return { orderId: order.orderCode, totalAmount };
+  return { orderId: order.orderCode, totalAmount: quote.total };
 }

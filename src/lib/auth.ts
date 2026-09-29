@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { allowAttempt } from '@/lib/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
 import { credentialFingerprint } from '@/lib/password-reset';
+import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
 
 const googleProviders = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -62,6 +63,7 @@ export const authOptions: NextAuthOptions = {
       token.address = stored?.address;
       token.city = stored?.city;
       token.points = stored?.points;
+      token.babyProfile = stored ? toBabyProfile(stored) : null;
       return token;
     },
     async session({ session, token }) {
@@ -73,6 +75,7 @@ export const authOptions: NextAuthOptions = {
         session.user.address = token.address;
         session.user.city = token.city;
         session.user.points = token.points;
+        session.user.babyProfile = token.babyProfile;
       }
       return session;
     },

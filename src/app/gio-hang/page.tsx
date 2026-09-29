@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -17,6 +17,8 @@ import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { trackBeginCheckout } from '@/lib/analytics/tracker';
 import { useRouter } from 'next/navigation';
+import { useOrderQuote } from '@/lib/orders/useOrderQuote';
+import { reconcileCartSelection } from '@/lib/cart-selection';
 
 // Bỏ link Google Form cũ
 // const GOOGLE_FORM_URL = 'https://forms.gle/t866jwRWJ38f4tKD6';
@@ -38,6 +40,11 @@ export default function GioHangPage() {
     () => items.map((i) => itemKey(i.productId, i.selectedSize)),
     [items]
   );
+  const previousKeys = useRef<string[]>([]);
+  useEffect(() => {
+    setSelectedKeys((current) => reconcileCartSelection(previousKeys.current, allKeys, current));
+    previousKeys.current = allKeys;
+  }, [allKeys]);
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selectedKeys.has(k));
   const someSelected = allKeys.some((k) => selectedKeys.has(k));
 
@@ -62,32 +69,17 @@ export default function GioHangPage() {
   const selectedItems = items.filter((i) =>
     selectedKeys.has(itemKey(i.productId, i.selectedSize))
   );
-  const selectedSubtotal = selectedItems.reduce(
-    (sum, i) => sum + i.price * i.quantity,
-    0
-  );
-
   const [couponCode, setCouponCode] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(0);
-
-  const shippingFee = selectedSubtotal >= 399000 || selectedSubtotal === 0 ? 0 : 30000;
-  const finalTotal = Math.max(0, selectedSubtotal + shippingFee - discountAmount);
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+  const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(selectedItems, appliedCoupon);
 
   const applyCoupon = () => {
-    if (couponCode.toUpperCase() === 'TPETIE20') {
-      setDiscountAmount(20000);
-      showToast('Đã áp dụng mã giảm giá 20.000đ!', 'success');
-    } else if (couponCode.toUpperCase() === 'MEMBERVIP') {
-      setDiscountAmount(Math.round(selectedSubtotal * 0.1));
-      showToast('Đã áp dụng mã giảm 10% thành viên mới!', 'success');
-    } else {
-      showToast('Mã giảm giá không hợp lệ hoặc đã hết hạn', 'info');
-    }
+    setAppliedCoupon(couponCode.trim().toUpperCase());
   };
 
   const handleStartCheckout = () => {
-    if (selectedItems.length === 0) {
-      showToast('Mẹ chưa chọn sản phẩm nào để đặt hàng!', 'info');
+    if (selectedItems.length === 0 || !quote) {
+      showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info');
       return;
     }
     trackBeginCheckout(
@@ -97,19 +89,20 @@ export default function GioHangPage() {
         price: i.price,
         quantity: i.quantity,
       })),
-      finalTotal
+      quote.total
     );
     
     // Lưu dữ liệu vào session và chuyển hướng sang trang thanh toán
     sessionStorage.setItem('checkout_data', JSON.stringify({
       items: selectedItems,
-      subtotal: selectedSubtotal,
-      discountAmount,
-      shippingFee,
-      finalTotal,
-      couponCode
+      subtotal: quote.subtotal,
+      discountAmount: quote.discountAmount,
+      shippingFee: quote.shippingFee,
+      finalTotal: quote.total,
+      couponCode: appliedCoupon
     }));
     
+    window.dispatchEvent(new Event('tpetie:navigation-start'));
     router.push('/thanh-toan');
   };
 
@@ -247,7 +240,9 @@ export default function GioHangPage() {
 
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-sm sm:text-base font-bold text-honey-600 font-heading">
-                          {formatPriceCompact(item.price * item.quantity)}
+                          {quote?.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)?.totalPrice !== undefined
+                            ? formatPriceCompact(quote.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)!.totalPrice)
+                            : selectedItems.some((selected) => selected.productId === item.productId && selected.selectedSize === item.selectedSize) ? 'Đang cập nhật…' : formatPriceCompact(item.price * item.quantity)}
                         </span>
 
                         <div className="flex items-center border border-cream-300 rounded-lg bg-cream-50">
@@ -286,9 +281,9 @@ export default function GioHangPage() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Nhập TPETIE20..."
+                    placeholder="Nhập mã giảm giá"
                     value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
+                    onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(''); }}
                     className="flex-1 px-3 py-2 text-xs rounded-xl border border-cream-300 bg-cream-50 focus:outline-none focus:border-honey-500 uppercase"
                   />
                   <button
@@ -299,32 +294,34 @@ export default function GioHangPage() {
                   </button>
                 </div>
               </div>
+              {quoteError && <p role="alert" className="text-xs text-red-600">{quoteError}</p>}
+              {quoteLoading && selectedItems.length > 0 && <p role="status" className="text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
 
               <div className="space-y-2 text-xs text-charcoal-700 pt-2 border-t border-cream-100">
                 <div className="flex justify-between">
                   <span>Tạm tính ({selectedItems.length} món được chọn):</span>
-                  <span className="font-semibold">{formatPriceCompact(selectedSubtotal)}</span>
+                  <span className="font-semibold">{quote ? formatPriceCompact(quote.subtotal) : '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Phí vận chuyển:</span>
                   <span className="font-semibold">
-                    {shippingFee === 0 ? (
+                    {quote?.shippingFee === 0 ? (
                       <span className="text-sage-700 font-bold">Miễn Phí</span>
                     ) : (
-                      formatPriceCompact(shippingFee)
+                      quote ? formatPriceCompact(quote.shippingFee) : '—'
                     )}
                   </span>
                 </div>
-                {discountAmount > 0 && (
+                {!!quote && quote.discountAmount > 0 && (
                   <div className="flex justify-between text-blush-600 font-semibold">
                     <span>Mã giảm giá:</span>
-                    <span>-{formatPriceCompact(discountAmount)}</span>
+                    <span>-{formatPriceCompact(quote.discountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-bold text-charcoal-900 pt-2 border-t border-cream-200">
                   <span>Tổng thanh toán:</span>
                   <span className="text-lg text-honey-600 font-heading">
-                    {formatPriceCompact(finalTotal)}
+                    {quote ? formatPriceCompact(quote.total) : '—'}
                   </span>
                 </div>
               </div>
@@ -332,7 +329,7 @@ export default function GioHangPage() {
               <button
                 onClick={handleStartCheckout}
                 data-track="cart-proceed-checkout"
-                disabled={selectedItems.length === 0}
+                disabled={selectedItems.length === 0 || !quote || quoteLoading}
                 className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 disabled:bg-cream-300 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
               >
                 <span>

@@ -9,6 +9,7 @@ import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { trackBeginCheckout } from '@/lib/analytics/tracker';
+import { useOrderQuote } from '@/lib/orders/useOrderQuote';
 
 
 interface BuyNowItem {
@@ -28,7 +29,8 @@ export default function MuaNgayPage() {
   const [item, setItem] = useState<BuyNowItem | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [couponCode, setCouponCode] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+  const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(item ? [{ productId: item.productId, selectedSize: item.selectedSize, quantity }] : [], appliedCoupon);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('tpetie_buy_now');
@@ -47,38 +49,28 @@ export default function MuaNgayPage() {
 
   if (!item) return null;
 
-  const subtotal = item.price * quantity;
-  const shippingFee = subtotal >= 399000 ? 0 : 30000;
-  const total = Math.max(0, subtotal + shippingFee - discountAmount);
-
   const applyCoupon = () => {
-    if (couponCode.toUpperCase() === 'TPETIE20') {
-      setDiscountAmount(20000);
-      showToast('Đã áp dụng mã giảm giá 20.000đ!', 'success');
-    } else if (couponCode.toUpperCase() === 'MEMBERVIP') {
-      setDiscountAmount(Math.round(subtotal * 0.1));
-      showToast('Đã áp dụng mã giảm 10% thành viên mới!', 'success');
-    } else {
-      showToast('Mã giảm giá không hợp lệ hoặc đã hết hạn', 'info');
-    }
+    setAppliedCoupon(couponCode.trim().toUpperCase());
   };
 
   const handleCheckout = () => {
+    if (!quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info'); return; }
     trackBeginCheckout(
       [{ item_id: item.productId, item_name: item.productName, price: item.price, quantity }],
-      total
+      quote.total
     );
     
     // Lưu dữ liệu vào session và chuyển hướng sang trang thanh toán
     sessionStorage.setItem('checkout_data', JSON.stringify({
       items: [{ ...item, quantity }],
-      subtotal,
-      discountAmount,
-      shippingFee,
-      finalTotal: total,
-      couponCode
+      subtotal: quote.subtotal,
+      discountAmount: quote.discountAmount,
+      shippingFee: quote.shippingFee,
+      finalTotal: quote.total,
+      couponCode: appliedCoupon
     }));
     
+    window.dispatchEvent(new Event('tpetie:navigation-start'));
     router.push('/thanh-toan');
   };
 
@@ -131,7 +123,7 @@ export default function MuaNgayPage() {
 
               <div className="flex items-center justify-between mt-3">
                 <span className="text-base font-bold text-honey-600 font-heading">
-                  {formatPriceCompact(item.price * quantity)}
+                  {quote ? formatPriceCompact(quote.items[0].totalPrice) : 'Đang cập nhật…'}
                 </span>
 
                 {/* Số lượng */}
@@ -177,9 +169,9 @@ export default function MuaNgayPage() {
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Nhập TPETIE20..."
+                placeholder="Nhập mã giảm giá"
                 value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
+                onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(''); }}
                 className="flex-1 px-3 py-2 text-xs rounded-xl border border-cream-300 bg-cream-50 focus:outline-none focus:border-honey-500 uppercase"
               />
               <button
@@ -190,41 +182,43 @@ export default function MuaNgayPage() {
               </button>
             </div>
           </div>
+          {quoteError && <p role="alert" className="text-xs text-red-600">{quoteError}</p>}
+          {quoteLoading && <p role="status" className="text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
 
           <div className="space-y-2 text-xs text-charcoal-700 pt-2 border-t border-cream-100">
             <div className="flex justify-between">
               <span>Tạm tính (1 sản phẩm):</span>
-              <span className="font-semibold">{formatPriceCompact(subtotal)}</span>
+              <span className="font-semibold">{quote ? formatPriceCompact(quote.subtotal) : '—'}</span>
             </div>
             <div className="flex justify-between">
               <span>Phí vận chuyển:</span>
               <span className="font-semibold">
-                {shippingFee === 0 ? (
+                {quote?.shippingFee === 0 ? (
                   <span className="text-sage-700 font-bold">Miễn Phí</span>
                 ) : (
-                  formatPriceCompact(shippingFee)
+                  quote ? formatPriceCompact(quote.shippingFee) : '—'
                 )}
               </span>
             </div>
-            {shippingFee > 0 && (
+            {!!quote && quote.shippingFee > 0 && (
               <p className="text-[11px] text-charcoal-400 bg-cream-50 rounded-lg px-2 py-1.5">
                 💡 Mua thêm{' '}
                 <strong className="text-honey-600">
-                  {formatPriceCompact(399000 - subtotal)}
+                  {formatPriceCompact(quote.freeShippingThreshold - quote.subtotal)}
                 </strong>{' '}
                 để được Freeship!
               </p>
             )}
-            {discountAmount > 0 && (
+            {!!quote && quote.discountAmount > 0 && (
               <div className="flex justify-between text-blush-600 font-semibold">
                 <span>Mã giảm giá:</span>
-                <span>-{formatPriceCompact(discountAmount)}</span>
+                <span>-{formatPriceCompact(quote.discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm font-bold text-charcoal-900 pt-2 border-t border-cream-200">
               <span>Tổng thanh toán:</span>
               <span className="text-lg text-honey-600 font-heading">
-                {formatPriceCompact(total)}
+                {quote ? formatPriceCompact(quote.total) : '—'}
               </span>
             </div>
           </div>
@@ -232,7 +226,8 @@ export default function MuaNgayPage() {
           <button
             onClick={handleCheckout}
             data-track="buy-now-checkout"
-            className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
+            disabled={!quote || quoteLoading}
+            className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
           >
             <span>Đặt Hàng Ngay</span>
             <ArrowRight className="w-4 h-4" />

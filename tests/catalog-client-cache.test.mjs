@@ -13,3 +13,16 @@ test('catalog loads once for repeated page visits and shares concurrent requests
   await loadCatalogProducts(fetcher);
   assert.equal(calls, 1);
 });
+
+test('catalog follows every page when more than 48 products exist', async () => {
+  clearCatalogCache();
+  const urls = [];
+  const fetcher = async (url) => {
+    urls.push(url);
+    const page = new URL(url, 'http://localhost').searchParams.get('page');
+    return { ok: true, json: async () => ({ total: 49, products: page === '2' ? [{ id: 'last' }] : Array.from({ length: 48 }, (_, index) => ({ id: `first-${index}` })) }) };
+  };
+  const products = await loadCatalogProducts(fetcher);
+  assert.equal(products.length, 49);
+  assert.deepEqual(urls, ['/api/products?limit=48&page=1', '/api/products?limit=48&page=2']);
+});

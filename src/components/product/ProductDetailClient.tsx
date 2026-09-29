@@ -8,7 +8,6 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ShoppingBag,
-  Heart,
   Ruler,
   ShieldCheck,
   Truck,
@@ -33,7 +32,11 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
   const router = useRouter();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [selectedSize, setSelectedSize] = useState<ProductSizeOption>(product.sizes[0]);
+  const [selectedSize, setSelectedSize] = useState<ProductSizeOption>(() =>
+    product.sizes.find((size) => size.stock > 0) || product.sizes[0] || {
+      size: '', weightRange: '', ageRange: '', price: product.basePrice, stock: 0,
+    }
+  );
   const [quantity, setQuantity] = useState(1);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
@@ -47,9 +50,10 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
   // Reset image and size when route params change
   useEffect(() => {
     setSelectedImageIndex(0);
-    if (product?.sizes && product.sizes.length > 0) {
-      setSelectedSize(product.sizes[0]);
-    }
+    setSelectedSize(product.sizes.find((size) => size.stock > 0) || product.sizes[0] || {
+      size: '', weightRange: '', ageRange: '', price: product.basePrice, stock: 0,
+    });
+    setQuantity(1);
   }, [product]);
 
   // Track view item on mount
@@ -65,11 +69,19 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
   }, [product, selectedSize.price]);
 
   const handleAddToCart = () => {
+    if (selectedSize.stock < quantity || selectedSize.stock < 1) {
+      showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
+      return;
+    }
     addToCart(product, selectedSize, quantity);
     showToast(`Đã thêm ${quantity} x "${product.name} (${selectedSize.size})" vào giỏ hàng!`, 'success');
   };
 
   const handleBuyNow = () => {
+    if (selectedSize.stock < quantity || selectedSize.stock < 1) {
+      showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
+      return;
+    }
     const formattedSize = `${selectedSize.size} (${selectedSize.weightRange})`;
     const buyNowItem = {
       productId: product.id,
@@ -162,7 +174,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
               </div>
             )}
 
-            {/* Nút Chia Sẻ / Yêu Thích */}
+            {/* Chia sẻ sản phẩm */}
             <div className="absolute top-3 right-3 flex space-x-2 z-10">
               <button
                 onClick={() => {
@@ -173,13 +185,6 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
                 title="Chia sẻ"
               >
                 <Share2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => showToast(`Đã lưu "${product.name}" vào danh sách yêu thích!`, 'love')}
-                className="p-2 rounded-full bg-white/90 backdrop-blur-md text-charcoal-700 hover:text-blush-500 transition-colors shadow-sm"
-                title="Yêu thích"
-              >
-                <Heart className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -283,8 +288,10 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
                 return (
                   <button
                     key={s.size}
+                    disabled={s.stock < 1}
                     onClick={() => {
                       setSelectedSize(s);
+                      setQuantity(1);
                       trackEvent('select_size', {
                         item_id: product.id,
                         selected_size: s.size,
@@ -295,12 +302,15 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
                     className={`p-3 rounded-2xl border text-left transition-all active:scale-95 flex flex-col justify-between ${
                       isSelected
                         ? 'border-honey-500 bg-honey-50/80 ring-2 ring-honey-400/40 shadow-sm'
-                        : 'border-cream-300 bg-white hover:bg-cream-50 text-charcoal-800'
+                        : s.stock < 1
+                          ? 'border-cream-200 bg-cream-100 text-charcoal-400 cursor-not-allowed'
+                          : 'border-cream-300 bg-white hover:bg-cream-50 text-charcoal-800'
                     }`}
                   >
                     <span className="text-xs font-extrabold text-charcoal-900">{s.size}</span>
                     <span className="text-[11px] text-sage-700 font-semibold">{s.weightRange}</span>
                     <span className="text-[10px] text-charcoal-400 mt-1">{s.ageRange}</span>
+                    {s.stock < 1 && <span className="text-[10px] text-blush-600 mt-1">Hết hàng</span>}
                   </button>
                 );
               })}
@@ -308,6 +318,9 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
           </div>
 
           {/* Số lượng */}
+          <p className="text-xs text-charcoal-600" aria-live="polite">
+            {selectedSize.stock > 0 ? `Còn ${selectedSize.stock} sản phẩm` : 'Kích cỡ này đã hết hàng'}
+          </p>
           <div className="flex items-center space-x-4 pt-2">
             <span className="text-xs font-bold text-charcoal-900 uppercase tracking-wider">Số Lượng:</span>
             <div className="flex items-center border border-cream-300 rounded-xl bg-white">
@@ -319,7 +332,8 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
               </button>
               <span className="px-4 text-sm font-bold text-charcoal-900">{quantity}</span>
               <button
-                onClick={() => setQuantity((q) => q + 1)}
+                onClick={() => setQuantity((q) => Math.min(99, selectedSize.stock, q + 1))}
+                disabled={selectedSize.stock < 1 || quantity >= Math.min(99, selectedSize.stock)}
                 className="p-2 hover:bg-cream-100 rounded-r-xl transition-colors text-charcoal-600"
               >
                 <Plus className="w-4 h-4" />
@@ -331,6 +345,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
           <div className="hidden sm:grid grid-cols-2 gap-3 pt-2">
             <button
               onClick={handleAddToCart}
+              disabled={selectedSize.stock < 1}
               data-track="add-to-cart"
               className="py-3.5 px-4 rounded-full border-2 border-honey-500 bg-white hover:bg-honey-50 text-honey-600 font-bold text-sm flex items-center justify-center space-x-2 transition-all active:scale-95 shadow-sm"
             >
@@ -339,6 +354,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
             </button>
             <button
               onClick={handleBuyNow}
+              disabled={selectedSize.stock < 1}
               data-track="buy-now"
               className="py-3.5 px-4 rounded-full bg-honey-500 hover:bg-honey-600 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-all active:scale-95 shadow-md"
             >
@@ -359,7 +375,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
             </div>
             <div className="flex items-center space-x-2">
               <Truck className="w-4 h-4 text-blush-500 shrink-0" />
-              <span>Miễn phí giao hàng toàn quốc cho đơn từ 399.000đ.</span>
+              <span>Phí giao hàng được tính theo cấu hình hiện tại khi đặt hàng.</span>
             </div>
           </div>
 
@@ -407,6 +423,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
       <div className="fixed bottom-14 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-cream-200 p-3 sm:hidden shadow-2xl flex items-center gap-2">
         <button
           onClick={handleAddToCart}
+          disabled={selectedSize.stock < 1}
           data-track="mobile-sticky-add-cart"
           className="flex-1 py-3 px-3 rounded-full border border-honey-500 bg-honey-50 text-honey-700 font-bold text-xs flex items-center justify-center space-x-1.5 active:scale-95"
         >
@@ -415,6 +432,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
         </button>
         <button
           onClick={handleBuyNow}
+          disabled={selectedSize.stock < 1}
           data-track="mobile-sticky-buy-now"
           className="flex-1 py-3 px-3 rounded-full bg-honey-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md active:scale-95"
         >

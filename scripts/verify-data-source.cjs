@@ -19,9 +19,12 @@ async function main() {
   const products = await productsResponse.json();
   const collections = await collectionsResponse.json();
   const equal = (left, right) => JSON.stringify(left.sort()) === JSON.stringify(right.sort());
-  if (!equal(dbProducts.map((row) => row.slug), products.products.map((row) => row.id)) ||
-      !equal(dbCollections.map((row) => row.slug), collections.collections.map((row) => row.id))) {
-    throw new Error('API catalog differs from active database records');
+  const productSlugs = dbProducts.map((row) => row.slug);
+  const apiProductSlugs = products.products.map((row) => row.slug);
+  const collectionSlugs = dbCollections.map((row) => row.slug);
+  const apiCollectionSlugs = collections.collections.map((row) => row.id);
+  if (!equal(productSlugs, apiProductSlugs) || !equal(collectionSlugs, apiCollectionSlugs)) {
+    throw new Error(`API catalog differs from active database records: products DB=${productSlugs.length} API=${apiProductSlugs.length}, collections DB=${collectionSlugs.length} API=${apiCollectionSlugs.length}; missing products=${productSlugs.filter((slug) => !apiProductSlugs.includes(slug)).join(',')}; extra products=${apiProductSlugs.filter((slug) => !productSlugs.includes(slug)).join(',')}`);
   }
   console.log(`DB/API match: ${dbProducts.length} products, ${dbCollections.length} collections; ${dbUsers} active user records in DB`);
 }

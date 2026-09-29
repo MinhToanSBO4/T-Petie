@@ -51,6 +51,8 @@ export async function GET() {
 // PATCH: Cập nhật thông tin cá nhân hoặc hồ sơ bé yêu
 export async function PATCH(req: Request) {
   try {
+    const origin = req.headers.get('origin');
+    if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.email || session.user.status !== 'active') {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
@@ -64,7 +66,12 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Thông tin hồ sơ không hợp lệ' }, { status: 400 });
       }
     }
-    if (babyProfile !== undefined && (!babyProfile || typeof babyProfile !== 'object' ||
+    if (babyProfile !== undefined && (!babyProfile || typeof babyProfile !== 'object' || Array.isArray(babyProfile) ||
+      (babyProfile.name !== undefined && (typeof babyProfile.name !== 'string' || babyProfile.name.length > 100)) ||
+      (babyProfile.birthDate !== undefined && babyProfile.birthDate !== '' &&
+        (typeof babyProfile.birthDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(babyProfile.birthDate) || Number.isNaN(Date.parse(babyProfile.birthDate)))) ||
+      (babyProfile.gender !== undefined && babyProfile.gender !== 'be-gai') ||
+      (babyProfile.recommendedSize !== undefined && (typeof babyProfile.recommendedSize !== 'string' || babyProfile.recommendedSize.length > 100)) ||
       (babyProfile.weight !== undefined && (!Number.isFinite(Number(babyProfile.weight)) || Number(babyProfile.weight) <= 0 || Number(babyProfile.weight) > 100)) ||
       (babyProfile.height !== undefined && (!Number.isFinite(Number(babyProfile.height)) || Number(babyProfile.height) <= 0 || Number(babyProfile.height) > 250)))) {
       return NextResponse.json({ error: 'Hồ sơ bé không hợp lệ' }, { status: 400 });

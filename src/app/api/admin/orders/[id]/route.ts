@@ -32,6 +32,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         for (const item of order.items) {
           await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
         }
+        if (order.couponCode) {
+          await tx.coupon.update({ where: { code: order.couponCode }, data: { usedCount: { decrement: 1 } } });
+        }
       }
     });
     if (body.status === 'CANCELLED') revalidateTag('products');

@@ -76,7 +76,7 @@ function DashboardContent() {
     return 'Size 5 (18 - 22kg, 4 - 5 tuổi)';
   };
 
-  const currentRecommendedSize = calculateRecommendedSize(weight);
+  const currentRecommendedSize = weight > 0 ? calculateRecommendedSize(weight) : '';
 
   // Lưu thông tin cá nhân
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -95,8 +95,12 @@ function DashboardContent() {
   // Lưu thông tin bé yêu
   const handleSaveBaby = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!babyName.trim() || weight <= 0 || height <= 0) {
+      showToast('Vui lòng nhập tên, cân nặng và chiều cao hợp lệ của bé.', 'info');
+      return;
+    }
     setIsSavingBaby(true);
-    await updateBabyProfile({
+    const result = await updateBabyProfile({
       name: babyName,
       birthDate,
       weight,
@@ -104,7 +108,7 @@ function DashboardContent() {
       recommendedSize: currentRecommendedSize,
     });
     setIsSavingBaby(false);
-    showToast('Đã cập nhật hồ sơ bé yêu & tính toán size chuẩn thành công! ✨');
+    showToast(result.success ? 'Đã cập nhật hồ sơ bé yêu. ✨' : result.error || 'Không lưu được hồ sơ bé.', result.success ? 'success' : 'info');
   };
 
   type OrderView = { id: string; date: string; status: string; total: number;
@@ -305,10 +309,10 @@ function DashboardContent() {
                     Kích Thước Khuyên Dùng Cho Bé Hiện Tại
                   </span>
                   <div className="text-xl sm:text-2xl font-bold font-heading text-sage-800">
-                    {currentRecommendedSize}
+                    {currentRecommendedSize || 'Nhập cân nặng để xem gợi ý'}
                   </div>
                   <p className="text-xs text-charcoal-600">
-                    Phù hợp cho bé nặng <strong>{weight}kg</strong>, cao <strong>{height}cm</strong>.
+                    {weight > 0 && height > 0 ? <>Dựa trên cân nặng <strong>{weight}kg</strong> và chiều cao <strong>{height}cm</strong>.</> : 'Gợi ý chỉ mang tính tham khảo sau khi có số đo.'}
                   </p>
                 </div>
 
