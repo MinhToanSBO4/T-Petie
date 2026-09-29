@@ -5,9 +5,10 @@ import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { FilterBar } from '@/components/filter/FilterBar';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { useCatalogProducts } from '@/components/product/useCatalogProducts';
+import { ProductGridSkeleton } from '@/components/product/ProductGridSkeleton';
 
 export default function BeGaiSetDoPage() {
-  const { products: allProducts } = useCatalogProducts();
+  const { products: allProducts, loading, error } = useCatalogProducts();
   const [sortBy, setSortBy] = useState('newest');
   const [priceRange, setPriceRange] = useState('all');
 
@@ -60,7 +61,7 @@ export default function BeGaiSetDoPage() {
         totalResults={filteredProducts.length}
       />
 
-      <ProductGrid products={filteredProducts} />
+      {loading ? <ProductGridSkeleton /> : error ? <p role="alert" className="py-12 text-center text-red-700">{error}</p> : <ProductGrid products={filteredProducts} />}
     </div>
   );
 }

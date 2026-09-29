@@ -7,12 +7,13 @@
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/security.test.mjs && node tests/order-pricing.test.mjs",
+    "test": "node tests/security.test.mjs && node tests/order-pricing.test.mjs && node tests/auth-identity.test.mjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
-    "prisma:seed-catalog": "ts-node --project tsconfig.seed.json prisma/seed-catalog.ts"
+    "prisma:seed-catalog": "ts-node --project tsconfig.seed.json prisma/seed-catalog.ts",
+    "prisma:seed-local-accounts": "ts-node --project tsconfig.seed.json prisma/seed-local-accounts.ts"
   },
   "prisma": {
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts"

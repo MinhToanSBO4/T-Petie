@@ -41,6 +41,7 @@ export default async function AdminPage() {
       <div className="flex gap-2">
         <Link href="/admin/don-hang" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Đơn hàng</Link>
         <Link href="/admin/san-pham" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Sản phẩm</Link>
+        <Link href="/admin/nhan-vien" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Nhân viên</Link>
         <a href="/api/admin/export" className="px-4 py-2 rounded-xl bg-honey-600 text-white font-semibold">Xuất Excel</a>
       </div>
     </div>

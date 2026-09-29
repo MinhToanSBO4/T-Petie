@@ -24,29 +24,37 @@ async function main() {
     }
   }
 
-  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_INITIAL_PASSWORD) return;
-  const csrfResponse = await fetch(new URL('/api/auth/csrf', base));
-  const { csrfToken } = await csrfResponse.json();
-  const body = new URLSearchParams({
-    csrfToken,
-    email: process.env.ADMIN_EMAIL,
-    password: process.env.ADMIN_INITIAL_PASSWORD,
-    callbackUrl: new URL('/admin', base).toString(),
-    json: 'true',
-  });
-  const loginResponse = await fetch(new URL('/api/auth/callback/credentials', base), {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookies(csrfResponse) },
-    body,
-    redirect: 'manual',
-  });
-  const sessionCookies = [cookies(csrfResponse), cookies(loginResponse)].filter(Boolean).join('; ');
-  const sessionResponse = await fetch(new URL('/api/auth/session', base), {
-    headers: { cookie: sessionCookies },
-  });
-  const session = await sessionResponse.json();
-  if (session?.user?.role !== 'admin') throw new Error(`Admin login smoke test failed (HTTP ${loginResponse.status})`);
-  console.log('Admin credentials login: OK');
+  for (const account of [
+    { username: process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL, password: process.env.ADMIN_INITIAL_PASSWORD, role: 'admin' },
+    { username: process.env.STAFF_USERNAME, password: process.env.STAFF_INITIAL_PASSWORD, role: 'staff' },
+  ]) {
+    if (!account.username || !account.password) continue;
+    const csrfResponse = await fetch(new URL('/api/auth/csrf', base));
+    const { csrfToken } = await csrfResponse.json();
+    const body = new URLSearchParams({
+      csrfToken, email: account.username, password: account.password,
+      callbackUrl: new URL(account.role === 'admin' ? '/admin' : '/admin/san-pham', base).toString(), json: 'true',
+    });
+    const loginResponse = await fetch(new URL('/api/auth/callback/credentials', base), {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookies(csrfResponse) }, body, redirect: 'manual',
+    });
+    const sessionCookies = [cookies(csrfResponse), cookies(loginResponse)].filter(Boolean).join('; ');
+    const sessionResponse = await fetch(new URL('/api/auth/session', base), { headers: { cookie: sessionCookies } });
+    const session = await sessionResponse.json();
+    if (session?.user?.role !== account.role) throw new Error(`${account.role} login smoke test failed (HTTP ${loginResponse.status})`);
+    if (account.role === 'admin') {
+      const staffPage = await fetch(new URL('/admin/nhan-vien', base), { headers: { cookie: sessionCookies } });
+      if (!staffPage.ok) throw new Error(`Admin staff page: HTTP ${staffPage.status}`);
+    } else {
+      const staffPage = await fetch(new URL('/admin/nhan-vien', base), { headers: { cookie: sessionCookies }, redirect: 'manual' });
+      const usersApi = await fetch(new URL('/api/admin/users', base), { headers: { cookie: sessionCookies } });
+      const staffHtml = await staffPage.text();
+      if (staffHtml.includes('Thêm nhân viên') || usersApi.status !== 403) {
+        throw new Error(`Staff access check failed: page=${staffPage.status}, api=${usersApi.status}, url=${staffPage.url}`);
+      }
+    }
+    console.log(`${account.role} username login: OK`);
+  }
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });

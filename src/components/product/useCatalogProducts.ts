@@ -6,6 +6,7 @@ import type { Product } from '@/types/product';
 export function useCatalogProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/products?limit=48', { signal: controller.signal })
@@ -14,8 +15,9 @@ export function useCatalogProducts() {
         return response.json();
       })
       .then((data) => setProducts(data.products || []))
-      .catch((reason) => { if (reason.name !== 'AbortError') setError(reason.message); });
+      .catch((reason) => { if (reason.name !== 'AbortError') setError(reason.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, []);
-  return { products, error };
+  return { products, error, loading };
 }

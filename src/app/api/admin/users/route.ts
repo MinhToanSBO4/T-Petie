@@ -26,6 +26,7 @@ export async function GET() {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         status: true,
         image: true,
@@ -47,6 +48,7 @@ export async function GET() {
     const formattedUsers = users.map((u) => ({
       id: u.id,
       email: u.email || '',
+      username: u.username || '',
       name: u.name || 'Người dùng',
       role: u.role as 'admin' | 'staff' | 'user',
       status: u.status as 'active' | 'blocked',
@@ -79,6 +81,8 @@ export async function GET() {
 // POST: Admin tạo tài khoản người dùng mới
 export async function POST(req: Request) {
   try {
+    const origin = req.headers.get('origin');
+    if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
     const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
@@ -89,20 +93,21 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, email, password, role, status, phone, address } = body;
+    const { name, email, username, password } = body;
 
-    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' ||
-      !name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12) {
-      return NextResponse.json({ error: 'Tên, email và mật khẩu tối thiểu 12 ký tự là bắt buộc.' }, { status: 400 });
+    if (typeof name !== 'string' || name.trim().length < 2 || name.length > 100 ||
+      typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254 ||
+      typeof username !== 'string' || !/^[a-z][a-z0-9_]{2,31}$/.test(username.trim().toLowerCase()) ||
+      typeof password !== 'string' || password.length < 12 || password.length > 128) {
+      return NextResponse.json({ error: 'Tên, email, username và mật khẩu 12–128 ký tự là bắt buộc.' }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const existing = await prisma.user.findUnique({
-      where: { email: cleanEmail },
-    });
+    const cleanUsername = username.trim().toLowerCase();
+    const existing = await prisma.user.findFirst({ where: { OR: [{ email: cleanEmail }, { username: cleanUsername }] } });
 
     if (existing) {
-      return NextResponse.json({ error: 'Email này đã tồn tại trong hệ thống!' }, { status: 409 });
+      return NextResponse.json({ error: 'Email hoặc tên đăng nhập đã tồn tại.' }, { status: 409 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -111,12 +116,11 @@ export async function POST(req: Request) {
       data: {
         name: name.trim(),
         email: cleanEmail,
+        username: cleanUsername,
         password: hashedPassword,
-        role: role === 'admin' ? 'admin' : role === 'staff' ? 'staff' : 'user',
-        status: status === 'blocked' ? 'blocked' : 'active',
-        phone: phone ? phone.trim() : null,
-        address: address ? address.trim() : null,
-        points: 100,
+        role: 'staff',
+        status: 'active',
+        points: 0,
       },
     });
 

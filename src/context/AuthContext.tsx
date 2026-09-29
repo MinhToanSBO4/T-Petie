@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: credentials.email.trim().toLowerCase(),
       password: credentials.password,
     });
-    if (!result || result.error) return { success: false, error: 'Email hoặc mật khẩu không đúng.' };
+    if (!result || result.error) return { success: false, error: 'Tên đăng nhập, email hoặc mật khẩu không đúng.' };
     const fresh = await getSession();
     if (!fresh?.user || fresh.user.status !== 'active') return { success: false, error: 'Không thể xác thực tài khoản.' };
     trackLogin('password', fresh.user.email || '');

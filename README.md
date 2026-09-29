@@ -25,7 +25,7 @@
 3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, sau đó `npm run prisma:seed-catalog`. Migration đầu tiên chỉ dành cho schema trống.
 4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Có thể chạy `node scripts/smoke-local.cjs` khi dev server đang bật.
 
-Tài khoản admin local: `admin@tpetie.local`; mật khẩu ngẫu nhiên nằm ở biến `ADMIN_INITIAL_PASSWORD` trong `.env.local` bị Git bỏ qua. Với môi trường khác, đặt `ADMIN_EMAIL` và `ADMIN_INITIAL_PASSWORD` (tối thiểu 16 ký tự), chạy `npm run prisma:seed` một lần rồi xóa biến mật khẩu khỏi môi trường triển khai.
+Tài khoản admin local đăng nhập bằng username `superadmin` và mật khẩu mẫu do chủ dự án cung cấp; nhân viên mẫu đăng nhập bằng `nhanvien`, mật khẩu nằm ở biến `STAFF_INITIAL_PASSWORD` trong `.env.local` bị Git bỏ qua. Admin quản lý nhân viên tại `/admin/nhan-vien`. Với môi trường khác, đặt `ADMIN_EMAIL` và `ADMIN_INITIAL_PASSWORD` (tối thiểu 16 ký tự), chạy `npm run prisma:seed` một lần rồi xóa biến mật khẩu khỏi môi trường triển khai. Không dùng tài khoản mẫu cho production.
 
 `npm run build` không tự thay đổi schema hay dữ liệu của database. Tồn kho và tổng tiền đơn hàng được kiểm tra lại phía máy chủ. Khi đưa lên Vercel, cần đặt cùng các biến môi trường và áp dụng migration/seed trước khi nhận đơn.
 

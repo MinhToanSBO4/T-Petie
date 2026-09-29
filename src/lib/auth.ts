@@ -5,6 +5,7 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import * as bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { allowAttempt } from '@/lib/rate-limit';
+import { parseLoginIdentifier } from '@/lib/auth-identity';
 import type { UserRole, UserStatus } from '@/types/auth';
 
 const googleProviders = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -18,15 +19,15 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: '/dang-nhap', error: '/dang-nhap' },
   providers: [
     CredentialsProvider({
-      name: 'Email và mật khẩu',
-      credentials: { email: { label: 'Email', type: 'email' }, password: { label: 'Mật khẩu', type: 'password' } },
+      name: 'Email hoặc tên đăng nhập và mật khẩu',
+      credentials: { email: { label: 'Email hoặc tên đăng nhập', type: 'text' }, password: { label: 'Mật khẩu', type: 'password' } },
       async authorize(credentials, request) {
-        const email = credentials?.email?.trim().toLowerCase();
+        const identity = parseLoginIdentifier(credentials?.email);
         const password = credentials?.password;
-        if (!email || !password) return null;
+        if (!identity || !password) return null;
         const ip = request.headers?.['x-forwarded-for']?.split(',')[0] || 'unknown';
-        if (!(await allowAttempt(`login:${ip}:${email}`, 10))) return null;
-        const user = await prisma.user.findUnique({ where: { email } });
+        if (!(await allowAttempt(`login:${ip}:${Object.values(identity)[0]}`, 10))) return null;
+        const user = await prisma.user.findUnique({ where: identity });
         if (!user?.password || user.status !== 'active') return null;
         if (!(await bcrypt.compare(password, user.password))) return null;
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

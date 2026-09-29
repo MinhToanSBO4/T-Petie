@@ -38,7 +38,7 @@ function LoginForm() {
     setErrorMessage(null);
 
     if (!email.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ Email của mẹ.');
+      setErrorMessage('Vui lòng nhập email hoặc tên đăng nhập.');
       return;
     }
 
@@ -55,6 +55,8 @@ function LoginForm() {
       showToast(`Chào mừng bạn trở lại với T'Petie! 🌸`);
       if (result.role === 'admin') {
         router.push(callbackUrl || '/admin');
+      } else if (result.role === 'staff') {
+        router.push(callbackUrl || '/admin/san-pham');
       } else {
         router.push(callbackUrl || '/');
       }
@@ -117,13 +119,14 @@ function LoginForm() {
             {/* Email Input */}
             <div>
               <input
-                type="email"
+                type="text"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
-                placeholder="Địa chỉ Email"
+                placeholder="Email hoặc tên đăng nhập"
                 className="w-full px-5 py-4 rounded-2xl border-2 border-cream-200 focus:border-honey-500 focus:bg-honey-50/30 outline-none text-base text-charcoal-900 placeholder:text-charcoal-400 transition-all"
               />
             </div>

@@ -1,13 +1,13 @@
 # T'Petie — phần cần bổ sung và kiểm chứng trước khi chạy thật
 
-Tài liệu này gom toàn bộ đầu vào còn thiếu, giới hạn đã biết và việc chưa hoàn tất. Bản mã nguồn mới ở **thư mục gốc**; `T-Petie-example/` là repo mẫu đã đổi tên. Supabase hiện dùng schema riêng `tpetie_app`; migration đã áp dụng và đã nạp 40 sản phẩm, 4 bộ sưu tập, 271 biến thể, 43 ảnh mẫu. Các bảng `public` có sẵn được giữ nguyên. Smoke test local cho trang chính, API catalog và đăng nhập admin đã đạt.
+Tài liệu này gom toàn bộ đầu vào còn thiếu, giới hạn đã biết và việc chưa hoàn tất. Bản mã nguồn mới ở **thư mục gốc**; `T-Petie-example/` là repo mẫu đã đổi tên. Supabase hiện dùng schema riêng `tpetie_app`; migration đã áp dụng và đã nạp 40 sản phẩm, 4 bộ sưu tập, 271 biến thể, 43 ảnh mẫu. Các bảng `public` có sẵn được giữ nguyên. Admin mẫu `superadmin` và nhân viên mẫu `nhanvien` đã được lưu trong DB, đăng nhập local và kiểm tra phân quyền thành công.
 
 ## Việc cần bạn cung cấp
 
-1. **Cloudinary CDN:** bạn đã đặt cloud name và API secret trong `.env`; API tải ảnh còn thiếu **`CLOUDINARY_API_KEY`**. Đặt key trong `.env` để thử tải ảnh từ trang quản trị. `CDN_URL` hiện có là địa chỉ trang quản lý, không phải URL phân phối ảnh. Ảnh mẫu hiện là URL/local asset của repo cũ; cần chuyển lên CDN nếu muốn toàn bộ ảnh do Cloudinary phục vụ.
+1. **Cloudinary CDN:** `.env` hiện đã có cloud name, API key và API secret; cần thử tải ảnh thật từ trang quản trị. `CDN_URL` hiện có là địa chỉ trang quản lý, không phải URL phân phối ảnh. Ảnh mẫu hiện là URL/local asset của repo cũ; cần chuyển lên CDN nếu muốn toàn bộ ảnh do Cloudinary phục vụ.
 2. **Dữ liệu kinh doanh:** đã nạp dữ liệu mặc định của repo mẫu theo yêu cầu. Trước khi bán thật, cần kiểm tra lại giá, SKU và số tồn; nạp các sản phẩm sale khác nếu muốn giữ đầy đủ danh mục cũ. Luật hiện tại: phí vận chuyển 30.000đ, miễn phí từ 399.000đ; mã `TPETIE20`, `MEMBERVIP` được kiểm tra trên máy chủ nhưng chưa có trang quản trị coupon.
 3. **Triển khai:** domain chính thức, `NEXTAUTH_URL`, `NEXTAUTH_SECRET` riêng cho production, thông tin liên hệ/chính sách bán hàng chính thức. Secret local đã được tạo riêng và không được commit. Thay mật khẩu Supabase từng xuất hiện dạng văn bản trong tài liệu gốc; dòng đó đã được xóa khỏi `yêu cầu.txt`, nhưng nên xoay vòng credential.
-4. **Google đăng nhập:** theo chỉ đạo hiện tại, chỉ để chỗ trong UI, chưa bật. `.env` hiện có `OAUTH_CLIENT_SECRET` nhưng chưa có Google Client ID; khi phát triển, cần cả `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` và callback URI đúng domain. Không cần cho đăng nhập thường.
+4. **Google đăng nhập:** theo chỉ đạo trước đó, chỉ để chỗ trong UI, chưa bật. `.env` hiện có `OAUTH_CLIENT_SECRET` nhưng **chưa có Google Client ID**; ứng dụng cần cặp `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` và callback URI đúng domain để bật Google. Đăng nhập username/email và mật khẩu đã hoạt động.
 
 ## Phần hệ thống còn cần làm hoặc đối chiếu
 
@@ -21,6 +21,6 @@ Tài liệu này gom toàn bộ đầu vào còn thiếu, giới hạn đã bi�
 
 ## Chạy thử và xác minh local
 
-Trong thư mục gốc: `npm ci` (nếu chưa cài), sau đó `npm run dev`; mở `http://localhost:3000`. `CONNECTION_STRING` trong `.env` đã chọn `tpetie_app`. Tài khoản admin local có email `admin@tpetie.local`; mật khẩu ngẫu nhiên lưu trong `.env.local` (biến `ADMIN_INITIAL_PASSWORD`, file bị Git bỏ qua). Không đưa mật khẩu này lên Git hoặc dùng cho production.
+Trong thư mục gốc: `npm ci` (nếu chưa cài), sau đó `npm run dev`; mở `http://localhost:3000`. `CONNECTION_STRING` trong `.env` đã chọn `tpetie_app`. Đăng nhập admin bằng username `superadmin` và mật khẩu mẫu đã thống nhất; đăng nhập nhân viên bằng `nhanvien` với mật khẩu ở biến `STAFF_INITIAL_PASSWORD` trong `.env.local` (file bị Git bỏ qua). Không đưa mật khẩu mẫu lên Git hoặc dùng cho production.
 
 Không cần chạy lại migration/seed để thử local. Trước khi mở bán, tạo tài khoản người mua, thử đặt COD, tra cứu mã đơn, thay đổi trạng thái đơn và kiểm tra tồn kho hoàn lại khi hủy; đăng nhập admin/nhân viên để kiểm tra giới hạn quyền; tải ảnh qua CDN và mở file Excel đã xuất.

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import * as bcrypt from 'bcryptjs';
 
 interface RouteContext {
   params: {
@@ -41,6 +42,7 @@ export async function GET(req: Request, { params }: RouteContext) {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         status: true,
         image: true,
@@ -85,6 +87,8 @@ export async function GET(req: Request, { params }: RouteContext) {
  */
 export async function PATCH(req: Request, { params }: RouteContext) {
   try {
+    const origin = req.headers.get('origin');
+    if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
     const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
@@ -96,7 +100,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
 
     const { id: targetUserId } = params;
     const body = await req.json();
-    const { role, status, name, phone, address, city } = body;
+    const { role, status, name, phone, address, city, password } = body;
 
     // Không cho phép Admin tự khóa hoặc tự hạ quyền chính mình
     if (session.user.id === targetUserId) {
@@ -118,19 +122,28 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       where: { id: targetUserId },
     });
 
-    if (!targetUser) {
+    if (!targetUser || targetUser.deletedAt) {
       return NextResponse.json(
         { error: 'Không tìm thấy người dùng cần cập nhật.' },
         { status: 404 }
       );
     }
+    if (targetUser.role === 'admin' && targetUser.id !== session.user.id) {
+      return NextResponse.json({ error: 'Không được sửa tài khoản quản trị khác' }, { status: 403 });
+    }
 
     const updateData: Record<string, unknown> = {};
-    if (role && (role === 'admin' || role === 'staff' || role === 'user')) {
+    if (role && (role === 'staff' || role === 'user') && targetUser.role !== 'admin') {
       updateData.role = role;
     }
     if (status && (status === 'active' || status === 'blocked')) {
       updateData.status = status;
+    }
+    if (password !== undefined) {
+      if (targetUser.role !== 'staff' || typeof password !== 'string' || password.length < 12 || password.length > 128) {
+        return NextResponse.json({ error: 'Mật khẩu nhân viên cần 12–128 ký tự' }, { status: 400 });
+      }
+      updateData.password = await bcrypt.hash(password, 12);
     }
     if (name !== undefined) {
       if (typeof name !== 'string' || name.length > 100) return NextResponse.json({ error: 'Tên không hợp lệ' }, { status: 400 });
@@ -149,6 +162,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       updateData.city = city.trim();
     }
 
+    if (!Object.keys(updateData).length) return NextResponse.json({ error: 'Không có dữ liệu hợp lệ để cập nhật' }, { status: 400 });
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: updateData,
@@ -204,18 +218,19 @@ export async function DELETE(req: Request, { params }: RouteContext) {
       where: { id: targetUserId },
     });
 
-    if (!targetUser) {
+    if (!targetUser || targetUser.deletedAt) {
       return NextResponse.json(
         { error: 'Không tìm thấy người dùng cần xóa.' },
         { status: 404 }
       );
     }
+    if (targetUser.role === 'admin') return NextResponse.json({ error: 'Không thể xóa tài khoản quản trị' }, { status: 403 });
 
     await prisma.$transaction(async (tx) => {
       await tx.account.deleteMany({ where: { userId: targetUserId } });
       await tx.session.deleteMany({ where: { userId: targetUserId } });
       await tx.user.update({ where: { id: targetUserId }, data: {
-        status: 'blocked', deletedAt: new Date(), email: null, password: null,
+        status: 'blocked', deletedAt: new Date(), email: null, username: null, password: null,
         phone: null, address: null, city: null, image: null, name: 'Tài khoản đã xóa',
       } });
     });
