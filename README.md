@@ -23,7 +23,7 @@
 1. Dùng Node.js 20 trở lên. Điền `CONNECTION_STRING` vào `.env` (Prisma CLI đọc file này); đặt `NEXTAUTH_URL`, `NEXTAUTH_SECRET` trong `.env.local`. Có thể tham khảo `.env.example`. Mật khẩu và khóa phải giữ ngoài Git. Nếu dùng biến môi trường hệ thống cho Prisma CLI, biến đó sẽ thay thế giá trị trong `.env`.
 2. Chạy `npm ci`.
 3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, sau đó `npm run prisma:seed-catalog`. Migration đầu tiên chỉ dành cho schema trống.
-4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Có thể chạy `node scripts/smoke-local.cjs` khi dev server đang bật.
+4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Có thể chạy `node scripts/smoke-local.cjs` khi dev server đang bật. Để đối chiếu dữ liệu API với Supabase, chạy `node scripts/verify-data-source.cjs`. Nếu dev báo thiếu file `vendor-chunks` trong `.next`, dừng dev server, chạy `node scripts/clean-next-cache.cjs`, rồi bật lại.
 
 Tài khoản admin local đăng nhập bằng username `superadmin` và mật khẩu mẫu do chủ dự án cung cấp; nhân viên mẫu đăng nhập bằng `nhanvien`, mật khẩu nằm ở biến `STAFF_INITIAL_PASSWORD` trong `.env.local` bị Git bỏ qua. Admin quản lý nhân viên tại `/admin/nhan-vien`. Với môi trường khác, đặt `ADMIN_EMAIL` và `ADMIN_INITIAL_PASSWORD` (tối thiểu 16 ký tự), chạy `npm run prisma:seed` một lần rồi xóa biến mật khẩu khỏi môi trường triển khai. Không dùng tài khoản mẫu cho production.
 

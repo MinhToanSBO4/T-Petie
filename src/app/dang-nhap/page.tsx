@@ -187,7 +187,7 @@ function LoginForm() {
             </Link>
             <button
               type="button"
-              onClick={() => setErrorMessage('Tính năng khôi phục mật khẩu sẽ gửi mã OTP đến email của mẹ.')}
+              onClick={() => setErrorMessage('Khôi phục mật khẩu qua email chưa được triển khai. Vui lòng liên hệ quản trị viên để được hỗ trợ.')}
               className="font-medium text-charcoal-900 hover:text-honey-600 transition-colors underline underline-offset-4"
             >
               Quên mật khẩu?

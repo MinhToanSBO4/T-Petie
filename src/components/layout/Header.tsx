@@ -236,7 +236,7 @@ export function Header() {
                       <p className="text-xs font-bold text-charcoal-900 truncate">{user.name || "Mẹ T'Petie"}</p>
                       <p className="text-[10px] text-charcoal-500 font-mono truncate">{user.email || 'me@tpetie.com'}</p>
                       <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-honey-700">
-                        ⭐ {user.points || 250} Điểm thưởng
+                        ⭐ {user.points ?? 0} Điểm thưởng
                       </span>
                     </div>
 

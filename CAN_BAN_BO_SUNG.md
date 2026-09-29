@@ -19,6 +19,7 @@ Tài liệu này gom toàn bộ đầu vào còn thiếu, giới hạn đã bi�
 - Giỏ hàng hiện lưu tại trình duyệt và không đồng bộ giữa thiết bị. Giá và tồn kho được kiểm tra lại khi đặt hàng; cần phát triển bảng cart theo thiết kế nếu muốn giữ giỏ hàng theo tài khoản.
 - Cần kiểm thử tải, khả năng chịu lỗi kết nối DB/CDN, giám sát lỗi, sao lưu/khôi phục và các ca tranh chấp tồn kho trước khi nhận đơn thật. Rate limit hiện lưu trong PostgreSQL; cần chiến lược dọn bản ghi hết hạn và đánh giá thêm khi lưu lượng lớn.
 - Cache catalog hiện có ở máy chủ (60 giây) và bộ nhớ trình duyệt (60 giây, chia sẻ request đang chạy). Điều này giúp chuyển giữa các trang danh mục trong cùng tab nhanh hơn; dữ liệu tồn kho trong danh mục có thể trễ tối đa khoảng một phút, nhưng checkout kiểm tra lại trực tiếp từ database. Cần đo và tối ưu thêm trên môi trường Preview; dev server có thời gian biên dịch lần đầu nên không đại diện cho production.
+- Đã đối chiếu trực tiếp API local với Supabase: 40 sản phẩm và 4 bộ sưu tập đang hoạt động khớp từng slug; 2 tài khoản mẫu nằm trong DB. Đây là **dữ liệu mẫu của repo cũ được nạp vào DB theo yêu cầu**, chưa phải dữ liệu kinh doanh đã xác nhận. Bảng giá, tồn kho, ảnh, đánh giá/số lượt đánh giá từ bản mẫu cần chủ dự án xác minh. Banner, bài giới thiệu, chính sách và các số liên hệ trong source là nội dung tĩnh; trang showroom đã bỏ địa chỉ/số điện thoại minh họa chưa xác thực, dashboard đã bỏ voucher và số điểm giả. Phí vận chuyển và hai mã giảm giá hiện là quy tắc cố định trong mã nguồn, chưa có bảng quản trị.
 
 ## Chạy thử và xác minh local
 

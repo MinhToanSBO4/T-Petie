@@ -151,13 +151,13 @@ function DashboardContent() {
                 {user?.name}
               </h1>
               <span className="text-[11px] font-bold bg-honey-500 text-white px-2.5 py-0.5 rounded-full shadow-2xs">
-                Mẹ Thân Thiết ⭐
+                Thành viên T&apos;Petie ⭐
               </span>
             </div>
             <p className="text-xs text-charcoal-600 flex items-center space-x-2">
               <span>{user?.email}</span>
               <span>•</span>
-              <span className="font-bold text-honey-700">{user?.points || 350} Điểm thưởng</span>
+              <span className="font-bold text-honey-700">{user?.points ?? 0} Điểm thưởng</span>
             </p>
           </div>
         </div>
@@ -181,8 +181,8 @@ function DashboardContent() {
           {[
             { id: 'profile', label: 'Thông tin cá nhân & Địa chỉ', icon: UserIcon, desc: 'Tên, SĐT, Địa chỉ nhận đồ' },
             { id: 'baby', label: 'Hồ sơ bé & Gợi ý size', icon: Baby, desc: 'Cân nặng, chiều cao, size chuẩn' },
-            { id: 'orders', label: 'Lịch sử đơn hàng', icon: Package, desc: '2 đơn hàng đã đặt' },
-            { id: 'rewards', label: 'Điểm thưởng & Ưu đãi', icon: Award, desc: '350 điểm • Voucher giảm 50k' },
+            { id: 'orders', label: 'Lịch sử đơn hàng', icon: Package, desc: `${orders.length} đơn hàng đã đặt` },
+            { id: 'rewards', label: 'Điểm thưởng & Ưu đãi', icon: Award, desc: `${user?.points ?? 0} điểm hiện có` },
           ].map((tab) => {
             const Icon = tab.icon;
             const isCurrent = activeTab === tab.id;
@@ -457,10 +457,10 @@ function DashboardContent() {
             <div className="space-y-6">
               <div className="border-b border-cream-200 pb-4">
                 <h2 className="text-lg sm:text-xl font-bold font-heading text-charcoal-900">
-                  🎁 Điểm Tích Lũy &amp; Mã Giảm Giá Độc Quyền
+                  🎁 Điểm Tích Lũy
                 </h2>
                 <p className="text-xs text-charcoal-500 mt-0.5">
-                  Mỗi 1.000đ chi tiêu = 1 Điểm tích lũy để đổi quà thôi nôi và voucher giảm giá.
+                  Số điểm hiện có trong tài khoản của bạn.
                 </p>
               </div>
 
@@ -469,48 +469,12 @@ function DashboardContent() {
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-honey-700">Điểm Thưởng Khả Dụng</span>
                   <div className="text-3xl font-extrabold font-heading text-honey-800 mt-1">
-                    {user?.points || 350} <span className="text-sm font-normal">Điểm ⭐</span>
+                    {user?.points ?? 0} <span className="text-sm font-normal">Điểm ⭐</span>
                   </div>
-                  <p className="text-xs text-charcoal-600 mt-1">Hạng thành viên: <strong>Mẹ Thân Thiết</strong> (Tích thêm 150 điểm để lên Hạng VIP Vàng)</p>
+                  <p className="text-xs text-charcoal-600 mt-1">Chương trình đổi điểm đang được hoàn thiện.</p>
                 </div>
               </div>
 
-              {/* Vouchers list */}
-              <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-charcoal-400">Voucher Đang Có Hiệu Lực</h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-4 bg-cream-50 rounded-2xl border border-honey-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold font-mono text-honey-700 bg-honey-100 px-2.5 py-0.5 rounded-full">METPETIE50</span>
-                      <span className="text-[10px] text-sage-700 font-bold bg-sage-50 px-2 py-0.5 rounded-full">Còn hạn</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-charcoal-900">Giảm 50.000đ cho đơn từ 399k</h4>
-                    <p className="text-[11px] text-charcoal-500">Áp dụng cho tất cả váy đầm bé gái</p>
-                    <button
-                      onClick={() => showToast('Đã sao chép mã METPETIE50 vào bộ nhớ tạm!')}
-                      className="text-xs font-bold text-honey-600 hover:text-honey-700 underline pt-1 block"
-                    >
-                      Sao chép mã 📋
-                    </button>
-                  </div>
-
-                  <div className="p-4 bg-cream-50 rounded-2xl border border-blush-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold font-mono text-blush-700 bg-blush-100 px-2.5 py-0.5 rounded-full">FREESHIP399</span>
-                      <span className="text-[10px] text-sage-700 font-bold bg-sage-50 px-2 py-0.5 rounded-full">Còn hạn</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-charcoal-900">Miễn phí vận chuyển toàn quốc</h4>
-                    <p className="text-[11px] text-charcoal-500">Áp dụng không giới hạn lượt mua</p>
-                    <button
-                      onClick={() => showToast('Đã sao chép mã FREESHIP399!')}
-                      className="text-xs font-bold text-honey-600 hover:text-honey-700 underline pt-1 block"
-                    >
-                      Sao chép mã 📋
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
