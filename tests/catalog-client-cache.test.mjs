@@ -13,3 +13,32 @@ test('catalog loads once for repeated page visits and shares concurrent requests
   await loadCatalogProducts(fetcher);
   assert.equal(calls, 1);
 });
+
+test('session storage persists catalog and clearCatalogCache clears both memory and session', async () => {
+  const store = new Map();
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (key) => store.get(key) || null,
+      setItem: (key, val) => store.set(key, String(val)),
+      removeItem: (key) => store.delete(key),
+    },
+  };
+
+  try {
+    clearCatalogCache();
+    let calls = 0;
+    const fetcher = async () => { calls++; return { ok: true, json: async () => ({ products: [{ id: 'session-item' }] }) }; };
+    
+    const result = await loadCatalogProducts(fetcher);
+    assert.equal(calls, 1);
+    assert.deepEqual(result, [{ id: 'session-item' }]);
+    assert(store.has('tpetie_catalog_cache_v1'));
+
+    clearCatalogCache();
+    assert.equal(getCachedCatalog(), null);
+    assert.equal(store.has('tpetie_catalog_cache_v1'), false);
+  } finally {
+    delete globalThis.window;
+  }
+});
+

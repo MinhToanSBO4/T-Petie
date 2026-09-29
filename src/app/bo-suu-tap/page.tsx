@@ -6,7 +6,7 @@ import { Sparkles, ArrowRight } from 'lucide-react';
 import { getCollections, getProducts } from '@/lib/catalog';
 import { ProductGrid } from '@/components/product/ProductGrid';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function BoSuuTapPage() {
   const [collections, products] = await Promise.all([getCollections(), getProducts()]);

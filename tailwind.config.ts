@@ -54,6 +54,31 @@ const config: Config = {
         '2xl': '1rem',
         '3xl': '1.5rem',
       },
+      animation: {
+        'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'shimmer': 'shimmer 1.8s infinite',
+        'indeterminate-progress': 'indeterminate 1.5s infinite linear',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        indeterminate: {
+          '0%': { transform: 'translateX(-100%) scaleX(0.2)' },
+          '50%': { transform: 'translateX(30%) scaleX(0.6)' },
+          '100%': { transform: 'translateX(100%) scaleX(0.2)' },
+        },
+      },
     },
   },
   plugins: [],

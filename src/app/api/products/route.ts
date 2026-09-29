@@ -14,5 +14,12 @@ export async function GET(request: Request) {
     (!category || product.category === category || product.subcategory === category) &&
     (!collection || product.collectionId === collection) &&
     (!search || product.name.toLowerCase().includes(search)));
-  return NextResponse.json({ products: products.slice((page - 1) * limit, page * limit), total: products.length, page, limit });
+  return NextResponse.json(
+    { products: products.slice((page - 1) * limit, page * limit), total: products.length, page, limit },
+    {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=300',
+      },
+    }
+  );
 }

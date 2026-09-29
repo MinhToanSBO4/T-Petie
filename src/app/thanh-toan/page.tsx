@@ -120,8 +120,23 @@ export default function ThanhToanPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-honey-500" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 animate-fade-in" role="status" aria-label="Đang tải thông tin thanh toán">
+        <div className="h-8 w-44 rounded-xl shimmer" />
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="flex-1 bg-white p-6 rounded-3xl border border-cream-200 shadow-card space-y-5">
+            <div className="h-6 w-52 rounded-lg shimmer" />
+            <div className="space-y-4">
+              <div className="h-11 rounded-xl shimmer" />
+              <div className="h-11 rounded-xl shimmer" />
+              <div className="h-11 rounded-xl shimmer" />
+            </div>
+          </div>
+          <div className="w-full lg:w-96 bg-white p-6 rounded-3xl border border-cream-200 shadow-card space-y-4">
+            <div className="h-6 w-36 rounded-lg shimmer" />
+            <div className="h-24 rounded-2xl shimmer" />
+            <div className="h-12 rounded-2xl shimmer" />
+          </div>
+        </div>
       </div>
     );
   }

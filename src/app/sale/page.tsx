@@ -3,7 +3,7 @@ import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { getProducts } from '@/lib/catalog';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function SalePage() {
   const products = (await getProducts()).filter((product) => product.isSale);

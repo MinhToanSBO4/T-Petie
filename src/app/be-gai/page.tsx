@@ -81,8 +81,13 @@ function BeGaiContent() {
 export default function BeGaiAllPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-honey-500"></div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-6 animate-fade-in">
+        <div className="h-5 w-40 rounded-lg shimmer" />
+        <div className="space-y-2">
+          <div className="h-8 w-64 rounded-xl shimmer" />
+          <div className="h-4 w-96 max-w-full rounded-lg shimmer" />
+        </div>
+        <ProductGridSkeleton />
       </div>
     }>
       <BeGaiContent />

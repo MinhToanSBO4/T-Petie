@@ -26,11 +26,22 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   // Đang tải phiên đăng nhập
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4 p-4">
-        <div className="w-12 h-12 rounded-full border-4 border-cream-200 border-t-honey-500 animate-spin" />
-        <p className="text-xs sm:text-sm font-medium text-charcoal-500 font-sans">
-          Đang xác thực phiên đăng nhập... 🌸
-        </p>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fade-in" role="status" aria-label="Đang xác thực phiên đăng nhập">
+        <div className="h-5 w-36 rounded-lg shimmer" />
+        <div className="bg-white rounded-3xl border border-cream-200 p-6 sm:p-8 space-y-6 shadow-card">
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 rounded-full shimmer" />
+            <div className="space-y-2">
+              <div className="h-6 w-48 rounded-xl shimmer" />
+              <div className="h-4 w-64 rounded-lg shimmer" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+            <div className="h-24 rounded-2xl shimmer" />
+            <div className="h-24 rounded-2xl shimmer" />
+            <div className="h-24 rounded-2xl shimmer" />
+          </div>
+        </div>
       </div>
     );
   }

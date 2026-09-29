@@ -12,7 +12,7 @@ interface PageProps {
   };
 }
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function CollectionDetailPage({ params }: PageProps) {
   const [collections, allProducts] = await Promise.all([getCollections(), getProducts()]);

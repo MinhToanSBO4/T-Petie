@@ -42,8 +42,17 @@ export function NavigationProgress() {
     return () => { window.clearTimeout(show); window.clearTimeout(clear); };
   }, [pending]);
 
-  return visible ? <div role="status" aria-label="Đang chuyển trang" className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-cream-50/60 backdrop-blur-[2px]">
-    <div className="absolute inset-x-0 top-0 h-1 overflow-hidden bg-honey-100"><div className="h-full w-1/3 animate-pulse bg-honey-600" /></div>
-    <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-lg"><span className="h-5 w-5 animate-spin rounded-full border-2 border-honey-200 border-t-honey-600" /><span className="text-sm font-semibold text-charcoal-800">Đang tải trang…</span></div>
-  </div> : null;
+  if (!visible) return null;
+
+  return (
+    <div
+      role="progressbar"
+      aria-label="Đang chuyển trang"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[999] h-[3px] bg-transparent"
+    >
+      <div className="h-full w-full overflow-hidden bg-honey-100/60">
+        <div className="h-full w-full origin-left bg-gradient-to-r from-honey-400 via-honey-500 to-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.6)] animate-indeterminate-progress" />
+      </div>
+    </div>
+  );
 }

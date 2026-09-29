@@ -8,7 +8,7 @@ import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function HomePage() {
   const [products, collections] = await Promise.all([getProducts(), getCollections()]);

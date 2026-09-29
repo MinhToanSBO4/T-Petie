@@ -70,10 +70,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, role: fresh.user.role };
   };
 
-  const loginWithGoogle = async (): Promise<Result> => ({
-    success: false,
-    error: 'Đăng nhập Google đang được chuẩn bị.',
-  });
+  const loginWithGoogle = async (): Promise<Result> => {
+    try {
+      const providersRes = await fetch('/api/auth/providers');
+      if (providersRes.ok) {
+        const providers = await providersRes.json();
+        if (!providers?.google) {
+          return {
+            success: false,
+            error: 'Google OAuth chưa được kích hoạt: Thiếu GOOGLE_CLIENT_SECRET trong file .env trên máy chủ.',
+          };
+        }
+      }
+      const result = await signIn('google', { callbackUrl: '/' });
+      if (result?.error) {
+        return { success: false, error: result.error };
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Không thể kết nối với dịch vụ đăng nhập Google.' };
+    }
+  };
 
   const register = async (data: RegisterData): Promise<Result> => {
     try {

@@ -9,8 +9,11 @@ import { parseLoginIdentifier } from '@/lib/auth-identity';
 import { credentialFingerprint } from '@/lib/password-reset';
 import type { UserRole, UserStatus } from '@/types/auth';
 
-const googleProviders = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-  ? [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET })]
+const googleClientId = process.env.GOOGLE_CLIENT_ID || (process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? process.env.OAUTH_CLIENT_SECRET : '');
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || (!process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? (process.env.OAUTH_CLIENT_SECRET || '') : '');
+
+const googleProviders = googleClientId && googleClientSecret
+  ? [GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })]
   : [];
 
 export const authOptions: NextAuthOptions = {
