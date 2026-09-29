@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/server/auth/options';
+import { prisma } from '@/server/db/client';
 import { CommerceManager } from '@/components/admin/CommerceManager';
 
 export const dynamic = 'force-dynamic';

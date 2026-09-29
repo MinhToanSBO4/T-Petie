@@ -15,10 +15,10 @@ import {
 import { useCart } from '@/context/CartContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
-import { trackBeginCheckout } from '@/lib/analytics/tracker';
+import { trackBeginCheckout } from '@/client/analytics/tracker';
 import { useRouter } from 'next/navigation';
-import { useOrderQuote } from '@/lib/orders/useOrderQuote';
-import { reconcileCartSelection } from '@/lib/cart-selection';
+import { useOrderQuote } from '@/hooks/useOrderQuote';
+import { reconcileCartSelection } from '@/client/cart-selection';
 
 // Bỏ link Google Form cũ
 // const GOOGLE_FORM_URL = 'https://forms.gle/t866jwRWJ38f4tKD6';

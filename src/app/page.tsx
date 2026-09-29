@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight, Sparkles, Heart, Star, ShieldCheck, Flame } from 'lucide-react';
-import { getProducts, getCollections } from '@/lib/catalog';
+import { getProducts, getCollections } from '@/server/catalog/queries';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { HeroCarousel } from '@/components/home/HeroCarousel';

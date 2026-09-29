@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Sparkles } from 'lucide-react';
-import { getCollections, getProducts } from '@/lib/catalog';
+import { getCollections, getProducts } from '@/server/catalog/queries';
 import { ProductGrid } from '@/components/product/ProductGrid';
 
 interface PageProps {

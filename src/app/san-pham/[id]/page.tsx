@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getProducts } from '@/lib/catalog';
+import { getProducts } from '@/server/catalog/queries';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 
 export const dynamic = 'force-dynamic';

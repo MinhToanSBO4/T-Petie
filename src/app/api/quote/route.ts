@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth';
-import { quoteOrder } from '@/lib/orders/quote-order';
+import { authOptions } from '@/server/auth/options';
+import { quoteOrder } from '@/server/orders/quote-order';
 
 export const dynamic = 'force-dynamic';
 

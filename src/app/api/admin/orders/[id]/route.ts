@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/server/auth/options';
+import { prisma } from '@/server/db/client';
 import { revalidateTag } from 'next/cache';
 
 const transitions: Record<string, string[]> = {

@@ -1,8 +1,8 @@
 import 'server-only';
-import { prisma } from '@/lib/prisma';
-import { priceOrder } from './pricing';
-import { calculateTotals } from './commerce-pricing';
-import { findRequestedVariant } from './variant-match';
+import { prisma } from '@/server/db/client';
+import { priceOrder } from '@/lib/orders/pricing';
+import { calculateTotals } from '@/lib/orders/commerce-pricing';
+import { findRequestedVariant } from '@/lib/orders/variant-match';
 
 export type QuoteItem = { productId: string; selectedSize: string; quantity: number };
 

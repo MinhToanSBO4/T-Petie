@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcileCartSelection } from '../src/lib/cart-selection.ts';
+import { reconcileCartSelection } from '../src/client/cart-selection.ts';
 
 test('items hydrated after first render become selected by default', () => {
   assert.deepEqual([...reconcileCartSelection([], ['a'], new Set())], ['a']);

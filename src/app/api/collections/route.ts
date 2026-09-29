@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCollections } from '@/lib/catalog';
+import { getCollections } from '@/server/catalog/queries';
 
 export const dynamic = 'force-dynamic';
 

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ArrowLeft, CheckCircle2, Loader2, MapPin, CreditCard, Phone, User, Search } from 'lucide-react';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
-import { useOrderQuote } from '@/lib/orders/useOrderQuote';
+import { useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
 
 interface CheckoutData {

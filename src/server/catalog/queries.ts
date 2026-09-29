@@ -1,6 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 import type { Product } from '@/types/product';
 import type { Collection } from '@/types/collection';
 

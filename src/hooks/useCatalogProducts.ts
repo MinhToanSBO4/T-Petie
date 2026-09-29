@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Product } from '@/types/product';
-import { getCachedCatalog, loadCatalogProducts } from '@/lib/catalog-client-cache';
+import { getCachedCatalog, loadCatalogProducts } from '@/client/catalog-cache';
 
 export function useCatalogProducts() {
   const [products, setProducts] = useState<Product[]>(() => getCachedCatalog() || []);

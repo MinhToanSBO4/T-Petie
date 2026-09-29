@@ -26,7 +26,7 @@ import { useToast } from '@/context/ToastContext';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 import { ProductCard } from '@/components/product/ProductCard';
-import { trackViewItem, trackEvent } from '@/lib/analytics/tracker';
+import { trackViewItem, trackEvent } from '@/client/analytics/tracker';
 
 export function ProductDetailClient({ product, allProducts }: { product: Product; allProducts: Product[] }) {
   const router = useRouter();

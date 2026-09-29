@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { getProducts } from '@/lib/catalog';
+import { getProducts } from '@/server/catalog/queries';
 
 export const dynamic = 'force-dynamic';
 

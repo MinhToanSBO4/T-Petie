@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getSession, signIn, signOut, useSession } from 'next-auth/react';
 import { AuthCredentials, BabyProfile, RegisterData, User, UserRole, UserStatus } from '@/types/auth';
-import { trackLogin, trackLogout } from '@/lib/analytics/tracker';
+import { trackLogin, trackLogout } from '@/client/analytics/tracker';
 
 type Result = { success: boolean; error?: string; role?: UserRole };
 interface AuthContextType {

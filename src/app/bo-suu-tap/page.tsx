@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Sparkles, ArrowRight } from 'lucide-react';
-import { getCollections, getProducts } from '@/lib/catalog';
+import { getCollections, getProducts } from '@/server/catalog/queries';
 import { ProductGrid } from '@/components/product/ProductGrid';
 
 export const dynamic = 'force-dynamic';

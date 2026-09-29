@@ -1,7 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 import { quoteOrder, type QuoteItem } from './quote-order';
 
 export type CheckoutInput = {

@@ -14,7 +14,7 @@ Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma, kh
 ## Giới hạn hiện tại
 
 - Giỏ hàng nằm trong bộ nhớ trình duyệt và không đồng bộ giữa thiết bị. Báo giá và đặt hàng đọc lại giá, tồn kho, phí giao hàng và coupon từ DB; dữ liệu cũ ở giỏ không quyết định tổng tiền đơn.
-- Các phần trong `db.sql` như nhiều địa chỉ, đánh giá, sổ tồn kho, hoàn tiền, điểm thưởng và nhật ký quản trị chưa có luồng hoàn chỉnh. Tài khoản mới bắt đầu với 0 điểm; giao diện không hiển thị điểm hoặc voucher tự tạo.
+- Các phần trong `docs/reference/db.sql` như nhiều địa chỉ, đánh giá, sổ tồn kho, hoàn tiền, điểm thưởng và nhật ký quản trị chưa có luồng hoàn chỉnh. Tài khoản mới bắt đầu với 0 điểm; giao diện không hiển thị điểm hoặc voucher tự tạo.
 - Chỉ có thanh toán COD. Cần kiểm thử staging, tải, giám sát lỗi, sao lưu/khôi phục DB và xử lý tranh chấp tồn kho trước khi nhận đơn thật ở quy mô lớn.
 - Catalog có cache máy chủ 60 giây và cache trong tab 60 giây. Vì vậy danh mục có thể hiển thị tồn kho cũ trong khoảng một phút; API báo giá và đặt hàng kiểm tra DB. Dev server biên dịch trang lần đầu nên thời gian tải lần đầu không phản ánh tốc độ bản production.
 - Giao diện lấy từ repo mẫu và đã nối các trang chính với API/DB. Cần đối chiếu hình ảnh trên các cỡ màn hình nếu yêu cầu khớp từng điểm ảnh. Schema `public` trên Supabase không được ứng dụng sử dụng; xem bảng trong `tpetie_app`.

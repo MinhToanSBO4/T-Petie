@@ -7,7 +7,7 @@
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/security.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/catalog-client-cache.test.mjs && node tests/baby-profile.test.mjs",
+    "test": "node tests/architecture-boundary.test.mjs && node tests/security.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/catalog-client-cache.test.mjs && node tests/baby-profile.test.mjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

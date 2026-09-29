@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
-import { allowAttempt } from '@/lib/rate-limit';
+import { allowAttempt } from '@/server/security/rate-limit';
 
 export async function POST(req: Request) {
   try {

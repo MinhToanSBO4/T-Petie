@@ -8,8 +8,8 @@ import { ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
-import { trackBeginCheckout } from '@/lib/analytics/tracker';
-import { useOrderQuote } from '@/lib/orders/useOrderQuote';
+import { trackBeginCheckout } from '@/client/analytics/tracker';
+import { useOrderQuote } from '@/hooks/useOrderQuote';
 
 
 interface BuyNowItem {
