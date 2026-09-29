@@ -11,6 +11,7 @@ Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma, kh
 5. **Google OAuth:** theo yêu cầu, để phát triển sau. Cần Google Client ID, Client Secret và callback URI của domain triển khai để bật. Đăng nhập username/email và mật khẩu đang dùng DB.
 6. **Thanh toán và vận chuyển ngoài COD:** chưa có nhà cung cấp cổng thanh toán hoặc hãng vận chuyển. Nếu cần chuyển khoản/QR tự đối soát, webhook hay vận đơn tự động, cần tài khoản và thông số tích hợp tương ứng.
 7. **Feedback khách hàng:** cần nội dung thật và xác nhận khách đồng ý công bố tên, địa điểm, trích dẫn. Admin/nhân viên nhập tại `/admin/feedback`; bản nháp không hiện ra trang chủ. Không nạp feedback mẫu hoặc tự tạo đánh giá.
+8. **Nội dung giới thiệu và bảng size:** slide giới thiệu và số đo size từ bản mẫu đã chuyển vào bảng `site_content`, nhưng các tuyên bố về chất liệu, quy trình may và số đo vẫn cần chủ cửa hàng kiểm chứng trước khi công khai.
 
 ## Giới hạn hiện tại
 
@@ -19,6 +20,7 @@ Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma, kh
 - Chỉ có thanh toán COD. Cần kiểm thử staging, tải, giám sát lỗi, sao lưu/khôi phục DB và xử lý tranh chấp tồn kho trước khi nhận đơn thật ở quy mô lớn.
 - Catalog có cache máy chủ 60 giây và cache trong tab 60 giây. Vì vậy danh mục có thể hiển thị tồn kho cũ trong khoảng một phút; API báo giá và đặt hàng kiểm tra DB. Dev server biên dịch trang lần đầu nên thời gian tải lần đầu không phản ánh tốc độ bản production.
 - Giao diện lấy từ repo mẫu và đã nối các trang chính với API/DB. Cần đối chiếu hình ảnh trên các cỡ màn hình nếu yêu cầu khớp từng điểm ảnh. Schema `public` trên Supabase không được ứng dụng sử dụng; xem bảng trong `tpetie_app`.
+- Catalog JSON và script seed cũ đã được xóa sau khi xác nhận DB có đủ 40 sản phẩm, 4 bộ sưu tập, 271 biến thể và toàn bộ ảnh local đang được tham chiếu. Database mới cần nhập catalog qua trang quản trị hoặc công cụ nhập dữ liệu riêng; migration không tự tạo sản phẩm kinh doanh mẫu.
 
 ## Chạy và kiểm tra local
 

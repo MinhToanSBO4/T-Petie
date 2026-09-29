@@ -172,6 +172,13 @@ model CustomerTestimonial {
   @@map("customer_testimonials")
 }
 
+model SiteContent {
+  key String @id
+  data Json
+  updatedAt DateTime @updatedAt
+  @@map("site_content")
+}
+
 model ProductImage {
   id String @id @default(cuid())
   productId String

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ruler, Sparkles, HelpCircle } from 'lucide-react';
-import { SIZE_CHART_HOC_XINH_KEM, SIZE_CHART_BABY, SIZE_SELECTION_TIPS } from '@/lib/constants/sizeGuide';
+import type { SizeGuide } from '@/lib/content/site-content';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -12,6 +12,24 @@ interface SizeGuideModalProps {
 
 export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
   const [activeTab, setActiveTab] = useState<'kids' | 'baby'>('kids');
+  const [guide, setGuide] = useState<SizeGuide | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen || guide) return;
+    const controller = new AbortController();
+    setError('');
+    fetch('/api/site-content/size-guide', { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Không tải được bảng chọn size. Vui lòng thử lại.');
+        return response.json() as Promise<SizeGuide>;
+      })
+      .then(setGuide)
+      .catch((reason) => {
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được bảng chọn size.');
+      });
+    return () => controller.abort();
+  }, [isOpen, guide]);
 
   return (
     <AnimatePresence>
@@ -34,7 +52,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                   <h3 className="font-heading font-bold text-base text-charcoal-900">
                     Bảng Hướng Dẫn Chọn Size Cho Bé
                   </h3>
-                  <p className="text-[11px] text-charcoal-400">Được đo chuẩn xác theo thể trạng trẻ em Việt Nam</p>
+                  <p className="text-[11px] text-charcoal-400">Tham khảo trước khi chọn size phù hợp cho bé</p>
                 </div>
               </div>
               <button
@@ -56,7 +74,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                     : 'text-charcoal-600 hover:text-charcoal-900'
                 }`}
               >
-                Bảng Size Chuẩn (Size 90 - 150)
+                Bảng size bé lớn
               </button>
               <button
                 onClick={() => setActiveTab('baby')}
@@ -66,7 +84,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                     : 'text-charcoal-600 hover:text-charcoal-900'
                 }`}
               >
-                Bé Sơ Sinh (0 - 12 Tháng)
+                Bảng size bé sơ sinh
               </button>
             </div>
 
@@ -82,7 +100,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cream-100">
-                  {(activeTab === 'kids' ? SIZE_CHART_HOC_XINH_KEM : SIZE_CHART_BABY).map((row, idx) => (
+                  {(activeTab === 'kids' ? guide?.kids : guide?.baby)?.map((row, idx) => (
                     <tr key={idx} className="hover:bg-cream-50 transition-colors">
                       <td className="py-2 px-3 font-bold text-honey-600">{row.size}</td>
                       <td className="py-2 px-3 font-semibold text-sage-700">{row.weight}</td>
@@ -92,6 +110,9 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                   ))}
                 </tbody>
               </table>
+              {!guide && <p role="status" className="p-4 text-center text-xs text-charcoal-600">
+                {error || 'Đang tải bảng chọn size…'}
+              </p>}
             </div>
 
             {/* Lưu ý khi chọn size */}
@@ -101,7 +122,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                 <span>Lưu ý khi chọn size cho bé:</span>
               </div>
               <ul className="space-y-1 list-disc pl-4 text-charcoal-600 leading-relaxed text-[11px]">
-                {SIZE_SELECTION_TIPS.map((tip, idx) => (
+                {guide?.tips.map((tip, idx) => (
                   <li key={idx}>{tip}</li>
                 ))}
               </ul>

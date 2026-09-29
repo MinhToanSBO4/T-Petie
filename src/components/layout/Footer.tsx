@@ -157,7 +157,7 @@ export function Footer() {
 
       {/* Copyright */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-10 pt-6 border-t border-cream-200 text-center text-xs text-charcoal-400 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <p>© 2024 T&apos;Petie Vietnam. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} T&apos;Petie Vietnam. All rights reserved.</p>
         <p className="flex items-center space-x-1">
           <span>Made with love for Mom &amp; Baby</span>
           <Heart className="w-3 h-3 text-blush-500 fill-blush-500 inline" />

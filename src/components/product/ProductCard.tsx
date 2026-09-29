@@ -44,7 +44,7 @@ export function ProductCard({ product }: { product: Product }) {
             className="w-full h-full relative"
           >
             <Image
-              src={product.thumbnail || (product.images && product.images[0]) || product.image || '/images/hero-banner.jpg'}
+              src={product.thumbnail || (product.images && product.images[0]) || product.image || '/images/logo.png'}
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

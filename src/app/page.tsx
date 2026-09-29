@@ -8,11 +8,14 @@ import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedTestimonials } from '@/server/content/testimonials';
+import { getHomeFeatures } from '@/server/content/site-content';
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [products, collections, testimonials] = await Promise.all([getProducts(), getCollections(), getPublishedTestimonials()]);
+  const [products, collections, testimonials, homeFeatures] = await Promise.all([
+    getProducts(), getCollections(), getPublishedTestimonials(), getHomeFeatures(),
+  ]);
 
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 8);
   const newArrivals = products.filter((p) => p.isNewArrival);
@@ -80,9 +83,9 @@ export default async function HomePage() {
       </section>}
 
       {/* 6. VÌ SAO MẸ YÊU THÍCH T'PETIE */}
-      <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
-        <FeatureCarousel />
-      </section>
+      {homeFeatures.length > 0 && <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
+        <FeatureCarousel features={homeFeatures} />
+      </section>}
       <TestimonialsSection testimonials={testimonials} />
     </div>
   );

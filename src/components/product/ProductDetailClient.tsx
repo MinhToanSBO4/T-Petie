@@ -42,7 +42,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
 
   const productImages = product.images && product.images.length > 0
     ? product.images
-    : [product.thumbnail || product.image || '/images/hero-banner.jpg'];
+    : [product.thumbnail || product.image || '/images/logo.png'];
 
   const { addToCart } = useCart();
   const { showToast } = useToast();

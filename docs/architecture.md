@@ -37,3 +37,5 @@ Mã trong `src/server` dùng `server-only` ở các entrypoint truy cập DB. Ki
 ## Phạm vi hiện tại
 
 Giỏ hàng lưu trong trình duyệt, nhưng khi báo giá và đặt đơn backend đọc lại DB. Bản cũ nằm trong `archive/legacy-site` để đối chiếu; ứng dụng mới không import mã hoặc dữ liệu runtime từ đó. Các phần nghiệp vụ chưa hoàn chỉnh được liệt kê trong `CAN_BAN_BO_SUNG.md`.
+
+Catalog, bộ sưu tập, feedback, bảng size và slide giới thiệu có nguồn chạy từ PostgreSQL. Bảng `site_content` giữ hai tài liệu nội dung nhỏ (`size_guide`, `home_features`), được kiểm tra cấu trúc trước khi trả ra giao diện. File ảnh trong `public/images` là tài sản tĩnh; DB lưu URL trỏ tới ảnh, nên các ảnh đang được tham chiếu phải tiếp tục có trong bản triển khai. Repo không còn JSON catalog hoặc script nạp lại dữ liệu kinh doanh mẫu.

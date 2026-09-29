@@ -3,35 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { HomeFeature } from '@/lib/content/site-content';
 
-const features = [
-  {
-    id: 1,
-    src: '/images/vay-thi-tho-hong.jpg',
-    icon: '🌿',
-    title: '100% Cotton & Đũi Tự Nhiên',
-    description: 'Vải được dệt từ sợi tự nhiên hữu cơ, không sử dụng hóa chất nhuộm độc hại, an toàn với làn da non nớt.',
-    objectPosition: 'center 15%'
-  },
-  {
-    id: 2,
-    src: '/images/set-ao-thanh-yen-phoi-chan-vay-caro-xanh.jpg',
-    icon: '🪡',
-    title: 'Đường May Lộn Ẩn Tinh Tế',
-    description: 'Mọi đường chỉ và cúc bấm đều được xử lý giấu mép kỹ càng, đảm bảo không cọ xát hay làm đau bé khi vận động.',
-    objectPosition: 'center 20%'
-  },
-  {
-    id: 3,
-    src: '/images/set-ao-mut-cam-phoi-quan-sooc-be.jpg',
-    icon: '🧸',
-    title: 'Form Dáng Dễ Mặc',
-    description: 'Thiết kế đũng quần và váy rộng rãi, có cúc bấm đũng tiện lợi cho mẹ thay bỉm cho bé chỉ trong 30 giây.',
-    objectPosition: 'center 10%'
-  }
-];
-
-export function FeatureCarousel() {
+export function FeatureCarousel({ features }: { features: HomeFeature[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto slide every 5 seconds
@@ -40,7 +14,9 @@ export function FeatureCarousel() {
       setCurrentIndex((prev) => (prev + 1) % features.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [features.length]);
+
+  useEffect(() => setCurrentIndex((index) => Math.min(index, features.length - 1)), [features.length]);
 
   const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % features.length);
   const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + features.length) % features.length);

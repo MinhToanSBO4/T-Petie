@@ -15,9 +15,7 @@
 | `src/lib` | Quy tắc tính giá thuần, định dạng, hằng số và tiện ích dùng chung |
 | `src/types` | Kiểu dữ liệu giao diện và NextAuth |
 | `prisma/schema.prisma` | Schema ứng dụng PostgreSQL |
-| `prisma/migrations` | Migration khởi tạo và thay đổi cấu hình thương mại |
-| `prisma/seed-data` | Dữ liệu catalog lấy từ repo mẫu |
-| `prisma/seed-catalog.ts` | Nạp catalog mẫu; không đặt lại tồn kho của biến thể đã tồn tại |
+| `prisma/migrations` | Migration schema và nội dung nền tảng; không chứa catalog kinh doanh mẫu |
 | `prisma/seed.ts` | Tạo tài khoản admin và nhân viên từ biến môi trường, bỏ qua tài khoản đã tồn tại |
 | `tests` | Kiểm tra quy tắc bảo mật và giá/tồn kho |
 | `docs/reference` | Tài liệu, báo cáo và bản thiết kế ban đầu |
@@ -38,12 +36,12 @@ Xem [sơ đồ và quy tắc phụ thuộc](docs/architecture.md) để biết c
 
 1. Dùng Node.js 20 trở lên. Điền `CONNECTION_STRING` vào `.env` (Prisma CLI đọc file này); đặt `NEXTAUTH_URL`, `NEXTAUTH_SECRET` trong `.env.local`. Có thể tham khảo `.env.example`. Mật khẩu và khóa phải giữ ngoài Git. Nếu dùng biến môi trường hệ thống cho Prisma CLI, biến đó sẽ thay thế giá trị trong `.env`.
 2. Chạy `npm ci`.
-3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, sau đó `npm run prisma:seed-catalog`. Migration đầu tiên chỉ dành cho schema trống.
+3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, `npm run accounts:provision`, rồi nhập catalog qua trang quản trị. Migration tạo danh mục gốc, bảng size và slide giới thiệu nhưng không tạo sản phẩm kinh doanh mẫu. Repo không còn chứa catalog JSON hoặc script seed catalog. Migration đầu tiên chỉ dành cho schema trống.
 4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Khi dev server đang bật, có thể chạy `node scripts/smoke-local.cjs`, `node scripts/verify-data-source.cjs`, `node scripts/check-commerce.cjs`, `node scripts/check-customer-flow.cjs`, `node scripts/check-order-flow.cjs` và `node scripts/check-new-product-flow.cjs`. Các script tạo dữ liệu thử sẽ tự dọn trong `finally`. Nếu dev báo thiếu file `vendor-chunks` trong `.next`, dừng dev server, chạy `node scripts/clean-next-cache.cjs`, rồi bật lại.
 
 Tài khoản được tạo bằng `npm run accounts:provision` sau khi đặt `ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_NAME` và `ADMIN_INITIAL_PASSWORD` (16–128 ký tự). Nhóm `STAFF_*` là tùy chọn. Lệnh này chỉ tạo tài khoản còn thiếu, không đặt lại mật khẩu tài khoản đã tồn tại. Xóa mật khẩu khởi tạo khỏi môi trường triển khai sau khi tạo và đổi mật khẩu trước khi bán thật. Admin quản lý nhân viên tại `/admin/nhan-vien`.
 
-Admin và nhân viên quản lý bộ sưu tập tại `/admin/bo-suu-tap`: tạo, sửa, sắp xếp, bật/tắt trên menu và trang chủ, lưu trữ bộ sưu tập có sản phẩm. Menu khách hàng đọc danh sách đang hoạt động từ API. Feedback khách hàng được quản lý tại `/admin/feedback`; chỉ bản ghi đã xác nhận sự đồng ý và bật công bố mới xuất hiện cuối trang chủ. Không có feedback giả được nạp sẵn. Chạy `npm run content:check` khi server local đang bật để kiểm tra luồng quản trị, menu và công bố feedback; script tự xóa bản ghi thử.
+Admin và nhân viên quản lý bộ sưu tập tại `/admin/bo-suu-tap`: tạo, sửa, sắp xếp, bật/tắt trên menu và trang chủ, lưu trữ bộ sưu tập có sản phẩm. Menu khách hàng đọc danh sách đang hoạt động từ API. Feedback khách hàng được quản lý tại `/admin/feedback`; chỉ bản ghi đã xác nhận sự đồng ý và bật công bố mới xuất hiện cuối trang chủ. Không có feedback giả được nạp sẵn. Bảng size và slide giới thiệu đọc từ bảng `site_content`; migration tạo nội dung ban đầu cho database mới. Chạy `npm run content:check` khi server local đang bật để kiểm tra luồng quản trị, menu và công bố feedback; script tự xóa bản ghi thử.
 
 `npm run build` không tự thay đổi schema hay dữ liệu của database. Tồn kho và tổng tiền đơn hàng được kiểm tra lại phía máy chủ. Khi chạy build trên Windows, hãy dừng `npm run dev` trước để Prisma có thể cập nhật DLL đang được Next.js sử dụng. Sau build có thể bật dev server lại.
 
@@ -67,4 +65,4 @@ Kết quả sau lần seed hiện tại là 40 sản phẩm, 4 bộ sưu tập, 
 
 ## Trạng thái tính năng
 
-Trang sản phẩm, bộ sưu tập và feedback công bố đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt. Báo giá ở giỏ hàng, mua ngay và thanh toán do API đọc giá, tồn kho, phí giao hàng và coupon trong database rồi tính lại; đặt COD cũng xác minh và trừ tồn kho trong transaction. Admin chỉnh phí giao hàng và mã giảm giá tại `/admin/cau-hinh`. Đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `docs/reference/db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.
+Trang sản phẩm, bộ sưu tập, bảng size, slide giới thiệu và feedback công bố đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt. Báo giá ở giỏ hàng, mua ngay và thanh toán do API đọc giá, tồn kho, phí giao hàng và coupon trong database rồi tính lại; đặt COD cũng xác minh và trừ tồn kho trong transaction. Admin chỉnh phí giao hàng và mã giảm giá tại `/admin/cau-hinh`. Đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `docs/reference/db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.
