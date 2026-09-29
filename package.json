@@ -7,7 +7,7 @@
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/security.test.mjs && node tests/order-pricing.test.mjs && node tests/auth-identity.test.mjs",
+    "test": "node tests/security.test.mjs && node tests/order-pricing.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/catalog-client-cache.test.mjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

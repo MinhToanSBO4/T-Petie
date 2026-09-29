@@ -10,6 +10,8 @@ import { Footer } from '@/components/layout/Footer';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { MiniCart } from '@/components/cart/MiniCart';
 import { FloatingMessenger } from '@/components/layout/FloatingMessenger';
+import { NavigationProgress } from '@/components/layout/NavigationProgress';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: "T'Petie | Thời Trang Trẻ Em Cao Cấp & Dịu Ngọt",
@@ -36,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const clarityId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
-  const ga4Id = 'G-LF9P82Z9QM';
+  const ga4Id = process.env.NEXT_PUBLIC_GA4_ID;
 
   return (
     <html lang="vi">
@@ -89,6 +91,7 @@ export default function RootLayout({
           <AuthProvider>
             <ToastProvider>
               <CartProvider>
+                <Suspense fallback={null}><NavigationProgress /></Suspense>
                 {/* Header Sticky */}
                 <Header />
 

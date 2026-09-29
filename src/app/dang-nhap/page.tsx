@@ -48,10 +48,17 @@ function LoginForm() {
     }
 
     setIsSubmitting(true);
-    const result = await login({ email, password });
-    setIsSubmitting(false);
+    let result;
+    try {
+      result = await login({ email, password });
+    } catch {
+      setIsSubmitting(false);
+      setErrorMessage('Không kết nối được máy chủ. Vui lòng thử lại.');
+      return;
+    }
 
     if (result.success) {
+      window.dispatchEvent(new Event('tpetie:navigation-start'));
       showToast(`Chào mừng bạn trở lại với T'Petie! 🌸`);
       if (result.role === 'admin') {
         router.push(callbackUrl || '/admin');
@@ -61,6 +68,7 @@ function LoginForm() {
         router.push(callbackUrl || '/');
       }
     } else {
+      setIsSubmitting(false);
       setErrorMessage(result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     }
   };

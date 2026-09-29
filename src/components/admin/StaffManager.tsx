@@ -11,7 +11,7 @@ export function StaffManager() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [draft, setDraft] = useState({ name: '', username: '', email: '', password: '' });
-  const [reset, setReset] = useState<Record<string, string>>({});
+  const [temporaryPassword, setTemporaryPassword] = useState<{ id: string; value: string } | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -40,14 +40,17 @@ export function StaffManager() {
     finally { setBusy(false); }
   }
 
-  async function update(id: string, body: Record<string, string>) {
+  async function update(id: string, body: Record<string, string | boolean>) {
     setBusy(true); setMessage('');
+    setTemporaryPassword(null);
     try {
       const response = await fetch(`/api/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không cập nhật được tài khoản');
-      setReset((current) => ({ ...current, [id]: '' }));
-      setMessage('Đã cập nhật tài khoản nhân viên.');
+      if (body.resetPassword && data.temporaryPassword) {
+        setTemporaryPassword({ id, value: data.temporaryPassword });
+        setMessage('Đã đặt lại mật khẩu. Các phiên đăng nhập cũ của nhân viên đã hết hiệu lực.');
+      } else setMessage('Đã cập nhật tài khoản nhân viên.');
       await reload();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không cập nhật được tài khoản'); }
     finally { setBusy(false); }
@@ -75,9 +78,12 @@ export function StaffManager() {
               <p className="text-sm text-charcoal-500">{person.email} · {person.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</p></div>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={busy} onClick={() => void update(person.id, { status: person.status === 'active' ? 'blocked' : 'active' })} className="rounded-xl border border-cream-200 px-3 py-2 text-sm disabled:opacity-50">{person.status === 'active' ? 'Khóa' : 'Mở khóa'}</button>
-              <input type="password" aria-label={`Mật khẩu mới cho ${person.username}`} placeholder="Mật khẩu mới" minLength={12} value={reset[person.id] || ''} onChange={(e) => setReset((current) => ({ ...current, [person.id]: e.target.value }))} className="rounded-xl border border-cream-200 px-3 py-2 text-sm" autoComplete="new-password" />
-              <button type="button" disabled={busy || (reset[person.id] || '').length < 12} onClick={() => void update(person.id, { password: reset[person.id] })} className="rounded-xl bg-charcoal-900 px-3 py-2 text-sm text-white disabled:opacity-50">Đặt lại mật khẩu</button>
+              <button type="button" disabled={busy} onClick={() => void update(person.id, { resetPassword: true })} className="rounded-xl bg-charcoal-900 px-3 py-2 text-sm text-white disabled:opacity-50">{busy ? 'Đang xử lý…' : 'Đặt lại mật khẩu'}</button>
             </div>
+            {temporaryPassword?.id === person.id && <div role="status" className="lg:col-span-2 rounded-xl bg-honey-50 border border-honey-200 p-4 text-sm">
+              <p className="font-semibold">Mật khẩu tạm cho @{person.username} — chỉ hiển thị lần này. Hãy gửi riêng cho nhân viên.</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2"><code className="break-all select-all">{temporaryPassword.value}</code><button type="button" onClick={() => void navigator.clipboard.writeText(temporaryPassword.value).then(() => setMessage('Đã sao chép mật khẩu tạm.')).catch(() => setMessage('Không sao chép được; hãy chọn và sao chép thủ công.'))} className="rounded-lg border border-honey-300 px-3 py-1">Sao chép</button></div>
+            </div>}
           </div>)}
     </section>
   </div>;

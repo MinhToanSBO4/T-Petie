@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { allowAttempt } from '@/lib/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
+import { credentialFingerprint } from '@/lib/password-reset';
 import type { UserRole, UserStatus } from '@/types/auth';
 
 const googleProviders = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -54,7 +55,9 @@ export const authOptions: NextAuthOptions = {
       if (!token.id) return token;
       const stored = await prisma.user.findUnique({ where: { id: token.id } });
       token.role = (stored?.role || 'user') as UserRole;
-      token.status = (stored?.status || 'blocked') as UserStatus;
+      const currentFingerprint = credentialFingerprint(stored?.password || null, process.env.NEXTAUTH_SECRET || '');
+      if (user) token.credentialFingerprint = currentFingerprint;
+      token.status = (stored?.status === 'active' && token.credentialFingerprint === currentFingerprint ? 'active' : 'blocked') as UserStatus;
       token.phone = stored?.phone;
       token.address = stored?.address;
       token.city = stored?.city;

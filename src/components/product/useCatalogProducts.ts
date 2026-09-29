@@ -2,22 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import type { Product } from '@/types/product';
+import { getCachedCatalog, loadCatalogProducts } from '@/lib/catalog-client-cache';
 
 export function useCatalogProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => getCachedCatalog() || []);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedCatalog());
   useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/products?limit=48', { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('Không tải được sản phẩm');
-        return response.json();
-      })
-      .then((data) => setProducts(data.products || []))
-      .catch((reason) => { if (reason.name !== 'AbortError') setError(reason.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+    let active = true;
+    loadCatalogProducts()
+      .then((data) => { if (active) { setProducts(data); setError(null); } })
+      .catch((reason) => { if (active) setError(reason.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
   return { products, error, loading };
 }

@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import * as bcrypt from 'bcryptjs';
+import { createTemporaryPassword } from '@/lib/password-reset';
 
 interface RouteContext {
   params: {
@@ -100,7 +101,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
 
     const { id: targetUserId } = params;
     const body = await req.json();
-    const { role, status, name, phone, address, city, password } = body;
+    const { role, status, name, phone, address, city, password, resetPassword } = body;
 
     // Không cho phép Admin tự khóa hoặc tự hạ quyền chính mình
     if (session.user.id === targetUserId) {
@@ -133,17 +134,21 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     }
 
     const updateData: Record<string, unknown> = {};
+    if (resetPassword !== undefined && resetPassword !== true) return NextResponse.json({ error: 'Yêu cầu đặt lại mật khẩu không hợp lệ' }, { status: 400 });
+    if (resetPassword && password !== undefined) return NextResponse.json({ error: 'Chỉ chọn một cách đặt lại mật khẩu' }, { status: 400 });
+    if (resetPassword && targetUser.role !== 'staff') return NextResponse.json({ error: 'Chỉ đặt lại mật khẩu nhân viên' }, { status: 403 });
     if (role && (role === 'staff' || role === 'user') && targetUser.role !== 'admin') {
       updateData.role = role;
     }
     if (status && (status === 'active' || status === 'blocked')) {
       updateData.status = status;
     }
-    if (password !== undefined) {
-      if (targetUser.role !== 'staff' || typeof password !== 'string' || password.length < 12 || password.length > 128) {
+    const temporaryPassword = resetPassword ? createTemporaryPassword() : undefined;
+    if (password !== undefined || temporaryPassword) {
+      if (!temporaryPassword && (targetUser.role !== 'staff' || typeof password !== 'string' || password.length < 12 || password.length > 128)) {
         return NextResponse.json({ error: 'Mật khẩu nhân viên cần 12–128 ký tự' }, { status: 400 });
       }
-      updateData.password = await bcrypt.hash(password, 12);
+      updateData.password = await bcrypt.hash(temporaryPassword || password, 12);
     }
     if (name !== undefined) {
       if (typeof name !== 'string' || name.length > 100) return NextResponse.json({ error: 'Tên không hợp lệ' }, { status: 400 });
@@ -173,7 +178,8 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       success: true,
       message: 'Cập nhật tài khoản người dùng thành công!',
       user: updatedUser,
-    });
+      ...(temporaryPassword ? { temporaryPassword } : {}),
+    }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('Error in Admin PATCH /api/admin/users/[id]:', error);
     return NextResponse.json(
