@@ -10,7 +10,7 @@ test('client authentication does not trust local role or demo users', () => {
 });
 
 test('auth has no built-in secret or Facebook provider', () => {
-  const source = read('../src/lib/auth.ts');
+  const source = read('../src/server/auth/options.ts');
   assert.doesNotMatch(source, /FacebookProvider|super_secret_jwt_key|allowDangerousEmailAccountLinking/);
 });
 

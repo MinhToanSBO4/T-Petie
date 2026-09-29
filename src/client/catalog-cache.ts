@@ -100,20 +100,28 @@ export function loadCatalogProducts(fetcher: typeof fetch = fetch): Promise<Prod
   if (current) return Promise.resolve(current);
   if (inFlight) return inFlight;
 
-  inFlight = fetcher('/api/products?limit=48')
-    .then(async (response) => {
+  inFlight = (async () => {
+    const all: Product[] = [];
+    let total = 0;
+    let page = 1;
+    do {
+      const response = await fetcher(`/api/products?limit=48&page=${page}`);
       if (!response.ok) throw new Error('Không tải được sản phẩm');
       const data = await response.json();
-      const products: Product[] = Array.isArray(data.products) ? data.products : [];
-      cached = products;
-      expiresAt = Date.now() + CACHE_TTL_MS;
-      writeSessionCache(products, CACHE_TTL_MS);
-      return cached;
-    })
-    .finally(() => {
-      inFlight = null;
-    });
+      const batch: Product[] = Array.isArray(data.products) ? data.products : [];
+      if (page === 1) total = Number.isSafeInteger(data.total) ? data.total : batch.length;
+      if (batch.length === 0 && all.length < total) throw new Error('Dữ liệu sản phẩm chưa đầy đủ');
+      all.push(...batch);
+      page++;
+    } while (all.length < total);
+
+    cached = all;
+    expiresAt = Date.now() + CACHE_TTL_MS;
+    writeSessionCache(all, CACHE_TTL_MS);
+    return all;
+  })().finally(() => {
+    inFlight = null;
+  });
 
   return inFlight;
 }
-

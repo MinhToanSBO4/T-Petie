@@ -13,12 +13,13 @@ import { useToast } from '@/context/ToastContext';
 export function ProductCard({ product }: { product: Product }) {
   const { addToCart } = useCart();
   const { showToast } = useToast();
+  const availableSize = product.sizes.find((size) => size.stock > 0);
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.sizes.length > 0) {
-      addToCart(product, product.sizes[0], 1);
+    if (availableSize) {
+      addToCart(product, availableSize, 1);
       showToast(`Đã thêm "${product.name}" vào giỏ hàng!`, 'success');
     }
   };
@@ -30,7 +31,7 @@ export function ProductCard({ product }: { product: Product }) {
       className="group bg-white rounded-2xl sm:rounded-3xl border border-cream-200 overflow-hidden shadow-card hover:shadow-soft transition-all flex flex-col justify-between"
     >
       <Link
-        href={`/san-pham/${product.id}`}
+        href={`/san-pham/${product.slug}`}
         data-track="select-item"
         data-item-id={product.id}
         data-item-name={product.name}
@@ -119,11 +120,12 @@ export function ProductCard({ product }: { product: Product }) {
       <div className="px-3 pb-3 sm:px-4 sm:pb-4 pt-0">
         <button
           onClick={handleQuickAdd}
+          disabled={!availableSize}
           data-track="quick-add-cart"
           className="w-full py-2 rounded-xl bg-cream-100 hover:bg-honey-500 hover:text-white text-charcoal-800 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 border border-cream-200"
         >
           <ShoppingBag className="w-3.5 h-3.5" />
-          <span>Thêm nhanh</span>
+          <span>{availableSize ? 'Thêm nhanh' : 'Hết hàng'}</span>
         </button>
       </div>
     </motion.div>

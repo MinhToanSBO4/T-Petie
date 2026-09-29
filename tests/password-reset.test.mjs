@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTemporaryPassword, credentialFingerprint } from '../src/lib/password-reset.ts';
+import { createTemporaryPassword, credentialFingerprint } from '../src/server/security/password-reset.ts';
 
 test('temporary passwords are strong and unique', () => {
   const first = createTemporaryPassword();

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ALTER COLUMN "points" SET DEFAULT 0;

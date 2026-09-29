@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
-import { allowAttempt } from '@/lib/rate-limit';
+import { allowAttempt } from '@/server/security/rate-limit';
 
 export async function POST(req: Request) {
   try {
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     // Mã hóa mật khẩu với bcrypt (12 rounds).
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 4. Lưu User mới vào Database (Role: user, Status: active, Points: 100)
+    // Lưu tài khoản khách hàng; chương trình tích điểm chưa được kích hoạt.
     const newUser = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         phone: phone ? phone.trim() : null,
         role: 'user',
         status: 'active',
-        points: 100, // Quà tặng 100 điểm chào mừng
+        points: 0,
         babyGender: 'be-gai',
       },
       select: {
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Đăng ký tài khoản thành công! T\'Petie tặng mẹ 100 điểm thưởng chào mừng.',
+        message: 'Đăng ký tài khoản thành công!',
         user: newUser,
       },
       { status: 201 }

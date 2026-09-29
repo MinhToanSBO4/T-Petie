@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 
 export async function allowAttempt(bucket: string, max: number, minutes = 10) {
   const key = createHash('sha256').update(bucket).digest('hex');

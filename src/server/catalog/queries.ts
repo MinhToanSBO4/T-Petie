@@ -1,6 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/server/db/client';
 import type { Product } from '@/types/product';
 import type { Collection } from '@/types/collection';
 
@@ -9,7 +9,8 @@ const productInclude = { images: { orderBy: { sortOrder: 'asc' as const } }, var
 function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ include: typeof productInclude }>>>[number]): Product {
   const images = row.images.map((image) => image.url);
   return {
-    id: row.slug,
+    id: row.id,
+    slug: row.slug,
     sku: row.sku,
     name: row.name,
     category: 'be-gai',
@@ -52,11 +53,11 @@ export const getProducts = unstable_cache(async () => {
 }, ['active-products'], { revalidate: 60, tags: ['products'] });
 
 export const getCollections = unstable_cache(async (): Promise<Collection[]> => {
-  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { slug: true } } }, orderBy: { sortOrder: 'asc' } });
+  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } }, orderBy: { sortOrder: 'asc' } });
   return rows.map((row) => ({
     id: row.slug, title: row.title, subtitle: row.subtitle || '', story: row.story || '',
     bannerImage: row.bannerUrl, lookbookImages: row.lookbookUrls,
     themeColor: row.themeColor || '#FFF8EE', accentColor: row.accentColor || '#D97706',
-    season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.slug),
+    season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.id),
   }));
 }, ['active-collections'], { revalidate: 60, tags: ['collections'] });

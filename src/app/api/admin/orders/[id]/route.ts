@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/server/auth/options';
+import { prisma } from '@/server/db/client';
 import { revalidateTag } from 'next/cache';
 
 const transitions: Record<string, string[]> = {
@@ -31,6 +31,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (body.status === 'CANCELLED') {
         for (const item of order.items) {
           await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
+        }
+        if (order.couponCode) {
+          await tx.coupon.update({ where: { code: order.couponCode }, data: { usedCount: { decrement: 1 } } });
         }
       }
     });

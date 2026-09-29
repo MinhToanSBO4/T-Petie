@@ -1,8 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight, Sparkles, Heart, Star, ShieldCheck, Flame } from 'lucide-react';
-import { getProducts, getCollections } from '@/lib/catalog';
+import { getProducts, getCollections } from '@/server/catalog/queries';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
@@ -21,7 +20,7 @@ export default async function HomePage() {
     <div className="space-y-10 sm:space-y-14">
       {/* 1. HERO BANNER SECTION */}
       <section className="relative px-4 sm:px-6 pt-4 max-w-6xl mx-auto">
-        <HeroCarousel />
+        {collections.length > 0 && <HeroCarousel collections={collections.slice(0, 4)} />}
       </section>
 
 
@@ -47,24 +46,11 @@ export default async function HomePage() {
       </section>
 
       {/* 4. FLASH SALE BANNER SECTION */}
-      <section id="flash-sale" className="px-4 sm:px-6 max-w-6xl mx-auto">
-        <Link 
-          href="/sale"
-          className="block relative w-full rounded-3xl overflow-hidden shadow-soft hover:shadow-md transition-shadow bg-[#f9f0e0]"
-          style={{ aspectRatio: '3168 / 1344' }}
-          data-track="home-flash-sale-banner"
-        >
-          <Image
-            src="https://i.ibb.co/r2z85170/banner-uu-dai-png.png"
-            alt="Ưu đãi độc quyền - Giảm đến 30%"
-            fill
-            priority
-            quality={100}
-            sizes="100vw"
-            className="object-contain"
-          />
-        </Link>
-      </section>
+      {flashSaleProducts.length > 0 && <section id="flash-sale" className="px-4 sm:px-6 max-w-6xl mx-auto">
+        <div className="mb-6 flex items-center justify-between"><h2 className="font-heading text-lg font-bold sm:text-2xl">Sản phẩm đang ưu đãi</h2>
+          <Link href="/sale" className="text-xs font-bold text-honey-600">Xem tất cả →</Link></div>
+        <ProductGrid products={flashSaleProducts.slice(0, 8)} />
+      </section>}
 
       {/* 5. BỘ SƯU TẬP LOOKBOOK CAROUSEL (4 BST) */}
       <section id="collections" className="px-4 sm:px-6 max-w-6xl mx-auto">

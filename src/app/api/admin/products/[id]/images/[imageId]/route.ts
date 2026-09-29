@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/server/auth/options';
+import { prisma } from '@/server/db/client';
 
 export async function DELETE(_request: Request, { params }: { params: { id: string; imageId: string } }) {
   const session = await getServerSession(authOptions);

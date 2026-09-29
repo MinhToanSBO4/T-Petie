@@ -25,7 +25,7 @@ model User {
   phone         String?
   address       String?
   city          String?
-  points        Int       @default(100)      // Điểm tích lũy chào mừng
+  points        Int       @default(0)        // Chương trình điểm thưởng chưa kích hoạt
   
   // Hồ sơ Bé Yêu & Gợi ý Size tự động
   babyName        String?
@@ -91,6 +91,31 @@ model Product {
   @@index([collectionId, isActive])
   @@index([isActive, createdAt])
   @@map("products")
+}
+
+model CommerceSetting {
+  id String @id
+  shippingFee BigInt
+  freeShippingThreshold BigInt
+  updatedAt DateTime @updatedAt
+  @@map("commerce_settings")
+}
+
+model Coupon {
+  code String @id
+  type String
+  value Int
+  minSubtotal BigInt @default(0)
+  active Boolean @default(true)
+  requiresLogin Boolean @default(false)
+  startsAt DateTime?
+  expiresAt DateTime?
+  usageLimit Int?
+  usedCount Int @default(0)
+  orders Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("coupons")
 }
 
 model Category {
@@ -176,12 +201,14 @@ model Order {
   subtotal BigInt
   shippingFee BigInt @default(0)
   discountAmount BigInt @default(0)
+  couponCode String?
   totalAmount BigInt
   currency String @default("VND")
   paymentMethod String @default("COD")
   paymentStatus String @default("PENDING")
   orderStatus String @default("PENDING")
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  coupon Coupon? @relation(fields: [couponCode], references: [code], onDelete: SetNull)
   items OrderItem[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

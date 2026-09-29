@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from '@/server/auth/options';
 import { ProductManager } from '@/components/admin/ProductManager';
 
 export const dynamic = 'force-dynamic';

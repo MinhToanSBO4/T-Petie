@@ -1,12 +1,14 @@
+import 'server-only';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import * as bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/prisma';
-import { allowAttempt } from '@/lib/rate-limit';
+import { prisma } from '@/server/db/client';
+import { allowAttempt } from '@/server/security/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
-import { credentialFingerprint } from '@/lib/password-reset';
+import { credentialFingerprint } from '@/server/security/password-reset';
+import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID || (process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? process.env.OAUTH_CLIENT_SECRET : '');
@@ -65,6 +67,7 @@ export const authOptions: NextAuthOptions = {
       token.address = stored?.address;
       token.city = stored?.city;
       token.points = stored?.points;
+      token.babyProfile = stored ? toBabyProfile(stored) : null;
       return token;
     },
     async session({ session, token }) {
@@ -76,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         session.user.address = token.address;
         session.user.city = token.city;
         session.user.points = token.points;
+        session.user.babyProfile = token.babyProfile;
       }
       return session;
     },

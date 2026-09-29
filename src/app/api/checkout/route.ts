@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth';
-import { allowAttempt } from '@/lib/rate-limit';
-import { createOrder, type CheckoutInput } from '@/lib/orders/create-order';
+import { authOptions } from '@/server/auth/options';
+import { allowAttempt } from '@/server/security/rate-limit';
+import { createOrder, type CheckoutInput } from '@/server/orders/create-order';
 
 export const dynamic = 'force-dynamic';
 

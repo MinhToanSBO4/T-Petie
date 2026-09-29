@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { FilterBar } from '@/components/filter/FilterBar';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { useCatalogProducts } from '@/components/product/useCatalogProducts';
+import { useCatalogProducts } from '@/hooks/useCatalogProducts';
 import { ProductGridSkeleton } from '@/components/product/ProductGridSkeleton';
 
 export default function BeGaiQuanPage() {

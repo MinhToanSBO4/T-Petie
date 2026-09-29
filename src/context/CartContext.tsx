@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CartItem } from '@/types/cart';
 import { Product, ProductSizeOption } from '@/types/product';
-import { trackAddToCart } from '@/lib/analytics/tracker';
+import { trackAddToCart } from '@/client/analytics/tracker';
 
 interface CartContextType {
   items: CartItem[];

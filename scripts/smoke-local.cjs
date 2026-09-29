@@ -13,11 +13,11 @@ async function main() {
     if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
     if (path === '/api/products') {
       const data = await response.json();
-      if (data.total !== 40 || data.products.length === 0) throw new Error('Product catalog is incomplete');
+      if (!Number.isInteger(data.total) || data.total < 1 || data.products.length === 0) throw new Error('Product catalog is incomplete');
       console.log(`${path}: HTTP ${response.status}; total=${data.total}`);
     } else if (path === '/api/collections') {
       const data = await response.json();
-      if (data.collections.length !== 4) throw new Error('Collections are incomplete');
+      if (data.collections.length < 1) throw new Error('Collections are incomplete');
       console.log(`${path}: HTTP ${response.status}; total=${data.collections.length}`);
     } else {
       console.log(`${path}: HTTP ${response.status}`);

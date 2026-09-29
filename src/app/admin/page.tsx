@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/server/auth/options';
+import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 const currency = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -42,6 +42,7 @@ export default async function AdminPage() {
         <Link href="/admin/don-hang" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Đơn hàng</Link>
         <Link href="/admin/san-pham" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Sản phẩm</Link>
         <Link href="/admin/nhan-vien" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Nhân viên</Link>
+        <Link href="/admin/cau-hinh" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Cấu hình bán hàng</Link>
         <a href="/api/admin/export" className="px-4 py-2 rounded-xl bg-honey-600 text-white font-semibold">Xuất Excel</a>
       </div>
     </div>

@@ -15,7 +15,8 @@ export type ProductSubcategory = 'ao' | 'quan' | 'vay' | 'set-do';
 export type SaleCampaign = 'dai-le-2-9' | 'sale-he' | 'sale-thu-dong' | 'sale-ngay-doi';
 
 export interface Product {
-  id: string;               // ID duy nhất (slug / SKU)
+  id: string;               // ID nội bộ trong database, dùng khi đặt hàng
+  slug: string;             // Đường dẫn công khai của sản phẩm
   sku: string;              // Mã sản phẩm (VD: "TP-VG-001")
   name: string;             // Tên sản phẩm
   category: 'be-gai' | 'phu-kien';

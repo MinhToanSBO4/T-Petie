@@ -1,29 +1,45 @@
 # T'Petie
 
-Ứng dụng thương mại điện tử Next.js ở thư mục gốc. `T-Petie-example/` là bản mã nguồn cũ để đối chiếu và không tham gia build. Tài liệu yêu cầu, kế hoạch và thiết kế dữ liệu gốc nằm cạnh README này. Các mục chưa thể xác nhận hoặc còn cần triển khai được gom trong [CAN_BAN_BO_SUNG.md](CAN_BAN_BO_SUNG.md).
+Ứng dụng thương mại điện tử Next.js ở thư mục gốc. `archive/legacy-site/` là bản mã nguồn cũ để đối chiếu, bị Git bỏ qua và không tham gia build. Báo cáo, kế hoạch và thiết kế dữ liệu gốc nằm trong `docs/reference/`; file yêu cầu của chủ dự án và [CAN_BAN_BO_SUNG.md](CAN_BAN_BO_SUNG.md) được giữ ở thư mục gốc.
 
 ## Cấu trúc
 
 | Đường dẫn | Vai trò |
 | --- | --- |
-| `src/app` | Trang và API Next.js |
+| `src/app` | Định tuyến Next.js: trang server/client và các HTTP Route Handler trong `api/` |
+| `src/server` | Backend: kết nối DB, cấu hình đăng nhập, truy vấn catalog, xử lý đơn hàng và giới hạn lượt thử; chỉ chạy trên máy chủ |
 | `src/components` | Thành phần giao diện |
-| `src/context` | Trạng thái phiên đăng nhập, giỏ hàng, thông báo |
-| `src/lib` | Đăng nhập, truy vấn catalog, tính giá, tạo đơn, giới hạn lượt thử |
-| `src/types` | Kiểu dữ liệu FE và NextAuth |
+| `src/context` | Trạng thái phiên đăng nhập, giỏ hàng, thông báo trong trình duyệt |
+| `src/hooks` | React hooks dùng bởi giao diện |
+| `src/client` | Cache catalog, trạng thái giỏ và analytics chỉ dùng trong trình duyệt |
+| `src/lib` | Quy tắc tính giá thuần, định dạng, hằng số và tiện ích dùng chung |
+| `src/types` | Kiểu dữ liệu giao diện và NextAuth |
 | `prisma/schema.prisma` | Schema ứng dụng PostgreSQL |
-| `prisma/migrations` | Migration khởi tạo cho cơ sở dữ liệu trống |
+| `prisma/migrations` | Migration khởi tạo và thay đổi cấu hình thương mại |
 | `prisma/seed-data` | Dữ liệu catalog lấy từ repo mẫu |
 | `prisma/seed-catalog.ts` | Nạp catalog mẫu; không đặt lại tồn kho của biến thể đã tồn tại |
 | `prisma/seed.ts` | Tạo tài khoản quản trị từ biến môi trường |
 | `tests` | Kiểm tra quy tắc bảo mật và giá/tồn kho |
+| `docs/reference` | Tài liệu, báo cáo và bản thiết kế ban đầu |
+| `archive/legacy-site` | Mã nguồn cũ để tham khảo; không tham gia sản phẩm mới |
+
+## Backend và đường đi dữ liệu
+
+Ứng dụng này là **Next.js full stack**: backend nằm cùng repo, trong `src/app/api` và `src/server`; không có tiến trình Express/Nest riêng. Component có `'use client'` gọi API nội bộ qua HTTP. Route Handler xác thực/kiểm tra đầu vào rồi gọi dịch vụ trong `src/server`, nơi Prisma kết nối Supabase bằng chuỗi kết nối bí mật ở phía máy chủ. Trang Next.js dạng Server Component có thể gọi trực tiếp `src/server` khi render HTML; dữ liệu được truyền vào component trình duyệt qua props. Trình duyệt không nhận chuỗi kết nối DB và không import Prisma.
+
+```text
+Trình duyệt → /api/* (src/app/api) → src/server → Prisma → Supabase PostgreSQL
+Server Component (src/app) ─────────→ src/server → Prisma → Supabase PostgreSQL
+```
+
+Xem [sơ đồ và quy tắc phụ thuộc](docs/architecture.md) để biết chỗ đặt mã mới.
 
 ## Chạy tại máy phát triển
 
 1. Dùng Node.js 20 trở lên. Điền `CONNECTION_STRING` vào `.env` (Prisma CLI đọc file này); đặt `NEXTAUTH_URL`, `NEXTAUTH_SECRET` trong `.env.local`. Có thể tham khảo `.env.example`. Mật khẩu và khóa phải giữ ngoài Git. Nếu dùng biến môi trường hệ thống cho Prisma CLI, biến đó sẽ thay thế giá trị trong `.env`.
 2. Chạy `npm ci`.
 3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, sau đó `npm run prisma:seed-catalog`. Migration đầu tiên chỉ dành cho schema trống.
-4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Có thể chạy `node scripts/smoke-local.cjs` khi dev server đang bật. Để đối chiếu dữ liệu API với Supabase, chạy `node scripts/verify-data-source.cjs`. Nếu dev báo thiếu file `vendor-chunks` trong `.next`, dừng dev server, chạy `node scripts/clean-next-cache.cjs`, rồi bật lại.
+4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Khi dev server đang bật, có thể chạy `node scripts/smoke-local.cjs`, `node scripts/verify-data-source.cjs`, `node scripts/check-commerce.cjs`, `node scripts/check-customer-flow.cjs`, `node scripts/check-order-flow.cjs` và `node scripts/check-new-product-flow.cjs`. Các script tạo dữ liệu thử sẽ tự dọn trong `finally`. Nếu dev báo thiếu file `vendor-chunks` trong `.next`, dừng dev server, chạy `node scripts/clean-next-cache.cjs`, rồi bật lại.
 
 Tài khoản admin local đăng nhập bằng username `superadmin` và mật khẩu mẫu do chủ dự án cung cấp; nhân viên mẫu đăng nhập bằng `nhanvien`, mật khẩu nằm ở biến `STAFF_INITIAL_PASSWORD` trong `.env.local` bị Git bỏ qua. Admin quản lý nhân viên tại `/admin/nhan-vien`. Với môi trường khác, đặt `ADMIN_EMAIL` và `ADMIN_INITIAL_PASSWORD` (tối thiểu 16 ký tự), chạy `npm run prisma:seed` một lần rồi xóa biến mật khẩu khỏi môi trường triển khai. Không dùng tài khoản mẫu cho production.
 
@@ -49,4 +65,4 @@ Kết quả sau lần seed hiện tại là 40 sản phẩm, 4 bộ sưu tập, 
 
 ## Trạng thái tính năng
 
-Trang sản phẩm và bộ sưu tập đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt; đặt hàng COD, tra cứu đơn, đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.
+Trang sản phẩm và bộ sưu tập đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt. Báo giá ở giỏ hàng, mua ngay và thanh toán do API đọc giá, tồn kho, phí giao hàng và coupon trong database rồi tính lại; đặt COD cũng xác minh và trừ tồn kho trong transaction. Admin chỉnh phí giao hàng và mã giảm giá tại `/admin/cau-hinh`. Đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `docs/reference/db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.
