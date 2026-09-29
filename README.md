@@ -17,6 +17,7 @@
 | `prisma/schema.prisma` | Schema ứng dụng PostgreSQL |
 | `prisma/migrations` | Migration schema và nội dung nền tảng; không chứa catalog kinh doanh mẫu |
 | `prisma/seed.ts` | Tạo tài khoản admin và nhân viên từ biến môi trường, bỏ qua tài khoản đã tồn tại |
+| `public/images` | Ảnh tĩnh đang được UI hoặc URL trong DB sử dụng; xem [danh sách ảnh](docs/image-inventory.md) |
 | `tests` | Kiểm tra quy tắc bảo mật và giá/tồn kho |
 | `docs/reference` | Tài liệu, báo cáo và bản thiết kế ban đầu |
 | `archive/legacy-site` | Mã nguồn cũ để tham khảo; không tham gia sản phẩm mới |
