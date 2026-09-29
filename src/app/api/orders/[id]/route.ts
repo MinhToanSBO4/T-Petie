@@ -1,0 +1,31 @@
+import { getServerSession } from 'next-auth';
+import { NextResponse } from 'next/server';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { allowAttempt } from '@/lib/rate-limit';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  if (!/^TP-[A-Z0-9-]{6,50}$/.test(params.id)) return NextResponse.json({ error: 'Không tìm thấy đơn hàng' }, { status: 404 });
+  const session = await getServerSession(authOptions);
+  const phone = new URL(request.url).searchParams.get('phone');
+  if (phone) {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+    if (!(await allowAttempt(`order-lookup:${ip}`, 20))) {
+      return NextResponse.json({ error: 'Bạn đã thử quá nhiều lần' }, { status: 429 });
+    }
+  }
+  const order = await prisma.order.findUnique({ where: { orderCode: params.id }, include: { items: true } });
+  const authorized = order && ((session?.user?.status === 'active' && session.user.id === order.userId) ||
+    (phone && /^0[35789]\d{8}$/.test(phone) && phone === order.customerPhone));
+  if (!authorized) return NextResponse.json({ error: 'Không tìm thấy đơn hàng' }, { status: 404 });
+  return NextResponse.json({ order: {
+    code: order.orderCode, status: order.orderStatus, createdAt: order.createdAt,
+    customerName: order.customerName, city: order.city, district: order.district,
+    total: Number(order.totalAmount), items: order.items.map((item) => ({
+      name: item.productName, size: item.size, quantity: item.quantity,
+      total: Number(item.totalPrice),
+    })),
+  } });
+}

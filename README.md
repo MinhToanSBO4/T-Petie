@@ -1,0 +1,34 @@
+# T'Petie
+
+Ứng dụng thương mại điện tử Next.js ở thư mục gốc. `T-Petie-example/` là bản mã nguồn cũ để đối chiếu và không tham gia build. Tài liệu yêu cầu, kế hoạch và thiết kế dữ liệu gốc nằm cạnh README này. Các mục chưa thể xác nhận hoặc còn cần triển khai được gom trong [CAN_BAN_BO_SUNG.md](CAN_BAN_BO_SUNG.md).
+
+## Cấu trúc
+
+| Đường dẫn | Vai trò |
+| --- | --- |
+| `src/app` | Trang và API Next.js |
+| `src/components` | Thành phần giao diện |
+| `src/context` | Trạng thái phiên đăng nhập, giỏ hàng, thông báo |
+| `src/lib` | Đăng nhập, truy vấn catalog, tính giá, tạo đơn, giới hạn lượt thử |
+| `src/types` | Kiểu dữ liệu FE và NextAuth |
+| `prisma/schema.prisma` | Schema ứng dụng PostgreSQL |
+| `prisma/migrations` | Migration khởi tạo cho cơ sở dữ liệu trống |
+| `prisma/seed-data` | Dữ liệu catalog lấy từ repo mẫu |
+| `prisma/seed-catalog.ts` | Nạp catalog mẫu; không đặt lại tồn kho của biến thể đã tồn tại |
+| `prisma/seed.ts` | Tạo tài khoản quản trị từ biến môi trường |
+| `tests` | Kiểm tra quy tắc bảo mật và giá/tồn kho |
+
+## Chạy tại máy phát triển
+
+1. Dùng Node.js 20 trở lên. Điền `CONNECTION_STRING` vào `.env` (Prisma CLI đọc file này); đặt `NEXTAUTH_URL`, `NEXTAUTH_SECRET` trong `.env.local`. Có thể tham khảo `.env.example`. Mật khẩu và khóa phải giữ ngoài Git. Nếu dùng biến môi trường hệ thống cho Prisma CLI, biến đó sẽ thay thế giá trị trong `.env`.
+2. Chạy `npm ci`.
+3. Trên máy hiện tại, migration và catalog đã được nạp vào schema Supabase `tpetie_app`; không cần chạy lại để thử. Với database mới: chạy `npx prisma migrate deploy`, sau đó `npm run prisma:seed-catalog`. Migration đầu tiên chỉ dành cho schema trống.
+4. Chạy `npm run dev`, mở `http://localhost:3000`. `npm test` và `npm run build` kiểm tra mã nguồn. Có thể chạy `node scripts/smoke-local.cjs` khi dev server đang bật.
+
+Tài khoản admin local: `admin@tpetie.local`; mật khẩu ngẫu nhiên nằm ở biến `ADMIN_INITIAL_PASSWORD` trong `.env.local` bị Git bỏ qua. Với môi trường khác, đặt `ADMIN_EMAIL` và `ADMIN_INITIAL_PASSWORD` (tối thiểu 16 ký tự), chạy `npm run prisma:seed` một lần rồi xóa biến mật khẩu khỏi môi trường triển khai.
+
+`npm run build` không tự thay đổi schema hay dữ liệu của database. Tồn kho và tổng tiền đơn hàng được kiểm tra lại phía máy chủ. Khi đưa lên Vercel, cần đặt cùng các biến môi trường và áp dụng migration/seed trước khi nhận đơn.
+
+## Trạng thái tính năng
+
+Trang sản phẩm và bộ sưu tập đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt; đặt hàng COD, tra cứu đơn, đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.

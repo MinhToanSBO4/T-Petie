@@ -1,0 +1,66 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { Breadcrumb } from '@/components/layout/Breadcrumb';
+import { FilterBar } from '@/components/filter/FilterBar';
+import { ProductGrid } from '@/components/product/ProductGrid';
+import { useCatalogProducts } from '@/components/product/useCatalogProducts';
+
+export default function BeGaiVayPage() {
+  const { products: allProducts } = useCatalogProducts();
+  const [sortBy, setSortBy] = useState('newest');
+  const [priceRange, setPriceRange] = useState('all');
+
+  const filteredProducts = useMemo(() => {
+    let list = allProducts.filter((p) => p.category === 'be-gai' && p.subcategory === 'vay');
+
+    if (priceRange === 'under-200') {
+      list = list.filter((p) => p.basePrice < 200000);
+    } else if (priceRange === '200-300') {
+      list = list.filter((p) => p.basePrice >= 200000 && p.basePrice <= 300000);
+    } else if (priceRange === 'above-300') {
+      list = list.filter((p) => p.basePrice > 300000);
+    }
+
+    if (sortBy === 'best-seller') {
+      list.sort((a, b) => (b.isBestSeller ? 1 : 0) - (a.isBestSeller ? 1 : 0));
+    } else if (sortBy === 'price-asc') {
+      list.sort((a, b) => a.basePrice - b.basePrice);
+    } else if (sortBy === 'price-desc') {
+      list.sort((a, b) => b.basePrice - a.basePrice);
+    }
+
+    return list;
+  }, [allProducts, sortBy, priceRange]);
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+      <Breadcrumb
+        items={[
+          { label: 'Bé Gái', href: '/be-gai' },
+          { label: 'Váy Đầm Công Chúa', href: '/be-gai/vay' },
+        ]}
+      />
+
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-charcoal-900 mb-2">
+          Váy Đầm Công Chúa Bé Gái 👗
+        </h1>
+        <p className="text-xs sm:text-sm text-charcoal-600 max-w-2xl leading-relaxed">
+          Những mẫu váy bồng xòe ngọt ngào từ voan tơ, lụa Habutai và thô đũi organic tự nhiên cho bé đi tiệc, đi chơi hay chụp ảnh kỷ niệm.
+        </p>
+      </div>
+
+      <FilterBar
+        activeSubcategory="vay"
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        selectedPriceRange={priceRange}
+        onPriceChange={setPriceRange}
+        totalResults={filteredProducts.length}
+      />
+
+      <ProductGrid products={filteredProducts} />
+    </div>
+  );
+}

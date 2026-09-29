@@ -1,0 +1,126 @@
+[
+  {
+    "id": "hoc-xinh-kem",
+    "title": "Học Xinh Kem",
+    "subtitle": "Nét trong sáng, tinh khôi cùng bé tựu trường rạng rỡ",
+    "story": "BST Học Xinh Kem mang phong cách học đường ngọt ngào và thanh lịch, kết hợp hoàn hảo giữa chất liệu thô đũi organic và voan tơ êm ái thoáng mát, giúp bé luôn rạng rỡ, tự tin và thoải mái vận động trong từng ngày tựu trường tươi vui.",
+    "bannerImage": "/images/banner-hxk.jpg",
+    "lookbookImages": [
+      "/images/ao-so-mi-trai-dat.jpg",
+      "/images/chan-vay-jeans-dang-xoe-navy.jpg",
+      "/images/ao-baby-blue-mat-truoc.jpg",
+      "/images/vay-thi-ca.jpg",
+      "/images/vay-nang-mai.jpg",
+      "/images/set-tinh-khoi.jpg"
+    ],
+    "themeColor": "#FFF8EE",
+    "accentColor": "#D97706",
+    "season": "BST Back To School 2026",
+    "badge": "Mới Nhất",
+    "featuredProductIds": [
+      "ao-so-mi-trai-dat",
+      "chan-vay-jeans",
+      "ao-baby-blue",
+      "set-nhi-nhanh-3-items",
+      "vay-thi-ca",
+      "vay-nang-mai",
+      "set-tinh-khoi",
+      "ao-ghile-hoi-hoa",
+      "chan-vay-hoi-hoa",
+      "quan-baggy-be",
+      "ao-polo-trang-giay",
+      "sooc-jeans",
+      "vay-ghile-o-ly"
+    ]
+  },
+  {
+    "id": "trung-thu-kem-com",
+    "title": "Trung Thu Kem & Cốm",
+    "subtitle": "Hương cốm non dịu ngọt và ánh trăng rằm ấm áp cho bé",
+    "story": "BST Trung Thu Kem & Cốm kết hợp hoàn hảo giữa chất liệu linen tự nhiên thoáng mát và các họa tiết thêu móc thủ công hình đầu lân, trăng rằm, thỏ ngọc ngộ nghĩnh mang lại nét đẹp trong trẻo, rạng rỡ cho bé trong đêm hội Trăng Rằm.",
+    "bannerImage": "/images/banner-trung-thu.jpg",
+    "lookbookImages": [
+      "/images/products/trung-thu-kem-com/set-lan-cat.jpg",
+      "/images/products/trung-thu-kem-com/set-lan-tuong.jpg",
+      "/images/products/trung-thu-kem-com/set-ao-dai-dan-nguyet.jpg",
+      "/images/products/trung-thu-kem-com/set-mut-tao.jpg",
+      "/images/products/trung-thu-kem-com/set-yukata.jpg",
+      "/images/products/trung-thu-kem-com/set-trang-non.jpg"
+    ],
+    "themeColor": "#EAF4EC",
+    "accentColor": "#77B77A",
+    "season": "Bộ Sưu Tập Trung Thu",
+    "badge": "Mới Nhất",
+    "featuredProductIds": [
+      "set-lan-cat",
+      "set-lan-tuong",
+      "set-ao-dai-dan-nguyet",
+      "set-mut-tao",
+      "set-yukata",
+      "set-trang-non"
+    ]
+  },
+  {
+    "id": "ha-mat",
+    "title": "Hạ Mật T6",
+    "subtitle": "Chất liệu thô đũi organic & linen thêu hoa đón làn gió mùa hè dịu mát",
+    "story": "BST Hạ Mật T6 2026 mang cảm hứng từ những ngày hè rực rỡ và ngọt ngào. Sử dụng chất liệu thô gió 2 lớp mềm nhẹ, tơ dệt hoa nổi đính kim sa và linen bột cao cấp thêu thủ công tỉ mỉ, mỗi thiết kế mang lại sự thoáng mát tuyệt đối và vẻ đẹp trong trẻo cho bé yêu.",
+    "bannerImage": "/images/banner-ha-mat.jpg",
+    "lookbookImages": [
+      "/images/products/ha-mat/vay-muoi-hong.jpg",
+      "/images/products/ha-mat/vay-sao-xanh.jpg",
+      "/images/products/ha-mat/set-bien-xanh.jpg",
+      "/images/products/ha-mat/ao-so-kem-ghim.jpg",
+      "/images/products/ha-mat/ao-lam-tinh-babydoll.jpg",
+      "/images/products/ha-mat/mu-bucket.jpg"
+    ],
+    "themeColor": "#FFF8E7",
+    "accentColor": "#F5A623",
+    "season": "BST Mùa Hè 2026",
+    "badge": "Mới Nhất",
+    "featuredProductIds": [
+      "vay-chanh-tay",
+      "vay-luu-ly",
+      "vay-muoi-hong",
+      "vay-sao-xanh",
+      "set-bien-xanh",
+      "ao-matcha-latte",
+      "quan-bi-nau",
+      "quan-vay-2-tang-navy",
+      "quan-bi-navy",
+      "ao-so-kem-ghim",
+      "ao-lam-tinh-babydoll",
+      "mu-bucket-ha-mat"
+    ]
+  },
+  {
+    "id": "khanh-vy",
+    "title": "Hè T3 Khánh Vy",
+    "subtitle": "Bộ sưu tập hợp tác đặc biệt — Tinh tế, ngọt ngào và cao cấp",
+    "story": "BST Hè T3 Khánh Vy là sự kết hợp độc quyền mang phong cách ngọt ngào, tinh tế với chất liệu tơ bướm organza, linen thô thêu hoa nổi và chéo Ý cao cấp. Từng thiết kế tôn vinh nét đẹp trong trẻo, tự nhiên và sự nâng niu tuyệt đối cho các bé gái.",
+    "bannerImage": "/images/banner-he-khanh-vy.jpg",
+    "lookbookImages": [
+      "/images/vay-thi-tho-trang.jpg",
+      "/images/vay-thi-tho-hong.jpg",
+      "/images/vay-tuong-vi.jpg",
+      "/images/vay-ha-lam.jpg",
+      "/images/set-ao-thanh-yen-phoi-chan-vay-caro-xanh.jpg",
+      "/images/set-ao-mut-cam-phoi-quan-sooc-be.jpg"
+    ],
+    "themeColor": "#FFEBEB",
+    "accentColor": "#E06D75",
+    "season": "BST Hè 2026",
+    "badge": "Độc Quyền",
+    "featuredProductIds": [
+      "vay-thi-tho-trang",
+      "vay-thi-tho-hong",
+      "vay-tuong-vi",
+      "vay-ha-lam",
+      "set-thanh-yen-caro",
+      "set-mut-cam-sooc-be",
+      "set-chim-cau-jean-no",
+      "ao-hai-au-khan-quang",
+      "quan-jump-navy-ha-an"
+    ]
+  }
+]

@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Kế Hoạch Refactor Toàn Diện — T'Petie</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      border-radius: 0px !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.55;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* ===== COVER PAGE ===== */
+    .cover-page {
+      height: 277mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      color: #ffffff;
+      text-align: center;
+      page-break-after: always;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover-page::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: 
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px);
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 1;
+      max-width: 520px;
+    }
+
+    .cover-badge {
+      display: inline-block;
+      background: #f59e0b;
+      color: #0f172a;
+      font-size: 8pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      padding: 6px 18px;
+      margin-bottom: 32px;
+    }
+
+    .cover-title {
+      font-size: 30pt;
+      font-weight: 900;
+      line-height: 1.15;
+      margin: 0 0 16px 0;
+      letter-spacing: -0.5px;
+    }
+
+    .cover-subtitle {
+      font-size: 13pt;
+      font-weight: 400;
+      color: #94a3b8;
+      margin: 0 0 48px 0;
+      line-height: 1.5;
+    }
+
+    .cover-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      text-align: left;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .cover-meta-item {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 12px 16px;
+    }
+
+    .cover-meta-label {
+      font-size: 7pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .cover-meta-value {
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    /* ===== PAGE CONTAINERS ===== */
+    .page {
+      min-height: 270mm;
+      page-break-after: always;
+      padding: 0;
+    }
+
+    .page:last-child {
+      page-break-after: avoid;
+    }
+
+    /* ===== HEADER BAR ===== */
+    .page-header {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .page-header-title {
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .page-header-num {
+      font-size: 8pt;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    /* ===== SECTION TITLES ===== */
+    .section-title {
+      font-size: 16pt;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    .section-subtitle {
+      font-size: 9pt;
+      color: #64748b;
+      margin: 0 0 20px 0;
+      font-weight: 500;
+    }
+
+    .section-divider {
+      width: 48px;
+      height: 3px;
+      background: #f59e0b;
+      margin-bottom: 16px;
+    }
+
+    /* ===== TABLE OF CONTENTS ===== */
+    .toc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 10pt;
+    }
+
+    .toc-item:last-child {
+      border-bottom: none;
+    }
+
+    .toc-num {
+      font-weight: 800;
+      color: #f59e0b;
+      margin-right: 12px;
+      font-size: 11pt;
+      min-width: 30px;
+    }
+
+    .toc-label {
+      flex: 1;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .toc-page {
+      font-weight: 700;
+      color: #64748b;
+      font-size: 9pt;
+    }
+
+    /* ===== CONTENT BLOCKS ===== */
+    h3 {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 20px 0 8px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #f59e0b;
+      display: inline-block;
+    }
+
+    h4 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 14px 0 6px 0;
+    }
+
+    p {
+      margin: 0 0 8px 0;
+      color: #334155;
+    }
+
+    ul {
+      margin: 4px 0 12px 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 4px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    /* ===== DATA TABLE ===== */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      font-size: 8.5pt;
+    }
+
+    .data-table th {
+      background: #0f172a;
+      color: #ffffff;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .data-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    .data-table tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .data-table tr:hover td {
+      background: #fef3c7;
+    }
+
+    /* ===== STATUS BADGES ===== */
+    .badge {
+      display: inline-block;
+      font-size: 7pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+    }
+
+    .badge-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .badge-high { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+    .badge-medium { background: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
+    .badge-low { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .badge-phase { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+    .badge-new { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+    .badge-remove { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+    /* ===== ARCHITECTURE BOXES ===== */
+    .arch-box {
+      border: 2px solid #e2e8f0;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      background: #ffffff;
+    }
+
+    .arch-box-title {
+      font-size: 9.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .arch-box.frontend { border-left: 4px solid #3b82f6; }
+    .arch-box.backend { border-left: 4px solid #10b981; }
+    .arch-box.database { border-left: 4px solid #8b5cf6; }
+    .arch-box.infra { border-left: 4px solid #f59e0b; }
+    .arch-box.security { border-left: 4px solid #ef4444; }
+
+    /* ===== CODE BLOCK ===== */
+    .code-block {
+      background: #1e293b;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7.5pt;
+      padding: 12px 14px;
+      margin: 8px 0 12px 0;
+      overflow-x: auto;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .code-comment { color: #64748b; }
+    .code-keyword { color: #f59e0b; }
+    .code-string { color: #34d399; }
+    .code-type { color: #60a5fa; }
+
+    /* ===== PHASE TIMELINE ===== */
+    .phase-block {
+      border: 2px solid #e2e8f0;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .phase-header {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .phase-name {
+      font-weight: 800;
+      font-size: 10pt;
+    }
+
+    .phase-duration {
+      font-size: 8pt;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .phase-body {
+      padding: 12px 16px;
+    }
+
+    /* ===== DIAGRAM CONTAINER ===== */
+    .diagram-container {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 16px;
+      margin: 12px 0;
+      text-align: center;
+    }
+
+    .diagram-caption {
+      font-size: 8pt;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 10px;
+    }
+
+    /* ===== COMPARISON TABLE ===== */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .compare-col {
+      border: 2px solid #e2e8f0;
+      padding: 12px 14px;
+    }
+
+    .compare-col.before {
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .compare-col.after {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+
+    .compare-label {
+      font-size: 7.5pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+    }
+
+    .compare-col.before .compare-label { color: #dc2626; }
+    .compare-col.after .compare-label { color: #16a34a; }
+
+    /* ===== TWO COLUMN ===== */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ===== FOOTER ===== */
+    .page-footer {
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7pt;
+      color: #94a3b8;
+    }
+
+    /* ===== CALLOUT ===== */
+    .callout {
+      border: 2px solid #f59e0b;
+      background: #fffbeb;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+
+    .callout-title {
+      font-weight: 800;
+      font-size: 9pt;
+      color: #92400e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .callout p {
+      color: #78350f;
+      margin: 0;
+      font-size: 8.5pt;
+    }
+
+    /* ===== MERMAID FIX ===== */
+    .mermaid {
+      background: transparent !important;
+    }
+    .mermaid svg {
+      max-width: 100%;
+    }
+
+    @media print {
+      body { margin: 0; padding: 0; }
+      .page { page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover-page">
+  <div class="cover-content">
+    <div class="cover-badge">Internal — Confidential</div>
+    <h1 class="cover-title">KẾ HOẠCH<br>REFACTOR TOÀN DIỆN</h1>
+    <p class="cover-subtitle">
+      Tái cấu trúc hệ thống T'Petie từ Frontend, Backend đến Database<br>
+      theo chuẩn kiến trúc phần mềm quốc tế
+    </p>
+    <div class="cover-meta-grid">
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Dự Án</div>
+        <div class="cover-meta-value">T'Petie E-Commerce</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Phiên Bản</div>
+        <div class="cover-meta-value">v2.0 — Refactor</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Người Thực Hiện</div>
+        <div class="cover-meta-value">Nguyễn Minh Toàn</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Ngày Lập</div>
+        <div class="cover-meta-value">28/09/2026</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 1: MỤC LỤC ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor Toàn Diện — T'Petie</span>
+    <span class="page-header-num">MỤC LỤC</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">Mục Lục</h2>
+  <p class="section-subtitle">Tổng quan nội dung kế hoạch refactor hệ thống</p>
+
+  <div style="margin-top: 20px;">
+    <div class="toc-item"><span class="toc-num">I</span><span class="toc-label">Tổng Quan Hiện Trạng & Động Lực Refactor</span><span class="toc-page">Trang 2</span></div>
+    <div class="toc-item"><span class="toc-num">II</span><span class="toc-label">Kiến Trúc Mục Tiêu (Target Architecture)</span><span class="toc-page">Trang 3–4</span></div>
+    <div class="toc-item"><span class="toc-num">III</span><span class="toc-label">Frontend — Tái Cấu Trúc Chi Tiết</span><span class="toc-page">Trang 5–6</span></div>
+    <div class="toc-item"><span class="toc-num">IV</span><span class="toc-label">Backend — API Layer & Business Logic</span><span class="toc-page">Trang 7–8</span></div>
+    <div class="toc-item"><span class="toc-num">V</span><span class="toc-label">Database — Schema Redesign & Migration</span><span class="toc-page">Trang 9–10</span></div>
+    <div class="toc-item"><span class="toc-num">VI</span><span class="toc-label">Bảo Mật & Compliance (OWASP Top 10)</span><span class="toc-page">Trang 11</span></div>
+    <div class="toc-item"><span class="toc-num">VII</span><span class="toc-label">Luồng Nghiệp Vụ Chuẩn (Business Flows)</span><span class="toc-page">Trang 12–13</span></div>
+    <div class="toc-item"><span class="toc-num">VIII</span><span class="toc-label">Lộ Trình Triển Khai 4 Phase (Roadmap)</span><span class="toc-page">Trang 14–15</span></div>
+    <div class="toc-item"><span class="toc-num">IX</span><span class="toc-label">Cấu Trúc Thư Mục Chuẩn</span><span class="toc-page">Trang 16</span></div>
+    <div class="toc-item"><span class="toc-num">X</span><span class="toc-label">Tiêu Chuẩn Áp Dụng & Tham Chiếu</span><span class="toc-page">Trang 17</span></div>
+  </div>
+
+  <div class="callout" style="margin-top: 30px;">
+    <div class="callout-title">Nguyên tắc dẫn đường</div>
+    <p>Mọi quyết định thiết kế trong tài liệu này tuân theo 3 nguyên tắc: <strong>Security by Default</strong> — bảo mật là yêu cầu bắt buộc, không phải tính năng thêm. <strong>Separation of Concerns</strong> — phân tách rõ ràng từng tầng trách nhiệm. <strong>Progressive Enhancement</strong> — xây nền vững trước, mở rộng sau.</p>
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: HIỆN TRẠNG ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">I. HIỆN TRẠNG</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">I. Tổng Quan Hiện Trạng & Động Lực</h2>
+  <p class="section-subtitle">Phân tích các vấn đề nghiêm trọng đã được phát hiện qua kiểm toán hệ thống</p>
+
+  <h3>1.1. Bảng Tổng Hợp Vấn Đề Hiện Tại</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 25%;">Hạng Mục</th>
+        <th style="width: 45%;">Vấn Đề Cốt Lõi</th>
+        <th style="width: 15%;">Mức Độ</th>
+        <th style="width: 15%;">Tầng</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Bảo mật đơn hàng</strong></td>
+        <td>Checkout ghi thẳng Google Sheet, không validate, không rate-limit → spam data</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>BE / Infra</td>
+      </tr>
+      <tr>
+        <td><strong>Secret Key lộ</strong></td>
+        <td>NEXTAUTH_SECRET hardcode fallback trong source code (auth.ts L16)</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>BE / Security</td>
+      </tr>
+      <tr>
+        <td><strong>DB không dùng</strong></td>
+        <td>PostgreSQL + Prisma cấu hình đầy đủ nhưng Product/Order không đọc/ghi từ DB</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Database</td>
+      </tr>
+      <tr>
+        <td><strong>FE chứa logic BE</strong></td>
+        <td>AuthContext chứa FALLBACK_USERS với password, so sánh trực tiếp trên client</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>Frontend</td>
+      </tr>
+      <tr>
+        <td><strong>Dữ liệu cứng JSON</strong></td>
+        <td>162KB products.json import tĩnh → không có CMS, không update được realtime</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Data Layer</td>
+      </tr>
+      <tr>
+        <td><strong>Dead code</strong></td>
+        <td>index.html (163KB), admin.html, tai-khoan.html, *.traineddata — không dùng</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Codebase</td>
+      </tr>
+      <tr>
+        <td><strong>Ảnh quá nặng</strong></td>
+        <td>Nhiều ảnh host trực tiếp trong repo, không optimize, không dùng CDN</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Performance</td>
+      </tr>
+      <tr>
+        <td><strong>UX không chuẩn</strong></td>
+        <td>Bộ sưu tập không hiện sản phẩm trực tiếp, bộ lọc thiếu, header sai thứ tự</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Frontend/UX</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>1.2. So Sánh Trước & Sau Refactor</h3>
+  <div class="compare-grid">
+    <div class="compare-col before">
+      <div class="compare-label">Hiện Tại (v1.x)</div>
+      <ul style="margin:0; padding-left: 16px; font-size: 8.5pt;">
+        <li>Checkout → Google Apps Script → Sheet</li>
+        <li>Dữ liệu sản phẩm = JSON tĩnh 162KB</li>
+        <li>Auth fallback bằng mảng user hardcode</li>
+        <li>Không có Order model trong DB</li>
+        <li>Dead code legacy HTML chiếm 300KB+</li>
+        <li>Secret key lộ trong source code</li>
+        <li>Không có rate limiting / CSRF</li>
+        <li>Không có API validation layer</li>
+      </ul>
+    </div>
+    <div class="compare-col after">
+      <div class="compare-label">Mục Tiêu (v2.0)</div>
+      <ul style="margin:0; padding-left: 16px; font-size: 8.5pt;">
+        <li>Checkout → API Route → Prisma → PostgreSQL</li>
+        <li>Dữ liệu sản phẩm đọc từ DB + ISR cache</li>
+        <li>Auth hoàn toàn qua NextAuth + DB</li>
+        <li>Full Order/OrderItem/Cart schema</li>
+        <li>Xoá sạch dead code, clean repository</li>
+        <li>Tất cả secrets qua env variables</li>
+        <li>Rate limiting + CSRF + Input validation</li>
+        <li>Zod schema validation toàn bộ API</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 3-4: KIẾN TRÚC MỤC TIÊU ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">II. KIẾN TRÚC MỤC TIÊU</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">II. Kiến Trúc Hệ Thống Mục Tiêu</h2>
+  <p class="section-subtitle">3-Tier Architecture theo mô hình Layered + Repository Pattern</p>
+
+  <div class="diagram-container">
+    <div class="mermaid">
+graph TB
+    subgraph CLIENT["PRESENTATION LAYER — Next.js App Router"]
+        A1["Pages (SSR/SSG)"]
+        A2["React Components"]
+        A3["Client State (Zustand)"]
+        A4["React Hook Form + Zod"]
+    end
+
+    subgraph API["API LAYER — Next.js Route Handlers"]
+        B1["Middleware Auth Guard"]
+        B2["Rate Limiter"]
+        B3["Input Validator (Zod)"]
+        B4["API Route Handlers"]
+    end
+
+    subgraph SERVICE["BUSINESS LOGIC LAYER"]
+        C1["OrderService"]
+        C2["ProductService"]
+        C3["UserService"]
+        C4["CartService"]
+        C5["AnalyticsService"]
+    end
+
+    subgraph DATA["DATA ACCESS LAYER"]
+        D1["Prisma ORM Client"]
+        D2["Repository Pattern"]
+        D3["Redis Cache"]
+    end
+
+    subgraph DB["PERSISTENCE LAYER"]
+        E1[("PostgreSQL — Vercel Postgres")]
+        E2[("Redis — Upstash")]
+        E3["Vercel Blob — Images"]
+    end
+
+    A1 --> B4
+    A2 --> A3
+    A4 --> B4
+    B4 --> B1
+    B4 --> B2
+    B4 --> B3
+    B4 --> C1
+    B4 --> C2
+    B4 --> C3
+    B4 --> C4
+    C1 --> D1
+    C2 --> D1
+    C3 --> D1
+    C4 --> D1
+    C5 --> D1
+    D1 --> E1
+    D2 --> D1
+    D3 --> E2
+    C2 --> D3
+    A2 --> E3
+    </div>
+    <div class="diagram-caption">Hình 1: Sơ đồ kiến trúc 3-Tier mục tiêu — Phân tách trách nhiệm rõ ràng theo tầng</div>
+  </div>
+
+  <h3>2.1. Nguyên Tắc Kiến Trúc</h3>
+  <div class="two-col">
+    <div>
+      <h4>Separation of Concerns (SoC)</h4>
+      <ul>
+        <li><strong>Presentation:</strong> Chỉ render UI, không chứa business logic</li>
+        <li><strong>API Layer:</strong> Validate, authorize, route — không query DB trực tiếp</li>
+        <li><strong>Service Layer:</strong> Toàn bộ logic nghiệp vụ (tính giá, kiểm stock, tạo đơn)</li>
+        <li><strong>Data Access:</strong> CRUD thuần qua Prisma, không chứa logic</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Dependency Inversion (DI)</h4>
+      <ul>
+        <li>Tầng trên không phụ thuộc tầng dưới trực tiếp</li>
+        <li>Service inject Repository qua interface</li>
+        <li>Dễ dàng swap DB provider mà không ảnh hưởng logic</li>
+        <li>Unit test được từng tầng độc lập</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>2.2. Technology Stack v2.0</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Tầng</th>
+        <th>Công Nghệ</th>
+        <th>Lý Do Chọn</th>
+        <th>Thay Thế Cho</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Frontend</td>
+        <td><strong>Next.js 14 App Router + TypeScript</strong></td>
+        <td>SSR/SSG/ISR, SEO tốt, ecosystem React lớn</td>
+        <td>Giữ nguyên, tối ưu cách dùng</td>
+      </tr>
+      <tr>
+        <td>Styling</td>
+        <td><strong>TailwindCSS 3.4 + Design Tokens</strong></td>
+        <td>Utility-first, chuẩn hoá design system</td>
+        <td>Giữ nguyên, thêm tokens</td>
+      </tr>
+      <tr>
+        <td>State Mgmt</td>
+        <td><strong>Zustand + React Query</strong></td>
+        <td>Nhẹ, type-safe, tách client/server state</td>
+        <td>useState + Context rải rác</td>
+      </tr>
+      <tr>
+        <td>Validation</td>
+        <td><strong>Zod</strong></td>
+        <td>Runtime schema validation, type inference tự động</td>
+        <td><span class="badge badge-new">MỚI</span> Không có</td>
+      </tr>
+      <tr>
+        <td>ORM</td>
+        <td><strong>Prisma 5.x</strong></td>
+        <td>Type-safe queries, migration, seeding</td>
+        <td>Giữ nguyên, dùng đúng cách</td>
+      </tr>
+      <tr>
+        <td>Database</td>
+        <td><strong>PostgreSQL (Vercel Postgres)</strong></td>
+        <td>ACID, quan hệ, production-grade</td>
+        <td>Giữ nguyên, redesign schema</td>
+      </tr>
+      <tr>
+        <td>Cache</td>
+        <td><strong>Upstash Redis</strong></td>
+        <td>Serverless-compatible, rate limiting</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>Auth</td>
+        <td><strong>NextAuth.js v4 + Prisma Adapter</strong></td>
+        <td>Session/JWT, Google/FB/Credentials</td>
+        <td>Giữ nguyên, loại bỏ fallback</td>
+      </tr>
+      <tr>
+        <td>Image</td>
+        <td><strong>Vercel Blob + next/image</strong></td>
+        <td>CDN tự động, optimize, lazy load</td>
+        <td>ibb.co + repo images</td>
+      </tr>
+      <tr>
+        <td>Analytics</td>
+        <td><strong>GA4 + GTM + Clarity</strong></td>
+        <td>Funnel tracking, heatmap, events</td>
+        <td>Giữ nguyên, chuẩn hoá events</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== PAGE 5-6: FRONTEND ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">III. FRONTEND</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">III. Frontend — Tái Cấu Trúc Chi Tiết</h2>
+  <p class="section-subtitle">Chuyển đổi từ Client-Side monolith sang Server Components + Client Islands</p>
+
+  <h3>3.1. Chiến Lược Rendering</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:25%;">Trang</th>
+        <th style="width:20%;">Rendering</th>
+        <th style="width:55%;">Chi Tiết</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>/ (Home)</strong></td>
+        <td><span class="badge badge-phase">ISR 60s</span></td>
+        <td>Fetch sản phẩm bán chạy, BST từ DB. Revalidate mỗi 60s. Hero carousel là Client Component.</td>
+      </tr>
+      <tr>
+        <td><strong>/san-pham/[slug]</strong></td>
+        <td><span class="badge badge-phase">SSG + ISR</span></td>
+        <td>generateStaticParams cho top 50 SP. Fallback blocking cho SP mới. SEO metadata từ DB.</td>
+      </tr>
+      <tr>
+        <td><strong>/bo-suu-tap/[id]</strong></td>
+        <td><span class="badge badge-phase">SSG + ISR</span></td>
+        <td>Hiển thị toàn bộ sản phẩm thuộc BST ngay lập tức, không cần click thêm.</td>
+      </tr>
+      <tr>
+        <td><strong>/be-gai</strong></td>
+        <td><span class="badge badge-phase">SSR</span></td>
+        <td>Server Component fetch toàn bộ SP. FilterBar là Client Component xử lý filter/sort.</td>
+      </tr>
+      <tr>
+        <td><strong>/gio-hang</strong></td>
+        <td><span class="badge badge-phase">CSR</span></td>
+        <td>Client Component thuần. Đọc/ghi Zustand store. Persist vào localStorage.</td>
+      </tr>
+      <tr>
+        <td><strong>/thanh-toan</strong></td>
+        <td><span class="badge badge-phase">CSR</span></td>
+        <td>Form React Hook Form + Zod validation. Submit qua API route có CSRF token.</td>
+      </tr>
+      <tr>
+        <td><strong>/admin/*</strong></td>
+        <td><span class="badge badge-phase">SSR + Guard</span></td>
+        <td>Middleware kiểm tra role=admin. Redirect nếu không đủ quyền. Dashboard SSR.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.2. Component Architecture</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+graph LR
+    subgraph SHARED["src/components/ui (Atomic)"]
+        U1["Button"]
+        U2["Input"]
+        U3["Badge"]
+        U4["Modal"]
+        U5["Toast"]
+        U6["Skeleton"]
+    end
+
+    subgraph PRODUCT["src/components/product"]
+        P1["ProductCard"]
+        P2["ProductGrid"]
+        P3["ProductGallery"]
+        P4["SizeSelector"]
+        P5["PriceDisplay"]
+    end
+
+    subgraph LAYOUT["src/components/layout"]
+        L1["Header — Sticky"]
+        L2["Footer"]
+        L3["MobileBottomNav"]
+        L4["Breadcrumb"]
+    end
+
+    subgraph FILTER["src/components/filter"]
+        F1["FilterBar"]
+        F2["PriceRangeSlider"]
+        F3["CategoryFilter"]
+        F4["SortDropdown"]
+    end
+
+    U1 --> P1
+    U3 --> P1
+    U6 --> P2
+    U2 --> F2
+    </div>
+    <div class="diagram-caption">Hình 2: Component dependency graph — Atomic Design Pattern</div>
+  </div>
+
+  <h3>3.3. Các Thay Đổi Trọng Yếu FE</h3>
+
+  <div class="arch-box frontend">
+    <div class="arch-box-title">3.3.1 — Loại bỏ AuthContext fallback users</div>
+    <p>Xoá hoàn toàn mảng <code>FALLBACK_USERS</code> và logic so sánh password trên client. Mọi authentication đi qua NextAuth server-side authorize → Prisma query.</p>
+    <div class="code-block"><span class="code-comment">// TRƯỚC (AuthContext.tsx — LỖ HỔNG BẢO MẬT)</span>
+<span class="code-keyword">const</span> FALLBACK_USERS: User[] = [
+  { email: <span class="code-string">'admin@tpetie.vn'</span>, password: <span class="code-string">'admin123'</span>, role: <span class="code-string">'admin'</span> },
+  ...
+];
+
+<span class="code-comment">// SAU (Xoá hoàn toàn, chỉ dùng NextAuth hooks)</span>
+<span class="code-keyword">export function</span> <span class="code-type">useAuth</span>() {
+  <span class="code-keyword">const</span> { data: session, status } = useSession();
+  <span class="code-keyword">return</span> { user: session?.user, isLoading: status === <span class="code-string">'loading'</span> };
+}</div>
+  </div>
+
+  <div class="arch-box frontend">
+    <div class="arch-box-title">3.3.2 — Chuyển products.json → Server-side fetch</div>
+    <p>Thay vì import 162KB JSON tĩnh vào client bundle, chuyển sang Server Component fetch từ DB với ISR caching.</p>
+    <div class="code-block"><span class="code-comment">// TRƯỚC (page.tsx — Nặng client bundle)</span>
+<span class="code-keyword">import</span> localProducts <span class="code-keyword">from</span> <span class="code-string">'@/data/products.json'</span>;
+<span class="code-keyword">const</span> products = localProducts <span class="code-keyword">as</span> <span class="code-type">Product</span>[];
+
+<span class="code-comment">// SAU (Server Component — Zero client JS)</span>
+<span class="code-keyword">async function</span> <span class="code-type">getProducts</span>() {
+  <span class="code-keyword">return</span> prisma.product.findMany({
+    include: { sizes: <span class="code-keyword">true</span>, images: <span class="code-keyword">true</span>, collection: <span class="code-keyword">true</span> },
+    orderBy: { createdAt: <span class="code-string">'desc'</span> },
+  });
+}
+<span class="code-keyword">export const</span> revalidate = 60; <span class="code-comment">// ISR: 60 giây</span></div>
+  </div>
+
+  <div class="arch-box frontend">
+    <div class="arch-box-title">3.3.3 — Filter Bar chuyên nghiệp</div>
+    <p>Thêm bộ lọc theo: <strong>Khoảng giá</strong> (slider), <strong>Size bé</strong> (S1–S4), <strong>Màu sắc</strong>, <strong>Chất liệu</strong>, <strong>Bộ sưu tập</strong>. URL-based filter (searchParams) để share/bookmark được.</p>
+  </div>
+
+  <div class="arch-box frontend">
+    <div class="arch-box-title">3.3.4 — Header/Navigation sắp xếp lại</div>
+    <p>Thứ tự menu chuẩn E-commerce: <strong>Trang chủ → Sản phẩm → Bộ sưu tập → Ưu đãi → Về chúng tôi</strong>. "Về chúng tôi" đưa về cuối. Bộ sưu tập click vào → hiện toàn bộ sản phẩm, không phải "Xem thêm".</p>
+  </div>
+</div>
+
+<!-- ==================== PAGE 7-8: BACKEND ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">IV. BACKEND</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">IV. Backend — API Layer & Business Logic</h2>
+  <p class="section-subtitle">Xây dựng API chuẩn RESTful với validation, authorization và error handling thống nhất</p>
+
+  <h3>4.1. API Endpoints — Thiết Kế Mới</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Endpoint</th>
+        <th>Mô Tả</th>
+        <th>Auth</th>
+        <th>Trạng Thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/products</code></td>
+        <td>Danh sách sản phẩm (filter, sort, paginate)</td>
+        <td>Public</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/products/[slug]</code></td>
+        <td>Chi tiết sản phẩm theo slug</td>
+        <td>Public</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/collections</code></td>
+        <td>Danh sách bộ sưu tập</td>
+        <td>Public</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>POST</td>
+        <td><code>/api/orders</code></td>
+        <td>Tạo đơn hàng mới (thay checkout cũ)</td>
+        <td>Optional</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/orders/[id]</code></td>
+        <td>Tra cứu đơn hàng</td>
+        <td>Owner</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>PATCH</td>
+        <td><code>/api/admin/orders/[id]</code></td>
+        <td>Admin cập nhật trạng thái đơn</td>
+        <td>Admin</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/admin/products</code></td>
+        <td>CRUD sản phẩm cho admin</td>
+        <td>Admin</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td>POST</td>
+        <td><code>/api/auth/[...nextauth]</code></td>
+        <td>NextAuth handlers (giữ nguyên)</td>
+        <td>—</td>
+        <td>Có sẵn</td>
+      </tr>
+      <tr>
+        <td>GET</td>
+        <td><code>/api/user/profile</code></td>
+        <td>Xem/sửa profile + hồ sơ bé yêu</td>
+        <td>User</td>
+        <td>Refactor</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>4.2. Luồng Xử Lý API Request</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+sequenceDiagram
+    participant C as Client (Browser)
+    participant M as Middleware
+    participant R as API Route Handler
+    participant V as Zod Validator
+    participant S as Service Layer
+    participant P as Prisma ORM
+    participant DB as PostgreSQL
+
+    C->>M: HTTP Request
+    M->>M: Rate Limit Check
+    M->>M: CSRF Token Verify
+    M->>M: Auth/Role Check
+    M-->>C: 429 / 403 (nếu fail)
+    M->>R: Forward Request
+    R->>V: Validate Body/Params
+    V-->>R: Validation Error → 400
+    R->>S: Call Service Method
+    S->>P: Query / Mutation
+    P->>DB: SQL Execute
+    DB-->>P: Result
+    P-->>S: Typed Data
+    S-->>R: Business Response
+    R-->>C: JSON Response + Status
+    </div>
+    <div class="diagram-caption">Hình 3: Sequence diagram — Luồng xử lý request chuẩn qua từng tầng</div>
+  </div>
+
+  <h3>4.3. Service Layer Pattern</h3>
+  <div class="code-block"><span class="code-comment">// src/lib/services/order.service.ts</span>
+<span class="code-keyword">import</span> { prisma } <span class="code-keyword">from</span> <span class="code-string">'@/lib/prisma'</span>;
+<span class="code-keyword">import</span> { <span class="code-type">CreateOrderInput</span>, <span class="code-type">OrderWithItems</span> } <span class="code-keyword">from</span> <span class="code-string">'@/types/order'</span>;
+
+<span class="code-keyword">export class</span> <span class="code-type">OrderService</span> {
+  <span class="code-keyword">static async</span> create(input: <span class="code-type">CreateOrderInput</span>): Promise&lt;<span class="code-type">OrderWithItems</span>&gt; {
+    <span class="code-comment">// 1. Validate stock availability</span>
+    <span class="code-keyword">for</span> (<span class="code-keyword">const</span> item <span class="code-keyword">of</span> input.items) {
+      <span class="code-keyword">const</span> product = <span class="code-keyword">await</span> prisma.product.findUnique({
+        where: { id: item.productId },
+        include: { sizes: <span class="code-keyword">true</span> },
+      });
+      <span class="code-keyword">if</span> (!product) <span class="code-keyword">throw new</span> AppError(<span class="code-string">'PRODUCT_NOT_FOUND'</span>, 404);
+      
+      <span class="code-keyword">const</span> sizeOption = product.sizes.find(s => s.size === item.size);
+      <span class="code-keyword">if</span> (!sizeOption || sizeOption.stock < item.quantity) {
+        <span class="code-keyword">throw new</span> AppError(<span class="code-string">'INSUFFICIENT_STOCK'</span>, 400);
+      }
+    }
+
+    <span class="code-comment">// 2. Create order in transaction</span>
+    <span class="code-keyword">return</span> prisma.$transaction(<span class="code-keyword">async</span> (tx) => {
+      <span class="code-comment">// Decrease stock + create order atomically</span>
+      ...
+    });
+  }
+}</div>
+
+  <h3>4.4. Error Handling Chuẩn</h3>
+  <div class="code-block"><span class="code-comment">// src/lib/errors/AppError.ts</span>
+<span class="code-keyword">export class</span> <span class="code-type">AppError</span> <span class="code-keyword">extends</span> Error {
+  <span class="code-keyword">constructor</span>(
+    <span class="code-keyword">public</span> code: <span class="code-type">string</span>,
+    <span class="code-keyword">public</span> statusCode: <span class="code-type">number</span>,
+    message?: <span class="code-type">string</span>,
+  ) {
+    <span class="code-keyword">super</span>(message || code);
+  }
+}
+
+<span class="code-comment">// API Response chuẩn</span>
+{ <span class="code-string">"success"</span>: <span class="code-keyword">false</span>, <span class="code-string">"error"</span>: { <span class="code-string">"code"</span>: <span class="code-string">"INSUFFICIENT_STOCK"</span>, <span class="code-string">"message"</span>: <span class="code-string">"Sản phẩm đã hết size này"</span> } }</div>
+</div>
+
+<!-- ==================== PAGE 9-10: DATABASE ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">V. DATABASE</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">V. Database — Schema Redesign</h2>
+  <p class="section-subtitle">Thiết kế lại toàn bộ schema PostgreSQL theo chuẩn E-Commerce, ACID-compliant</p>
+
+  <h3>5.1. Entity Relationship Diagram (ERD)</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+erDiagram
+    User ||--o{ Order : places
+    User ||--o{ Account : has
+    User ||--o{ Session : has
+    User ||--o{ CartItem : has
+
+    Product ||--o{ ProductSize : has
+    Product ||--o{ ProductImage : has
+    Product }o--|| Collection : belongs_to
+    Product }o--|| Category : belongs_to
+
+    Order ||--|{ OrderItem : contains
+    OrderItem }o--|| Product : references
+    OrderItem }o--|| ProductSize : references
+
+    CartItem }o--|| Product : references
+    CartItem }o--|| ProductSize : references
+
+    User {
+        string id PK
+        string email UK
+        string password
+        string name
+        string role
+        string status
+        string phone
+        string address
+        string city
+        int points
+        string babyName
+        datetime babyBirthDate
+        float babyWeight
+        float babyHeight
+    }
+
+    Product {
+        string id PK
+        string slug UK
+        string sku UK
+        string name
+        string description
+        float basePrice
+        float originalPrice
+        int discountPercent
+        string material
+        string category_id FK
+        string collection_id FK
+        boolean isBestSeller
+        boolean isNewArrival
+        boolean isSale
+    }
+
+    ProductSize {
+        string id PK
+        string product_id FK
+        string size
+        string weightRange
+        string ageRange
+        float price
+        int stock
+    }
+
+    Order {
+        string id PK
+        string orderCode UK
+        string user_id FK
+        string customerName
+        string customerPhone
+        string customerAddress
+        string note
+        float subtotal
+        float discountAmount
+        float shippingFee
+        float totalAmount
+        string status
+        string source
+        datetime createdAt
+    }
+
+    OrderItem {
+        string id PK
+        string order_id FK
+        string product_id FK
+        string size_id FK
+        string productName
+        int quantity
+        float unitPrice
+        float lineTotal
+    }
+
+    Collection {
+        string id PK
+        string slug UK
+        string name
+        string description
+        string coverImage
+        boolean isActive
+    }
+
+    Category {
+        string id PK
+        string slug UK
+        string name
+    }
+
+    CartItem {
+        string id PK
+        string user_id FK
+        string product_id FK
+        string size_id FK
+        int quantity
+    }
+
+    ProductImage {
+        string id PK
+        string product_id FK
+        string url
+        int sortOrder
+        boolean isThumbnail
+    }
+    </div>
+    <div class="diagram-caption">Hình 4: Entity Relationship Diagram — Schema mới đầy đủ quan hệ và ràng buộc</div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 10: DB TIẾP ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">V. DATABASE (tiếp)</span>
+  </div>
+
+  <h3>5.2. So Sánh Schema Cũ vs Mới</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:20%;">Model</th>
+        <th style="width:35%;">Schema Cũ (v1)</th>
+        <th style="width:35%;">Schema Mới (v2)</th>
+        <th style="width:10%;">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Product</strong></td>
+        <td>Chỉ có id, name, price. 3 trường. Không dùng.</td>
+        <td>20+ trường: slug, sku, basePrice, material, flags, FK tới Collection & Category</td>
+        <td><span class="badge badge-critical">Redesign</span></td>
+      </tr>
+      <tr>
+        <td><strong>ProductSize</strong></td>
+        <td>Không tồn tại (nằm trong JSON)</td>
+        <td>Model riêng: size, weightRange, ageRange, price, stock. FK → Product</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>ProductImage</strong></td>
+        <td>Không tồn tại (array string trong JSON)</td>
+        <td>Model riêng: url, sortOrder, isThumbnail. FK → Product</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>Order</strong></td>
+        <td>Không tồn tại (ghi vào Google Sheet)</td>
+        <td>Full model: orderCode, customer info, totals, status, timestamps</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>OrderItem</strong></td>
+        <td>Không tồn tại</td>
+        <td>Chi tiết từng sản phẩm trong đơn: quantity, unitPrice, lineTotal</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>Collection</strong></td>
+        <td>Không tồn tại (JSON tĩnh)</td>
+        <td>Model DB: slug, name, description, coverImage, isActive</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>Category</strong></td>
+        <td>Không tồn tại (hardcode string)</td>
+        <td>Model DB: slug, name. Product FK reference</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>CartItem</strong></td>
+        <td>Không tồn tại (localStorage chỉ)</td>
+        <td>Server-side cart: FK → User, Product, Size. Quantity</td>
+        <td><span class="badge badge-new">MỚI</span></td>
+      </tr>
+      <tr>
+        <td><strong>User</strong></td>
+        <td>Có sẵn, khá đầy đủ</td>
+        <td>Giữ nguyên, thêm relation tới Order và CartItem</td>
+        <td>Refactor</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>5.3. Migration Strategy</h3>
+  <div class="arch-box database">
+    <div class="arch-box-title">Chiến Lược Di Chuyển Dữ Liệu</div>
+    <ol style="margin: 4px 0; padding-left: 20px; font-size: 8.5pt;">
+      <li><strong>Bước 1:</strong> Viết Prisma schema mới → <code>prisma migrate dev --name full_schema_v2</code></li>
+      <li><strong>Bước 2:</strong> Script seed chuyển đổi <code>products.json</code> → Insert vào Product + ProductSize + ProductImage</li>
+      <li><strong>Bước 3:</strong> Script seed chuyển đổi <code>collections.json</code> → Insert vào Collection</li>
+      <li><strong>Bước 4:</strong> Verify data integrity: count records, spot-check relations</li>
+      <li><strong>Bước 5:</strong> Chuyển đổi trang FE dần dần: page by page, fetch từ DB thay JSON</li>
+      <li><strong>Bước 6:</strong> Khi 100% trang đã chuyển → Xoá <code>src/data/*.json</code></li>
+    </ol>
+  </div>
+
+  <h3>5.4. Indexing Strategy</h3>
+  <table class="data-table">
+    <thead>
+      <tr><th>Table</th><th>Index</th><th>Loại</th><th>Lý Do</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Product</td><td>slug</td><td>UNIQUE</td><td>URL lookup — trang chi tiết SP</td></tr>
+      <tr><td>Product</td><td>sku</td><td>UNIQUE</td><td>Mã SP cho quản lý kho</td></tr>
+      <tr><td>Product</td><td>category_id, isSale, isBestSeller</td><td>COMPOSITE</td><td>Filter + sort queries</td></tr>
+      <tr><td>ProductSize</td><td>product_id</td><td>INDEX</td><td>Join khi load chi tiết SP</td></tr>
+      <tr><td>Order</td><td>orderCode</td><td>UNIQUE</td><td>Tra cứu đơn hàng</td></tr>
+      <tr><td>Order</td><td>user_id, createdAt</td><td>COMPOSITE</td><td>Lịch sử mua của user</td></tr>
+      <tr><td>Order</td><td>status</td><td>INDEX</td><td>Admin filter theo trạng thái</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== PAGE 11: BẢO MẬT ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">VI. BẢO MẬT</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">VI. Bảo Mật & Compliance</h2>
+  <p class="section-subtitle">Áp dụng OWASP Top 10 (2021) và Security Best Practices cho Next.js</p>
+
+  <h3>6.1. Checklist Bảo Mật</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:20%;">OWASP Category</th>
+        <th style="width:40%;">Giải Pháp Cụ Thể</th>
+        <th style="width:25%;">Implementation</th>
+        <th style="width:15%;">Priority</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>A01: Broken Access Control</strong></td>
+        <td>Middleware kiểm tra role trước mỗi admin route. Server-side session check, không tin client.</td>
+        <td><code>middleware.ts</code> + <code>getServerSession()</code></td>
+        <td><span class="badge badge-critical">P0</span></td>
+      </tr>
+      <tr>
+        <td><strong>A02: Crypto Failures</strong></td>
+        <td>NEXTAUTH_SECRET 100% từ env. Bcrypt cost factor ≥12. Không log password/token.</td>
+        <td>Xoá hardcode secret fallback</td>
+        <td><span class="badge badge-critical">P0</span></td>
+      </tr>
+      <tr>
+        <td><strong>A03: Injection</strong></td>
+        <td>Prisma parameterized queries (mặc định). Zod sanitize input. Không dùng raw SQL.</td>
+        <td>Zod schemas + Prisma</td>
+        <td><span class="badge badge-high">P1</span></td>
+      </tr>
+      <tr>
+        <td><strong>A04: Insecure Design</strong></td>
+        <td>Rate limiting (Upstash) cho checkout + auth. CSRF token cho form mutate data.</td>
+        <td>@upstash/ratelimit</td>
+        <td><span class="badge badge-critical">P0</span></td>
+      </tr>
+      <tr>
+        <td><strong>A05: Security Misconfig</strong></td>
+        <td>Security headers: CSP, X-Frame, HSTS. Disable X-Powered-By. Strict CORS.</td>
+        <td><code>next.config.js</code> headers</td>
+        <td><span class="badge badge-high">P1</span></td>
+      </tr>
+      <tr>
+        <td><strong>A07: XSS</strong></td>
+        <td>React auto-escapes JSX. Không dùng dangerouslySetInnerHTML (trừ analytics scripts có whitelist).</td>
+        <td>Audit toàn bộ component</td>
+        <td><span class="badge badge-high">P1</span></td>
+      </tr>
+      <tr>
+        <td><strong>A09: Logging</strong></td>
+        <td>Structured logging (pino). Log access, mutations, errors. Không log PII/secrets.</td>
+        <td>pino logger service</td>
+        <td><span class="badge badge-medium">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.2. Middleware Security Stack</h3>
+  <div class="code-block"><span class="code-comment">// src/middleware.ts — Security layers</span>
+<span class="code-keyword">import</span> { NextResponse } <span class="code-keyword">from</span> <span class="code-string">'next/server'</span>;
+<span class="code-keyword">import</span> { getToken } <span class="code-keyword">from</span> <span class="code-string">'next-auth/jwt'</span>;
+<span class="code-keyword">import</span> { Ratelimit } <span class="code-keyword">from</span> <span class="code-string">'@upstash/ratelimit'</span>;
+<span class="code-keyword">import</span> { Redis } <span class="code-keyword">from</span> <span class="code-string">'@upstash/redis'</span>;
+
+<span class="code-keyword">const</span> ratelimit = <span class="code-keyword">new</span> Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, <span class="code-string">'10 s'</span>), <span class="code-comment">// 10 req / 10s</span>
+});
+
+<span class="code-keyword">export async function</span> middleware(req) {
+  <span class="code-comment">// 1. Rate Limit</span>
+  <span class="code-keyword">const</span> { success } = <span class="code-keyword">await</span> ratelimit.limit(ip);
+  <span class="code-keyword">if</span> (!success) <span class="code-keyword">return</span> NextResponse.json({ error: <span class="code-string">'Too Many Requests'</span> }, { status: 429 });
+
+  <span class="code-comment">// 2. Auth Guard cho /admin/*</span>
+  <span class="code-keyword">if</span> (req.nextUrl.pathname.startsWith(<span class="code-string">'/admin'</span>)) {
+    <span class="code-keyword">const</span> token = <span class="code-keyword">await</span> getToken({ req });
+    <span class="code-keyword">if</span> (!token || token.role !== <span class="code-string">'admin'</span>) {
+      <span class="code-keyword">return</span> NextResponse.redirect(<span class="code-keyword">new</span> URL(<span class="code-string">'/dang-nhap'</span>, req.url));
+    }
+  }
+
+  <span class="code-comment">// 3. Security Headers</span>
+  <span class="code-keyword">const</span> response = NextResponse.next();
+  response.headers.set(<span class="code-string">'X-Frame-Options'</span>, <span class="code-string">'DENY'</span>);
+  response.headers.set(<span class="code-string">'X-Content-Type-Options'</span>, <span class="code-string">'nosniff'</span>);
+  response.headers.set(<span class="code-string">'Referrer-Policy'</span>, <span class="code-string">'strict-origin-when-cross-origin'</span>);
+  <span class="code-keyword">return</span> response;
+}</div>
+
+  <h3>6.3. Chuỗi Bảo Mật Đơn Hàng (Sau Refactor)</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+flowchart LR
+    A["Client Submit Form"] --> B{"Rate Limit OK?"}
+    B -->|No| C["429 Too Many Requests"]
+    B -->|Yes| D{"CSRF Token Valid?"}
+    D -->|No| E["403 Forbidden"]
+    D -->|Yes| F{"Zod Validate Input?"}
+    F -->|No| G["400 Bad Request"]
+    F -->|Yes| H["OrderService.create()"]
+    H --> I{"Stock Available?"}
+    I -->|No| J["400 Hết hàng"]
+    I -->|Yes| K["DB Transaction"]
+    K --> L["201 Order Created"]
+
+    style C fill:#fee2e2,stroke:#ef4444
+    style E fill:#fee2e2,stroke:#ef4444
+    style G fill:#fee2e2,stroke:#ef4444
+    style J fill:#fee2e2,stroke:#ef4444
+    style L fill:#dcfce7,stroke:#22c55e
+    </div>
+    <div class="diagram-caption">Hình 5: Chuỗi bảo mật 4 lớp cho luồng đặt hàng</div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 12-13: BUSINESS FLOWS ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">VII. BUSINESS FLOWS</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">VII. Luồng Nghiệp Vụ Chuẩn</h2>
+  <p class="section-subtitle">Redesign Customer Journey theo chuẩn E-Commerce (đối chiếu atino.vn + shopee.vn)</p>
+
+  <h3>7.1. Luồng Mua Hàng Hoàn Chỉnh (Happy Path)</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+flowchart TB
+    START(["Khách truy cập T'Petie"]) --> HOME["Trang Chủ"]
+    HOME --> BROWSE{"Duyệt sản phẩm"}
+    BROWSE --> CAT["Trang Danh Mục /be-gai"]
+    BROWSE --> BST["Trang BST /bo-suu-tap/slug"]
+    BROWSE --> SALE["Trang Ưu Đãi /sale"]
+    
+    CAT --> FILTER["Bộ Lọc: Giá / Size / Màu / Chất liệu"]
+    BST --> FILTER
+    SALE --> FILTER
+    
+    FILTER --> PDP["Trang Chi Tiết Sản Phẩm /san-pham/slug"]
+    PDP --> SELECT["Chọn Size + Xem bảng size theo cân nặng"]
+    SELECT --> ADD_CART["Thêm Vào Giỏ Hàng"]
+    
+    ADD_CART --> MINI_CART["Mini Cart Slide-in"]
+    MINI_CART --> CONTINUE{"Tiếp tục mua?"}
+    CONTINUE -->|Có| BROWSE
+    CONTINUE -->|Không| CART["Trang Giỏ Hàng /gio-hang"]
+    
+    CART --> CHECKOUT["Trang Thanh Toán /thanh-toan"]
+    CHECKOUT --> FILL["Điền thông tin: Tên, SĐT, Địa chỉ"]
+    FILL --> SUBMIT["Xác Nhận Đặt Hàng"]
+    SUBMIT --> SUCCESS["Trang Đặt Hàng Thành Công"]
+    SUCCESS --> TRACK["Mã đơn hàng để tra cứu"]
+    
+    style START fill:#eff6ff,stroke:#3b82f6
+    style SUCCESS fill:#dcfce7,stroke:#22c55e
+    style FILTER fill:#fef3c7,stroke:#f59e0b
+    style ADD_CART fill:#fef3c7,stroke:#f59e0b
+    </div>
+    <div class="diagram-caption">Hình 6: Customer Journey — Luồng mua hàng chuẩn từ browse đến checkout</div>
+  </div>
+
+  <h3>7.2. Luồng Quản Lý Đơn Hàng (Admin)</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+stateDiagram-v2
+    [*] --> pending : Khách đặt hàng
+    pending --> confirmed : Admin xác nhận
+    pending --> cancelled : Admin / Khách huỷ
+    confirmed --> shipping : Giao cho vận chuyển
+    shipping --> delivered : Giao thành công
+    shipping --> returned : Khách trả hàng
+    delivered --> completed : Hoàn tất (sau 7 ngày)
+    returned --> refunded : Hoàn tiền
+    cancelled --> [*]
+    completed --> [*]
+    refunded --> [*]
+    </div>
+    <div class="diagram-caption">Hình 7: State machine — Trạng thái đơn hàng (Order Status Flow)</div>
+  </div>
+
+  <h3>7.3. Các Cải Tiến UX Quan Trọng</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:8%;">#</th>
+        <th style="width:25%;">Vấn Đề UX Hiện Tại</th>
+        <th style="width:42%;">Giải Pháp</th>
+        <th style="width:25%;">Tham Chiếu</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Header "Về chúng tôi" đặt sai vị trí</td>
+        <td>Đưa về cuối menu: Trang chủ → Sản phẩm → BST → Ưu đãi → Về chúng tôi</td>
+        <td>atino.vn, Nielsen Norman Group</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Click BST phải click thêm lần nữa</td>
+        <td>Trang BST hiện ngay toàn bộ sản phẩm thuộc BST, có ProductGrid inline</td>
+        <td>atino.vn/collections</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Không có bộ lọc sản phẩm</td>
+        <td>FilterBar với: Giá (slider), Size, Màu, Chất liệu. Sticky trên mobile.</td>
+        <td>shopee.vn, ASOS.com</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Vào BST phải cuộn xuống mới thấy SP</td>
+        <td>SP hiện ngay đầu trang, header BST compact (ảnh nhỏ + tên + mô tả 1 dòng)</td>
+        <td>Baymard Institute UX</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Touch target nhỏ trên mobile</td>
+        <td>Tất cả nút CTA ≥ 44x44px. Size selector dạng chip lớn.</td>
+        <td>Apple HIG, Material Design</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Không có trang tra cứu đơn hàng</td>
+        <td>Thêm /tra-cuu-don: nhập mã đơn + SĐT → xem trạng thái</td>
+        <td>ghn.vn, ghtk.vn</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== PAGE 14-15: ROADMAP ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">VIII. ROADMAP</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">VIII. Lộ Trình Triển Khai 4 Phase</h2>
+  <p class="section-subtitle">Phân chia refactor thành 4 giai đoạn, ưu tiên bảo mật và nền tảng dữ liệu trước</p>
+
+  <!-- Phase 1 -->
+  <div class="phase-block">
+    <div class="phase-header">
+      <span class="phase-name">PHASE 1 — NỀN TẢNG & BẢO MẬT</span>
+      <span class="phase-duration">Tuần 1–2 | Ưu tiên: CRITICAL</span>
+    </div>
+    <div class="phase-body">
+      <p><strong>Mục tiêu:</strong> Loại bỏ mọi lỗ hổng bảo mật, dọn dead code, thiết lập DB schema mới.</p>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Task</th><th>Output</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td>1.1</td><td>Xoá NEXTAUTH_SECRET hardcode, chuyển 100% env</td><td>.env.example chuẩn</td><td>BE</td></tr>
+          <tr><td>1.2</td><td>Xoá FALLBACK_USERS khỏi AuthContext</td><td>AuthContext.tsx clean</td><td>FE</td></tr>
+          <tr><td>1.3</td><td>Xoá dead code: index.html, admin.html, tai-khoan.html, *.traineddata, *.py, *.js scripts</td><td>Repo giảm ~7MB</td><td>DevOps</td></tr>
+          <tr><td>1.4</td><td>Redesign Prisma schema (Product, Size, Image, Order, Collection, Category, CartItem)</td><td>schema.prisma v2</td><td>BE/DB</td></tr>
+          <tr><td>1.5</td><td>Migration script: products.json → DB seed</td><td>prisma/seed.ts v2</td><td>BE</td></tr>
+          <tr><td>1.6</td><td>Setup Upstash Redis + Rate Limiter middleware</td><td>middleware.ts</td><td>BE/Infra</td></tr>
+          <tr><td>1.7</td><td>Security headers trong next.config.js</td><td>CSP, HSTS, X-Frame</td><td>DevOps</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase-block">
+    <div class="phase-header">
+      <span class="phase-name">PHASE 2 — API LAYER & BACKEND</span>
+      <span class="phase-duration">Tuần 3–4 | Ưu tiên: HIGH</span>
+    </div>
+    <div class="phase-body">
+      <p><strong>Mục tiêu:</strong> Xây dựng toàn bộ API endpoints, Service Layer, thay thế Google Sheet checkout.</p>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Task</th><th>Output</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td>2.1</td><td>API /api/products (GET — list, filter, paginate)</td><td>Product API</td><td>BE</td></tr>
+          <tr><td>2.2</td><td>API /api/products/[slug] (GET — detail)</td><td>Product Detail API</td><td>BE</td></tr>
+          <tr><td>2.3</td><td>API /api/collections (GET — list + products)</td><td>Collection API</td><td>BE</td></tr>
+          <tr><td>2.4</td><td>API /api/orders (POST — create order, validate, stock check)</td><td>Order API</td><td>BE</td></tr>
+          <tr><td>2.5</td><td>API /api/orders/[id] (GET — tra cứu đơn)</td><td>Order Lookup API</td><td>BE</td></tr>
+          <tr><td>2.6</td><td>OrderService, ProductService, UserService</td><td>Service Layer</td><td>BE</td></tr>
+          <tr><td>2.7</td><td>Zod schemas cho toàn bộ API input/output</td><td>src/lib/validators/</td><td>BE</td></tr>
+          <tr><td>2.8</td><td>AppError class + error handler middleware</td><td>Error handling chuẩn</td><td>BE</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase-block">
+    <div class="phase-header">
+      <span class="phase-name">PHASE 3 — FRONTEND REFACTOR & UX</span>
+      <span class="phase-duration">Tuần 5–6 | Ưu tiên: HIGH</span>
+    </div>
+    <div class="phase-body">
+      <p><strong>Mục tiêu:</strong> Chuyển FE dùng DB data, cải thiện UX, thêm bộ lọc, sửa navigation.</p>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Task</th><th>Output</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td>3.1</td><td>Homepage: Server Component, fetch từ DB (ISR 60s)</td><td>page.tsx SSR</td><td>FE</td></tr>
+          <tr><td>3.2</td><td>Trang danh mục: FilterBar (giá, size, màu, chất liệu)</td><td>Filter hoàn chỉnh</td><td>FE</td></tr>
+          <tr><td>3.3</td><td>Trang BST: Hiện toàn bộ SP inline, header compact</td><td>BST UX cải thiện</td><td>FE</td></tr>
+          <tr><td>3.4</td><td>Header navigation reorder: Về chúng tôi → cuối</td><td>Header.tsx</td><td>FE</td></tr>
+          <tr><td>3.5</td><td>Checkout form: React Hook Form + Zod client-side</td><td>Checkout v2</td><td>FE</td></tr>
+          <tr><td>3.6</td><td>Trang tra cứu đơn hàng /tra-cuu-don</td><td>Order Tracking</td><td>FE</td></tr>
+          <tr><td>3.7</td><td>Zustand store thay CartContext + AuthContext</td><td>State Mgmt v2</td><td>FE</td></tr>
+          <tr><td>3.8</td><td>Image migration: repo → Vercel Blob</td><td>CDN images</td><td>FE/Infra</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="phase-block">
+    <div class="phase-header">
+      <span class="phase-name">PHASE 4 — ADMIN PANEL & ANALYTICS</span>
+      <span class="phase-duration">Tuần 7–8 | Ưu tiên: MEDIUM</span>
+    </div>
+    <div class="phase-body">
+      <p><strong>Mục tiêu:</strong> Dashboard admin quản lý đơn/SP, chuẩn hoá analytics events, testing & deploy.</p>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Task</th><th>Output</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td>4.1</td><td>Admin Dashboard: Tổng quan đơn hàng, doanh thu</td><td>Admin Panel</td><td>FE/BE</td></tr>
+          <tr><td>4.2</td><td>Admin CRUD sản phẩm (thêm/sửa/xoá)</td><td>Product Management</td><td>FE/BE</td></tr>
+          <tr><td>4.3</td><td>Admin quản lý đơn hàng (đổi trạng thái)</td><td>Order Management</td><td>FE/BE</td></tr>
+          <tr><td>4.4</td><td>Chuẩn hoá GA4 custom events + dataLayer</td><td>Analytics v2</td><td>Analytics</td></tr>
+          <tr><td>4.5</td><td>Structured logging (pino)</td><td>Logging service</td><td>BE</td></tr>
+          <tr><td>4.6</td><td>E2E testing (Playwright) cho critical flows</td><td>Test suite</td><td>QA</td></tr>
+          <tr><td>4.7</td><td>Production deploy checklist & monitoring</td><td>Go-Live</td><td>DevOps</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 15: GANTT CHART ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">VIII. ROADMAP (tiếp)</span>
+  </div>
+
+  <h3>8.1. Gantt Chart Tổng Thể</h3>
+  <div class="diagram-container">
+    <div class="mermaid">
+gantt
+    title Lộ Trình Refactor T'Petie v2.0
+    dateFormat  YYYY-MM-DD
+    axisFormat  %d/%m
+
+    section Phase 1: Nền Tảng
+    Xoá dead code + secrets        :done, p1a, 2026-10-01, 3d
+    Redesign Prisma schema          :active, p1b, 2026-10-01, 5d
+    DB Migration + Seed             :p1c, after p1b, 3d
+    Rate Limiter + Security Headers :p1d, 2026-10-06, 4d
+
+    section Phase 2: Backend
+    Product API endpoints           :p2a, 2026-10-13, 4d
+    Order API + Service Layer       :p2b, 2026-10-15, 5d
+    Zod Validators + Error Handling :p2c, 2026-10-17, 3d
+    Collection API                  :p2d, 2026-10-20, 3d
+
+    section Phase 3: Frontend
+    Homepage SSR + ISR              :p3a, 2026-10-27, 3d
+    FilterBar Component             :p3b, 2026-10-28, 4d
+    BST + Navigation fix            :p3c, 2026-10-30, 3d
+    Checkout v2 + Order Tracking    :p3d, 2026-11-02, 4d
+    Zustand + Image CDN             :p3e, 2026-11-04, 3d
+
+    section Phase 4: Admin + QA
+    Admin Dashboard                 :p4a, 2026-11-10, 5d
+    Analytics chuẩn hoá             :p4b, 2026-11-12, 3d
+    E2E Testing                     :p4c, 2026-11-15, 4d
+    Production Deploy               :crit, p4d, 2026-11-19, 2d
+    </div>
+    <div class="diagram-caption">Hình 8: Gantt chart — Timeline 8 tuần refactor toàn diện</div>
+  </div>
+
+  <h3>8.2. Rủi Ro & Giải Pháp</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:25%;">Rủi Ro</th>
+        <th style="width:15%;">Xác Suất</th>
+        <th style="width:15%;">Tác Động</th>
+        <th style="width:45%;">Chiến Lược Giảm Thiểu</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Data migration lỗi (mất/sai dữ liệu SP)</td>
+        <td><span class="badge badge-high">Trung bình</span></td>
+        <td><span class="badge badge-critical">Cao</span></td>
+        <td>Script seed có validation + count check. Backup JSON gốc. Rollback nếu sai.</td>
+      </tr>
+      <tr>
+        <td>Prisma schema break existing auth</td>
+        <td><span class="badge badge-medium">Thấp</span></td>
+        <td><span class="badge badge-critical">Cao</span></td>
+        <td>User model giữ nguyên structure, chỉ thêm relation. Migration additive-only.</td>
+      </tr>
+      <tr>
+        <td>Vercel free tier vượt giới hạn DB</td>
+        <td><span class="badge badge-medium">Thấp</span></td>
+        <td><span class="badge badge-high">Trung bình</span></td>
+        <td>Tối ưu queries, ISR cache. Monitor usage. Có thể chuyển Supabase nếu cần.</td>
+      </tr>
+      <tr>
+        <td>Delay do 1 người làm full-stack</td>
+        <td><span class="badge badge-high">Cao</span></td>
+        <td><span class="badge badge-high">Trung bình</span></td>
+        <td>Ưu tiên Phase 1-2 (bảo mật + backend) trước. Phase 3-4 có thể kéo dài thêm 2 tuần.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== PAGE 16: CẤU TRÚC THƯ MỤC ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">IX. CẤU TRÚC THƯ MỤC</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">IX. Cấu Trúc Thư Mục Chuẩn</h2>
+  <p class="section-subtitle">Clean Architecture cho Next.js App Router — mỗi folder có trách nhiệm rõ ràng</p>
+
+  <div class="two-col">
+    <div>
+      <div class="code-block" style="font-size: 7pt; line-height: 1.5;">
+<span class="code-comment">T-Petie/</span>
+├── prisma/
+│   ├── schema.prisma        <span class="code-comment"># DB schema đầy đủ</span>
+│   ├── seed.ts              <span class="code-comment"># Script seed dữ liệu</span>
+│   └── migrations/          <span class="code-comment"># Migration history</span>
+│
+├── src/
+│   ├── app/                 <span class="code-comment"># Next.js App Router</span>
+│   │   ├── layout.tsx       <span class="code-comment"># Root layout</span>
+│   │   ├── page.tsx         <span class="code-comment"># Homepage (SSR/ISR)</span>
+│   │   ├── san-pham/
+│   │   │   └── [slug]/
+│   │   │       └── page.tsx <span class="code-comment"># Product detail (SSG)</span>
+│   │   ├── bo-suu-tap/
+│   │   │   └── [slug]/
+│   │   │       └── page.tsx <span class="code-comment"># Collection (SSG)</span>
+│   │   ├── be-gai/
+│   │   │   └── page.tsx     <span class="code-comment"># Category listing (SSR)</span>
+│   │   ├── gio-hang/
+│   │   │   └── page.tsx     <span class="code-comment"># Cart (CSR)</span>
+│   │   ├── thanh-toan/
+│   │   │   └── page.tsx     <span class="code-comment"># Checkout (CSR)</span>
+│   │   ├── tra-cuu-don/
+│   │   │   └── page.tsx     <span class="code-comment"># Order tracking</span>
+│   │   ├── admin/
+│   │   │   ├── page.tsx     <span class="code-comment"># Dashboard</span>
+│   │   │   ├── don-hang/    <span class="code-comment"># Order mgmt</span>
+│   │   │   └── san-pham/    <span class="code-comment"># Product mgmt</span>
+│   │   └── api/
+│   │       ├── auth/[...nextauth]/
+│   │       ├── products/
+│   │       ├── collections/
+│   │       ├── orders/
+│   │       ├── user/
+│   │       └── admin/</span></div>
+    </div>
+    <div>
+      <div class="code-block" style="font-size: 7pt; line-height: 1.5;">
+<span class="code-comment">│   (tiếp)</span>
+│   ├── components/
+│   │   ├── ui/              <span class="code-comment"># Atomic: Button, Input, Badge</span>
+│   │   ├── layout/          <span class="code-comment"># Header, Footer, Nav</span>
+│   │   ├── product/         <span class="code-comment"># Card, Grid, Gallery</span>
+│   │   ├── filter/          <span class="code-comment"># FilterBar, Slider</span>
+│   │   ├── cart/            <span class="code-comment"># MiniCart, CartItem</span>
+│   │   ├── collection/      <span class="code-comment"># Lookbook, BST</span>
+│   │   ├── checkout/        <span class="code-comment"># Form, Summary</span>
+│   │   └── admin/           <span class="code-comment"># Dashboard widgets</span>
+│   │
+│   ├── lib/
+│   │   ├── prisma.ts        <span class="code-comment"># Prisma client singleton</span>
+│   │   ├── auth.ts          <span class="code-comment"># NextAuth config</span>
+│   │   ├── services/        <span class="code-comment"># Business logic layer</span>
+│   │   │   ├── order.service.ts
+│   │   │   ├── product.service.ts
+│   │   │   └── user.service.ts
+│   │   ├── validators/      <span class="code-comment"># Zod schemas</span>
+│   │   │   ├── order.schema.ts
+│   │   │   └── product.schema.ts
+│   │   ├── errors/          <span class="code-comment"># AppError class</span>
+│   │   ├── analytics/       <span class="code-comment"># GA4/GTM tracker</span>
+│   │   └── utils/           <span class="code-comment"># Formatters, helpers</span>
+│   │
+│   ├── stores/              <span class="code-comment"># Zustand stores</span>
+│   │   ├── cart.store.ts
+│   │   └── filter.store.ts
+│   │
+│   └── types/               <span class="code-comment"># TypeScript definitions</span>
+│       ├── product.ts
+│       ├── order.ts
+│       ├── collection.ts
+│       └── auth.ts
+│
+├── public/                  <span class="code-comment"># Static assets (minimal)</span>
+├── .env.example             <span class="code-comment"># Template env vars</span>
+├── middleware.ts             <span class="code-comment"># Auth + Rate Limit</span>
+└── next.config.js           <span class="code-comment"># Security headers</span></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-title">Các file cần xoá khỏi repository</div>
+    <p><strong>Root:</strong> index.html (163KB), admin.html, admin-login.html, tai-khoan.html, uu-dai.html, extract_prices.py, update_products.js, update_responsive.js, eng.traineddata (5.2MB), vie.traineddata (1.7MB), products-sale.json, ảnh bìa TP.jpg</p>
+    <p><strong>Thư mục:</strong> /open-code-review-main/ (toàn bộ), /troxinhde/ (toàn bộ), /scratch/ (toàn bộ), /images/ (chuyển sang Vercel Blob)</p>
+    <p><strong>Tiết kiệm ước tính:</strong> ~10MB+ repo size, loại bỏ 10+ file dead code, clean git history</p>
+  </div>
+</div>
+
+<!-- ==================== PAGE 17: TIÊU CHUẨN ==================== -->
+<div class="page" style="padding: 0 20px;">
+  <div class="page-header">
+    <span class="page-header-title">Kế Hoạch Refactor — T'Petie</span>
+    <span class="page-header-num">X. TIÊU CHUẨN ÁP DỤNG</span>
+  </div>
+
+  <div class="section-divider"></div>
+  <h2 class="section-title">X. Tiêu Chuẩn & Tham Chiếu</h2>
+  <p class="section-subtitle">Các framework, tiêu chuẩn quốc tế và nguồn tham chiếu được áp dụng trong kế hoạch này</p>
+
+  <h3>10.1. Tiêu Chuẩn Kiến Trúc & Bảo Mật</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:30%;">Tiêu Chuẩn / Framework</th>
+        <th style="width:45%;">Mô Tả</th>
+        <th style="width:25%;">Áp Dụng Tại</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>OWASP Top 10 (2021)</strong></td>
+        <td>10 rủi ro bảo mật web phổ biến nhất — tiêu chuẩn vàng cho AppSec</td>
+        <td>Chương VI — Toàn bộ checklist</td>
+      </tr>
+      <tr>
+        <td><strong>Clean Architecture (R. Martin)</strong></td>
+        <td>Dependency Rule: tầng ngoài phụ thuộc tầng trong, không ngược lại</td>
+        <td>Chương II — 3-Tier design</td>
+      </tr>
+      <tr>
+        <td><strong>SOLID Principles</strong></td>
+        <td>Single Responsibility, Open/Closed, Dependency Inversion</td>
+        <td>Service Layer, Component design</td>
+      </tr>
+      <tr>
+        <td><strong>12-Factor App (Heroku)</strong></td>
+        <td>Config qua env, stateless processes, logs as event streams</td>
+        <td>Env management, deployment</td>
+      </tr>
+      <tr>
+        <td><strong>Repository Pattern</strong></td>
+        <td>Abstraction layer giữa business logic và data access</td>
+        <td>Prisma services</td>
+      </tr>
+      <tr>
+        <td><strong>Atomic Design (B. Frost)</strong></td>
+        <td>Atoms → Molecules → Organisms → Templates → Pages</td>
+        <td>Component hierarchy</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>10.2. Tham Chiếu UX/UI</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:30%;">Nguồn</th>
+        <th style="width:70%;">Nội Dung Tham Chiếu</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>atino.vn</strong></td>
+        <td>Luồng nghiệp vụ mua hàng, cấu trúc navigation, BST hiện SP trực tiếp, bộ lọc sản phẩm</td>
+      </tr>
+      <tr>
+        <td><strong>Nielsen Norman Group</strong></td>
+        <td>Nghiên cứu UX: Navigation design, Information architecture, Mobile usability heuristics</td>
+      </tr>
+      <tr>
+        <td><strong>Baymard Institute</strong></td>
+        <td>E-Commerce UX benchmark: Product listing, Filtering, Checkout UX (4,600+ guidelines)</td>
+      </tr>
+      <tr>
+        <td><strong>Apple HIG / Material Design 3</strong></td>
+        <td>Touch target tối thiểu 44x44px, spacing, typography scale, accessibility</td>
+      </tr>
+      <tr>
+        <td><strong>Shopee.vn / ASOS.com</strong></td>
+        <td>Filter bar patterns, product grid responsive, search UX, mobile bottom navigation</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>10.3. Tham Chiếu Kỹ Thuật</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:30%;">Tài Liệu</th>
+        <th style="width:70%;">URL / Nguồn</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Next.js App Router Docs</td>
+        <td>nextjs.org/docs — Server Components, ISR, Middleware, Route Handlers</td>
+      </tr>
+      <tr>
+        <td>Prisma ORM Docs</td>
+        <td>prisma.io/docs — Schema design, Migrations, Transactions, Relations</td>
+      </tr>
+      <tr>
+        <td>NextAuth.js Docs</td>
+        <td>next-auth.js.org — Prisma Adapter, JWT Callbacks, Middleware Auth</td>
+      </tr>
+      <tr>
+        <td>Upstash Rate Limiting</td>
+        <td>upstash.com/docs/redis/sdks/ratelimit-ts — Sliding window, Serverless</td>
+      </tr>
+      <tr>
+        <td>Zod Documentation</td>
+        <td>zod.dev — Runtime type validation, TypeScript type inference</td>
+      </tr>
+      <tr>
+        <td>Vercel Platform Docs</td>
+        <td>vercel.com/docs — Deployment, Postgres, Blob Storage, Edge Middleware</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 30px; padding: 20px; border: 2px solid #0f172a; text-align: center;">
+    <p style="font-size: 10pt; font-weight: 800; color: #0f172a; margin: 0 0 8px 0;">— KẾT THÚC TÀI LIỆU —</p>
+    <p style="font-size: 8.5pt; color: #64748b; margin: 0 0 4px 0;">Kế Hoạch Refactor Toàn Diện Hệ Thống T'Petie v2.0</p>
+    <p style="font-size: 8.5pt; color: #64748b; margin: 0 0 4px 0;">Người thực hiện: <strong style="color: #0f172a;">Nguyễn Minh Toàn</strong></p>
+    <p style="font-size: 8pt; color: #94a3b8; margin: 0;">Ngày lập: 28/09/2026 — Phiên bản: 1.0</p>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eff6ff',
+      primaryBorderColor: '#3b82f6',
+      primaryTextColor: '#0f172a',
+      lineColor: '#64748b',
+      secondaryColor: '#f0fdf4',
+      tertiaryColor: '#fef3c7',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: '11px',
+    },
+    flowchart: { curve: 'basis', padding: 12 },
+    sequence: { actorMargin: 40, messageFontSize: 11 },
+    gantt: { fontSize: 10, barHeight: 20, topPadding: 30 },
+  });
+</script>
+
+</body>
+</html>

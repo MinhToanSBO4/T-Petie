@@ -1,0 +1,12 @@
+.env
+.env*.local
+/node_modules/
+/.next/
+/coverage/
+/out/
+/build/
+*.tsbuildinfo
+next-env.d.ts
+*.pem
+npm-debug.log*
+T-Petie-example/

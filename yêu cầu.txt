@@ -1,0 +1,25 @@
+giao diện nhớ giữ nguyên có một số thứ cần sửa thì t lm sau
+trc mắt lm mấy cái t bảo đi
+nhớ đừng để lỗi nhá
+đăng nhập bằng google
+bỏ đăng nhập facebook đi
+nhớ admin trình bày thống kê nhìn chuyên nghiệp tí dễ hiểu
+và có export excel
+nhân viên quyền ít hơn admin th
+nhân viên là quản lý sản phẩm số lượng, ảnh
+có thể thêm xoá bộ sưu tập
+ảnh lưu trên CDN
+sử dung cache để tối ưu tài nguyên
+đảm bảo hệ thống an toàn bảo mật cơ bản
+
+-----
+
+
+Framework: Next.js
+Vercel: BE + FE
+DB (PostgreSQL): Supabase
+
+--------
+MK DB: lưu trong .env tại máy phát triển; cần cấp lại mật khẩu trước khi triển khai.
+
+Web lấy giao diện: https://t-petie.vercel.app/
