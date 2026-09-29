@@ -11,8 +11,8 @@ import { credentialFingerprint } from '@/server/security/password-reset';
 import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID || (process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? process.env.OAUTH_CLIENT_SECRET : '');
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || (!process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? (process.env.OAUTH_CLIENT_SECRET || '') : '');
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
 const googleProviders = googleClientId && googleClientSecret
   ? [GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })]

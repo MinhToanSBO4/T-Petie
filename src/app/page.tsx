@@ -6,21 +6,24 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
+import { TestimonialsSection } from '@/components/home/TestimonialsSection';
+import { getPublishedTestimonials } from '@/server/content/testimonials';
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [products, collections] = await Promise.all([getProducts(), getCollections()]);
+  const [products, collections, testimonials] = await Promise.all([getProducts(), getCollections(), getPublishedTestimonials()]);
 
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 8);
   const newArrivals = products.filter((p) => p.isNewArrival);
   const flashSaleProducts = products.filter((p) => p.isSale);
+  const homepageCollections = collections.filter((collection) => collection.showOnHome);
 
   return (
     <div className="space-y-10 sm:space-y-14">
       {/* 1. HERO BANNER SECTION */}
       <section className="relative px-4 sm:px-6 pt-4 max-w-6xl mx-auto">
-        {collections.length > 0 && <HeroCarousel collections={collections.slice(0, 4)} />}
+        {homepageCollections.length > 0 && <HeroCarousel collections={homepageCollections} />}
       </section>
 
 
@@ -53,7 +56,7 @@ export default async function HomePage() {
       </section>}
 
       {/* 5. BỘ SƯU TẬP LOOKBOOK CAROUSEL (4 BST) */}
-      <section id="collections" className="px-4 sm:px-6 max-w-6xl mx-auto">
+      {homepageCollections.length > 0 && <section id="collections" className="px-4 sm:px-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center space-x-1.5 text-xs font-bold text-honey-600 uppercase tracking-wider mb-1">
@@ -73,13 +76,14 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        <LookbookCarousel collections={collections} />
-      </section>
+        <LookbookCarousel collections={homepageCollections} />
+      </section>}
 
       {/* 6. VÌ SAO MẸ YÊU THÍCH T'PETIE */}
       <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
         <FeatureCarousel />
       </section>
+      <TestimonialsSection testimonials={testimonials} />
     </div>
   );
 }

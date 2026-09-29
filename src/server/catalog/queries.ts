@@ -53,11 +53,13 @@ export const getProducts = unstable_cache(async () => {
 }, ['active-products'], { revalidate: 60, tags: ['products'] });
 
 export const getCollections = unstable_cache(async (): Promise<Collection[]> => {
-  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } }, orderBy: { sortOrder: 'asc' } });
+  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   return rows.map((row) => ({
     id: row.slug, title: row.title, subtitle: row.subtitle || '', story: row.story || '',
     bannerImage: row.bannerUrl, lookbookImages: row.lookbookUrls,
     themeColor: row.themeColor || '#FFF8EE', accentColor: row.accentColor || '#D97706',
     season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.id),
+    showInMenu: row.showInMenu, showOnHome: row.showOnHome,
   }));
 }, ['active-collections'], { revalidate: 60, tags: ['collections'] });

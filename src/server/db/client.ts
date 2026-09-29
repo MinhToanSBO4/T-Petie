@@ -10,9 +10,18 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+function pooledConnectionUrl() {
+  const value = process.env.CONNECTION_STRING;
+  if (!value) return undefined;
+  const url = new URL(value);
+  if (!url.searchParams.has('connection_limit')) url.searchParams.set('connection_limit', '1');
+  return url.toString();
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: { db: { url: pooledConnectionUrl() } },
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 

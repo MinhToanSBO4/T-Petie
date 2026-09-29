@@ -5,29 +5,22 @@ import { useCallback, useEffect, useState } from 'react';
 
 type ProductRow = { id: string; slug: string; sku: string; name: string; price: number; active: boolean;
   images: { id: string; url: string }[]; variants: { id: string; size: string; stock: number; price: number }[] };
-type CollectionRow = { id: string; title: string; slug: string; bannerUrl: string };
 
 export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean }) {
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [collections, setCollections] = useState<CollectionRow[]>([]);
   const [stockDraft, setStockDraft] = useState<Record<string, string>>({});
   const [imageDraft, setImageDraft] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [newCollection, setNewCollection] = useState({ title: '', slug: '', bannerUrl: '' });
   const [newProduct, setNewProduct] = useState({ name: '', slug: '', sku: '', price: '', size: 'Size 90', stock: '0', imageUrl: '' });
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [productResponse, collectionResponse] = await Promise.all([
-        fetch('/api/admin/products', { cache: 'no-store' }),
-        fetch('/api/admin/collections', { cache: 'no-store' }),
-      ]);
-      if (!productResponse.ok || !collectionResponse.ok) throw new Error('Không tải được dữ liệu quản trị');
-      const [productData, collectionData] = await Promise.all([productResponse.json(), collectionResponse.json()]);
+      const productResponse = await fetch('/api/admin/products', { cache: 'no-store' });
+      if (!productResponse.ok) throw new Error('Không tải được dữ liệu quản trị');
+      const productData = await productResponse.json();
       setProducts(productData.products);
-      setCollections(collectionData.collections);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Có lỗi xảy ra'); }
     finally { setLoading(false); }
   }, []);
@@ -61,7 +54,9 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   return <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
     <div><Link href="/admin" className="text-xs text-honey-600">← Quản trị</Link>
       <h1 className="text-3xl font-bold">Sản phẩm & bộ sưu tập</h1>
-      <p className="text-sm text-charcoal-500">Quản lý tồn kho theo size và URL ảnh CDN.</p></div>
+      <p className="text-sm text-charcoal-500">Quản lý tồn kho theo size và URL ảnh CDN.</p>
+      <div className="mt-3 flex flex-wrap gap-4"><Link href="/admin/bo-suu-tap" className="text-sm font-semibold text-honey-700">Quản lý bộ sưu tập →</Link>
+        <Link href="/admin/feedback" className="text-sm font-semibold text-honey-700">Quản lý feedback →</Link></div></div>
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     {loading && <p>Đang tải...</p>}
 
@@ -110,20 +105,5 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
         className="px-5 min-h-11 rounded-xl bg-honey-600 text-white font-bold">Tạo sản phẩm</button>
     </section>}
 
-    <section className="bg-white rounded-2xl border border-cream-200 p-5 space-y-4">
-      <h2 className="text-xl font-bold">Bộ sưu tập ({collections.length})</h2>
-      {collections.map((collection) => <div key={collection.id} className="flex justify-between gap-3 border-t pt-3 text-sm">
-        <div><strong>{collection.title}</strong><p className="text-charcoal-500">/{collection.slug}</p></div>
-        <button onClick={() => { if (confirm(`Xóa bộ sưu tập ${collection.title}?`)) void write(`/api/admin/collections/${collection.id}`, 'DELETE'); }}
-          className="text-red-700 font-bold min-h-11">Xóa</button>
-      </div>)}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {Object.entries(newCollection).map(([key, value]) => <input key={key} aria-label={key} placeholder={key} value={value}
-          onChange={(event) => setNewCollection((current) => ({ ...current, [key]: event.target.value }))}
-          className="rounded-xl border p-3 text-sm" />)}
-      </div>
-      <button onClick={() => write('/api/admin/collections', 'POST', newCollection)}
-        className="px-5 min-h-11 rounded-xl bg-sage-600 text-white font-bold">Thêm bộ sưu tập</button>
-    </section>
   </div>;
 }

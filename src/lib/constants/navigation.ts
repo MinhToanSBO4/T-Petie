@@ -42,8 +42,6 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   {
     label: 'Bộ Sưu Tập',
     href: '/bo-suu-tap',
-    badge: 'Mới',
-    badgeColor: 'bg-honey-500',
     children: [],
   },
   {
@@ -61,7 +59,7 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
 export const MOBILE_BOTTOM_NAV: NavItem[] = [
   { label: 'Trang Chủ', href: '/', icon: 'Home' },
   { label: 'Sản Phẩm', href: '/be-gai', icon: 'Shirt' },
-  { label: 'Bộ Sưu Tập', href: '/bo-suu-tap', icon: 'Sparkles', badge: 'Mới' },
+  { label: 'Bộ Sưu Tập', href: '/bo-suu-tap', icon: 'Sparkles' },
   { label: 'Ưu Đãi', href: '/sale', icon: 'Percent', badge: 'Hot' },
   { label: 'Về Chúng Tôi', href: '/ve-chung-toi', icon: 'Heart' },
 ];

@@ -12,9 +12,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!session?.user || session.user.status !== 'active' || !['admin', 'staff'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
-  const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUD_NAME;
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
   const key = process.env.CLOUDINARY_API_KEY;
-  const secret = process.env.CLOUDINARY_API_SECRET || process.env.CLOUD_API_SECRET;
+  const secret = process.env.CLOUDINARY_API_SECRET;
   if (!cloud || !key || !secret || !/^[a-zA-Z0-9_-]+$/.test(cloud)) {
     return NextResponse.json({ error: 'Chưa cấu hình Cloudinary' }, { status: 503 });
   }

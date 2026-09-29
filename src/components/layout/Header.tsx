@@ -28,12 +28,20 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [collectionNav, setCollectionNav] = useState<SubNavItem[]>([]);
   useEffect(() => {
-    fetch('/api/collections').then((response) => response.json()).then((data) => {
-      if (Array.isArray(data.collections)) setCollectionNav(data.collections.map((item: { id: string; title: string }) => ({
-        label: item.title, href: `/bo-suu-tap/${item.id}`,
-      })));
-    }).catch(() => {});
-  }, []);
+    const controller = new AbortController();
+    const refreshCollections = () => {
+      fetch('/api/collections', { cache: 'no-store', signal: controller.signal })
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được bộ sưu tập')))
+        .then((data) => {
+          if (Array.isArray(data.collections)) setCollectionNav(data.collections
+            .filter((item: { showInMenu: boolean }) => item.showInMenu)
+            .map((item: { id: string; title: string }) => ({ label: item.title, href: `/bo-suu-tap/${item.id}` })));
+        }).catch(() => {});
+    };
+    refreshCollections();
+    window.addEventListener('tpetie:collections-updated', refreshCollections);
+    return () => { controller.abort(); window.removeEventListener('tpetie:collections-updated', refreshCollections); };
+  }, [pathname]);
   const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/bo-suu-tap'
     ? { ...item, children: collectionNav } : item);
   const { scrollY } = useScroll();
@@ -234,10 +242,7 @@ export function Header() {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-cream-300/90 ring-1 ring-black/5 py-2 z-50 animate-scale-up">
                     <div className="px-3.5 py-2 border-b border-cream-100">
                       <p className="text-xs font-bold text-charcoal-900 truncate">{user.name || "Mẹ T'Petie"}</p>
-                      <p className="text-[10px] text-charcoal-500 font-mono truncate">{user.email || 'me@tpetie.com'}</p>
-                      <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-honey-700">
-                        ⭐ {user.points ?? 0} Điểm thưởng
-                      </span>
+                      {user.email && <p className="text-[10px] text-charcoal-500 font-mono truncate">{user.email}</p>}
                     </div>
 
                     <div className="py-1 text-xs text-charcoal-900">

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: { cpus: 2 },
   webpack(config) {
     // This workspace is on exFAT, where Webpack's disk snapshots are unreliable.
     // This changes module compilation caching, not catalog data caching.
