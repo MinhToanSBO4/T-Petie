@@ -29,6 +29,18 @@ Tài khoản admin local: `admin@tpetie.local`; mật khẩu ngẫu nhiên nằm
 
 `npm run build` không tự thay đổi schema hay dữ liệu của database. Tồn kho và tổng tiền đơn hàng được kiểm tra lại phía máy chủ. Khi đưa lên Vercel, cần đặt cùng các biến môi trường và áp dụng migration/seed trước khi nhận đơn.
 
+## Xem dữ liệu trên Supabase
+
+Ứng dụng lưu bảng trong schema **`tpetie_app`**, không phải `public`. Ở Supabase **Table Editor**, đổi bộ chọn schema sang `tpetie_app` rồi mở `products`, `collections`, `product_variants`. Nếu dùng **SQL Editor**, chạy:
+
+```sql
+select 'products' as table_name, count(*) from tpetie_app.products
+union all select 'collections', count(*) from tpetie_app.collections
+union all select 'product_variants', count(*) from tpetie_app.product_variants;
+```
+
+Kết quả sau lần seed hiện tại là 40 sản phẩm, 4 bộ sưu tập, 271 biến thể. Các bảng `public` có sẵn từ trước được giữ nguyên và chưa có dữ liệu; Supabase Data API chưa được mở cho `tpetie_app` vì ứng dụng truy cập PostgreSQL qua Prisma phía máy chủ.
+
 ## Trạng thái tính năng
 
 Trang sản phẩm và bộ sưu tập đọc PostgreSQL với cache ngắn; giỏ hàng lưu cục bộ trên trình duyệt; đặt hàng COD, tra cứu đơn, đăng nhập email/mật khẩu, phân quyền admin/nhân viên, quản lý catalog, xử lý đơn, thống kê và xuất Excel đã có mã triển khai. Google OAuth được giữ chỗ trong giao diện và chỉ có thể bật sau khi cấu hình credentials. Các luồng thanh toán khác và các bảng mở rộng trong thiết kế `db.sql` chưa được triển khai toàn bộ; xem file công việc còn lại để đánh giá trước khi chạy thật.

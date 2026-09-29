@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack(config) {
+    // This workspace is on exFAT, where Webpack's disk snapshots are unreliable.
+    // This changes module compilation caching, not catalog data caching.
+    if (process.platform === 'win32') config.cache = { type: 'memory' };
+    return config;
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'i.ibb.co' },
