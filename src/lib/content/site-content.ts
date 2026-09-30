@@ -30,6 +30,10 @@ export function orderHomeBlocks<T>(blocks: Record<HomeBlockId, T>, order: readon
 
 /** Nhận diện thương hiệu dùng chung cho Header, Footer và các trang. */
 export type BrandAssets = { logoUrl: string; logoAlt: string };
+/** Thông tin liên hệ và kênh mạng xã hội hiển thị ở footer, nút chat và trang chính sách. */
+export type ContactInfo = { hotline: string; hotlineHours: string; zaloUrl: string; zaloLabel: string;
+  messengerUrl: string; facebookUrl: string; tiktokUrl: string; instagramUrl: string;
+  commitment: string; madeIn: string; copyrightName: string };
 
 /** Banner và lời dẫn của trang Ưu đãi. */
 export type SalePageContent = { bannerUrl: string; bannerAlt: string; title: string; description: string };
@@ -182,6 +186,29 @@ export function parseBrandAssets(value: unknown): BrandAssets {
   return { logoUrl: optionalImageUrl(row.logoUrl), logoAlt: optionalText(row.logoAlt, 200) };
 }
 
+/** Liên kết ngoài tùy chọn: để trống thì ẩn nút tương ứng. */
+function optionalHref(value: unknown): string {
+  return value === undefined || value === null || value === '' ? '' : contentHref(value);
+}
+
+export function parseContactInfo(value: unknown): ContactInfo {
+  const row = record(value);
+  const hotline = optionalText(row.hotline, 20);
+  // Chỉ nhận số, khoảng trắng, dấu chấm/gạch và dấu + đầu số để tạo được liên kết gọi điện.
+  if (hotline && !/^\+?\d[\d .-]{5,18}$/.test(hotline)) throw new Error('Invalid site content phone');
+  return { hotline, hotlineHours: optionalText(row.hotlineHours, 60),
+    zaloUrl: optionalHref(row.zaloUrl), zaloLabel: optionalText(row.zaloLabel, 80),
+    messengerUrl: optionalHref(row.messengerUrl), facebookUrl: optionalHref(row.facebookUrl),
+    tiktokUrl: optionalHref(row.tiktokUrl), instagramUrl: optionalHref(row.instagramUrl),
+    commitment: optionalText(row.commitment, 300), madeIn: optionalText(row.madeIn, 80),
+    copyrightName: optionalText(row.copyrightName, 80) };
+}
+
+/** Số gọi điện cho liên kết tel: từ số hiển thị ("035 999 5381" → "0359995381"). */
+export function telHref(hotline: string) {
+  return `tel:${hotline.replace(/[^\d+]/g, '')}`;
+}
+
 export function parseSalePage(value: unknown): SalePageContent {
   const row = record(value);
   return { bannerUrl: optionalImageUrl(row.bannerUrl), bannerAlt: optionalText(row.bannerAlt, 200),
@@ -242,6 +269,7 @@ export const SITE_CONTENT_PARSERS = {
   home_layout: parseHomeLayout,
   home_features: parseHomeFeaturesSection,
   brand_assets: parseBrandAssets,
+  contact_info: parseContactInfo,
   sale_page: parseSalePage,
   about_page: parseAboutPage,
   category_pages: parseCategoryPages,

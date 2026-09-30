@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
@@ -23,6 +24,8 @@ type ContentDraft = {
   home_features: { eyebrow: string; title: string; items: HomeFeatureRow[] };
   testimonials_section: { eyebrow: string; title: string } & ImageDraft;
   brand_assets: { logoUrl: string; logoAlt: string };
+  contact_info: { hotline: string; hotlineHours: string; zaloUrl: string; zaloLabel: string; messengerUrl: string;
+    facebookUrl: string; tiktokUrl: string; instagramUrl: string; commitment: string; madeIn: string; copyrightName: string };
   sale_page: { bannerUrl: string; bannerAlt: string; title: string; description: string };
   about_page: { heroImageUrl: string; heroImageAlt: string; heroTitle: string; heroDescription: string;
     ctaTitle: string; ctaDescription: string; ctaLabel: string; ctaHref: string };
@@ -48,6 +51,8 @@ const emptyDraft = (): ContentDraft => ({
   home_features: { eyebrow: '', title: '', items: [] },
   testimonials_section: { eyebrow: '', title: '', imageUrl: '', imageAlt: '' },
   brand_assets: { logoUrl: '', logoAlt: '' },
+  contact_info: { hotline: '', hotlineHours: '', zaloUrl: '', zaloLabel: '', messengerUrl: '', facebookUrl: '',
+    tiktokUrl: '', instagramUrl: '', commitment: '', madeIn: '', copyrightName: '' },
   sale_page: { bannerUrl: '', bannerAlt: '', title: '', description: '' },
   about_page: { heroImageUrl: '', heroImageAlt: '', heroTitle: '', heroDescription: '',
     ctaTitle: '', ctaDescription: '', ctaLabel: '', ctaHref: '' },
@@ -72,6 +77,7 @@ function toDraft(content: Record<string, unknown> | null): ContentDraft {
     : pick('home_features', draft.home_features);
   draft.testimonials_section = pick('testimonials_section', draft.testimonials_section);
   draft.brand_assets = pick('brand_assets', draft.brand_assets);
+  draft.contact_info = pick('contact_info', draft.contact_info);
   draft.sale_page = pick('sale_page', draft.sale_page);
   draft.about_page = pick('about_page', draft.about_page);
   const sizeGuide = content.size_guide as { baby?: SizeGuideRow[]; kids?: SizeGuideRow[]; tips?: string[] } | null;
@@ -102,10 +108,13 @@ function DestinationField({ label, value, onChange }: { label: string; value: st
   return <label className="text-sm font-semibold">{label}<select value={DESTINATIONS.some((item) => item.value === value) ? value : ''} onChange={(event) => onChange(event.target.value)} className={field}>{DESTINATIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-function ProductSelector({ products, selected, onChange }: { products: Product[]; selected: string[]; onChange: (ids: string[]) => void }) {
+/** Ô chọn sản phẩm chỉ cần các trường này; trang chỉ gửi đúng chừng đó xuống trình duyệt. */
+export type ProductOption = Pick<Product, 'id' | 'name' | 'thumbnail' | 'basePrice'>;
+
+function ProductSelector({ products, selected, onChange }: { products: ProductOption[]; selected: string[]; onChange: (ids: string[]) => void }) {
   const [query, setQuery] = useState('');
   const matches = products.filter((product) => product.name.toLocaleLowerCase('vi-VN').includes(query.toLocaleLowerCase('vi-VN')));
-  const chosen = selected.map((id) => products.find((product) => product.id === id)).filter((product): product is Product => Boolean(product));
+  const chosen = selected.map((id) => products.find((product) => product.id === id)).filter((product): product is ProductOption => Boolean(product));
   return <div className="space-y-3 rounded-xl border border-cream-200 p-3"><div className="flex items-center justify-between"><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}</p></div>
     <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm sản phẩm theo tên…" className="w-full rounded-lg border p-2 text-sm" />
     {query && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...selected, product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={product.thumbnail} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
@@ -114,7 +123,7 @@ function ProductSelector({ products, selected, onChange }: { products: Product[]
 }
 
 function LinkFields({ legend, value, onChange, eyebrow, products }: {
-  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean; products: Product[];
+  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean; products: ProductOption[];
 }) {
   return <fieldset className="space-y-3 rounded-2xl border border-cream-200 p-4">
     <legend className="px-2 text-sm font-bold">{legend}</legend>
@@ -201,12 +210,13 @@ function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: 
 export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, testimonials }: {
   initialContent: Record<string, unknown>;
   collections: Collection[];
-  products: Product[];
+  products: ProductOption[];
   bestSellers: Product[];
   saleProducts: Product[];
   testimonials: TestimonialCard[];
 }) {
   const [draft, setDraft] = useState<ContentDraft>(() => toDraft(initialContent));
+  const router = useRouter();
   const [dirty, setDirty] = useState<ContentKey[]>([]);
   const [editing, setEditing] = useState<ContentKey | null>(null);
   const [saving, setSaving] = useState(false);
@@ -238,19 +248,21 @@ export function SiteContentManager({ initialContent, collections, products, best
     setSaving(true); setMessage(''); setError('');
     const failed: ContentKey[] = [];
     try {
-      for (const key of keysToSave) {
+      // Các khối độc lập nhau nên lưu song song thay vì chờ lần lượt từng khối.
+      await Promise.all(keysToSave.map(async (key) => {
         const response = await fetch(`/api/admin/site-content/${key}`, { method: 'PUT',
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft[key]) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) { failed.push(key); setError(data.error || `Không lưu được khối ${key}`); }
-      }
+      }));
       if (failed.length === 0) {
         const changedDuringSave = revisionRef.current !== savedRevision;
         setMessage(changedDuringSave
           ? `Đã lưu ${keysToSave.length} khối. Bạn còn thay đổi mới chưa được lưu.`
           : `Đã lưu ${keysToSave.length} khối nội dung. Website sẽ hiển thị nội dung mới trong ít phút.`);
         if (!changedDuringSave) setDirty([]);
-        window.dispatchEvent(new Event('tpetie:site-content-updated'));
+        // Trang này dựng từ dữ liệu máy chủ: xóa bản đã lưu trong trình duyệt để lần mở sau thấy nội dung mới.
+        router.refresh();
       } else {
         if (revisionRef.current === savedRevision) setDirty(failed);
       }
@@ -460,6 +472,28 @@ export function SiteContentManager({ initialContent, collections, products, best
           onChange={(logoUrl) => update('brand_assets', { ...draft.brand_assets, logoUrl })} />
         <TextField label="Mô tả logo (alt)" value={draft.brand_assets.logoAlt} maxLength={200}
           onChange={(logoAlt) => update('brand_assets', { ...draft.brand_assets, logoAlt })} />
+      </SectionShell>
+
+      <SectionShell title="Liên hệ & mạng xã hội" hint="Hiển thị ở chân trang, nút chat Messenger và trang chính sách. Để trống mục nào thì mục đó được ẩn."
+        editing={editing === 'contact_info'} onToggle={() => toggle('contact_info')}
+        preview={<div className="space-y-1 text-sm text-charcoal-700">
+          <p>Hotline: <strong>{draft.contact_info.hotline || 'chưa có'}</strong>{draft.contact_info.hotlineHours ? ` (${draft.contact_info.hotlineHours})` : ''}</p>
+          <p className="text-xs text-charcoal-500">{[draft.contact_info.zaloUrl && 'Zalo', draft.contact_info.messengerUrl && 'Messenger',
+            draft.contact_info.facebookUrl && 'Facebook', draft.contact_info.tiktokUrl && 'TikTok', draft.contact_info.instagramUrl && 'Instagram']
+            .filter(Boolean).join(' · ') || 'Chưa có kênh mạng xã hội'}</p>
+        </div>}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            ['hotline', 'Số hotline', 20, '035 999 5381'], ['hotlineHours', 'Giờ nhận cuộc gọi', 60, '8:30 – 23:00'],
+            ['zaloUrl', 'Liên kết Zalo', 300, 'https://zalo.me/…'], ['zaloLabel', 'Tên hiển thị Zalo', 80, "Zalo Official: T'Petie"],
+            ['messengerUrl', 'Liên kết Messenger (nút chat)', 300, 'https://m.me/…'], ['facebookUrl', 'Trang Facebook', 300, 'https://www.facebook.com/…'],
+            ['tiktokUrl', 'Kênh TikTok', 300, 'https://www.tiktok.com/@…'], ['instagramUrl', 'Trang Instagram', 300, 'https://www.instagram.com/…'],
+            ['madeIn', 'Nhãn xuất xứ', 80, 'Thiết kế & May đo tại Việt Nam'], ['copyrightName', 'Tên bản quyền', 80, "T'Petie Vietnam"],
+          ] as const).map(([key, label, maxLength, placeholder]) => <TextField key={key} label={label} value={draft.contact_info[key]}
+            maxLength={maxLength} placeholder={placeholder} onChange={(value) => update('contact_info', { ...draft.contact_info, [key]: value })} />)}
+        </div>
+        <TextField label="Lời cam kết (chân trang)" value={draft.contact_info.commitment} maxLength={300}
+          onChange={(commitment) => update('contact_info', { ...draft.contact_info, commitment })} />
       </SectionShell>
     </div>
 

@@ -18,7 +18,9 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
 
-export function Header({ logoUrl, logoAlt }: { logoUrl?: string; logoAlt?: string } = {}) {
+export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
+  logoUrl?: string; logoAlt?: string; collectionNav?: SubNavItem[];
+} = {}) {
   const pathname = usePathname();
   const { totalItems, openMiniCart, cartBounceTrigger } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
@@ -27,22 +29,6 @@ export function Header({ logoUrl, logoAlt }: { logoUrl?: string; logoAlt?: strin
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredNavIndex, setHoveredNavIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [collectionNav, setCollectionNav] = useState<SubNavItem[]>([]);
-  useEffect(() => {
-    const controller = new AbortController();
-    const refreshCollections = () => {
-      fetch('/api/collections', { cache: 'no-store', signal: controller.signal })
-        .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được bộ sưu tập')))
-        .then((data) => {
-          if (Array.isArray(data.collections)) setCollectionNav(data.collections
-            .filter((item: { showInMenu: boolean }) => item.showInMenu)
-            .map((item: { id: string; title: string }) => ({ label: item.title, href: `/collections/${item.id}` })));
-        }).catch(() => {});
-    };
-    refreshCollections();
-    window.addEventListener('tpetie:collections-updated', refreshCollections);
-    return () => { controller.abort(); window.removeEventListener('tpetie:collections-updated', refreshCollections); };
-  }, [pathname]);
   const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections'
     ? { ...item, children: collectionNav } : item);
   const { scrollY } = useScroll();

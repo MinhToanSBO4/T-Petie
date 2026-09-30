@@ -1,11 +1,20 @@
 import React from 'react';
+import { getSiteContent } from '@/server/content/site-content';
+import { telHref } from '@/lib/content/site-content';
+
+// Trang tĩnh, làm mới khi quản trị sửa thông tin liên hệ (hoặc sau tối đa 5 phút).
+export const revalidate = 300;
 
 export const metadata = {
   title: 'Chính sách bảo mật - T\'Petie',
   description: 'Chính sách bảo mật thông tin & Quyền riêng tư tại T\'Petie',
 };
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  const contact = (await getSiteContent()).contact_info;
+  const hotline = contact?.hotline
+    ? <a href={telHref(contact.hotline)} className="text-honey-600 font-bold hover:underline">{contact.hotline}</a>
+    : 'các kênh liên hệ ở cuối trang';
   return (
     <div className="bg-cream-50 min-h-screen py-12 sm:py-16">
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
@@ -92,7 +101,7 @@ export default function PrivacyPolicyPage() {
               </h2>
               <div className="ml-0 sm:ml-10 bg-blush-50 p-4 rounded-2xl border border-blush-100 inline-block mt-2">
                 <p className="font-medium text-charcoal-800">
-                  Hotline: <a href="tel:0359995381" className="text-honey-600 font-bold hover:underline">035 999 5381</a> (8:30 – 23:00)
+                  Hotline: {hotline}{contact?.hotlineHours ? ` (${contact.hotlineHours})` : ''}
                 </p>
               </div>
             </section>
@@ -118,7 +127,7 @@ export default function PrivacyPolicyPage() {
               </h2>
               <ul className="list-disc pl-5 sm:pl-12 space-y-3 mb-6">
                 <li>Khách hàng có quyền xem, cập nhật, chỉnh sửa hoặc yêu cầu chỉnh sửa dữ liệu cá nhân, yêu cầu xóa, hủy hoặc hạn chế xử lý dữ liệu cá nhân đã cung cấp, đồng thời gửi khiếu nại, yêu cầu hoặc phản ánh liên quan đến việc thu thập, sử dụng, lưu trữ, xử lý và bảo mật dữ liệu cá nhân.</li>
-                <li>Khách hàng có thể thực hiện các yêu cầu trên bằng cách gửi yêu cầu qua Hotline: <a href="tel:0359995381" className="text-honey-600 font-bold hover:underline">035 999 5381</a>.</li>
+                <li>Khách hàng có thể thực hiện các yêu cầu trên bằng cách gửi yêu cầu qua Hotline: {hotline}.</li>
                 <li>Sau khi tiếp nhận yêu cầu, T’Petie sẽ xác minh thông tin của chủ thể dữ liệu, xem xét và thực hiện xử lý phù hợp theo quy định của pháp luật. Trường hợp yêu cầu không được thực hiện do thuộc trường hợp pháp luật quy định, T’Petie sẽ thông báo lý do cho chủ thể dữ liệu.</li>
                 <li>Mọi khiếu nại, yêu cầu hoặc phản ánh liên quan đến việc thu thập, sử dụng và bảo mật thông tin cá nhân được tiếp nhận qua các kênh liên hệ nêu trên. T’Petie sẽ tiếp nhận, xác minh, xử lý và phản hồi theo quy định của pháp luật.</li>
               </ul>

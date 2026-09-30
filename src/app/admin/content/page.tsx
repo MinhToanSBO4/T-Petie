@@ -22,7 +22,7 @@ export default async function AdminSiteContentPage() {
   return <SiteContentManager
     initialContent={content}
     collections={collections.filter((collection) => collection.showOnHome)}
-    products={products}
+    products={products.map(({ id, name, thumbnail, basePrice }) => ({ id, name, thumbnail, basePrice }))}
     bestSellers={products.filter((product) => product.isBestSeller).slice(0, 4)}
     saleProducts={products.filter((product) => product.isSale).slice(0, 4)}
     testimonials={(featuredReviews.length > 0 ? featuredReviews : testimonials).slice(0, 3)}

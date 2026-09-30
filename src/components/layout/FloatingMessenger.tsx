@@ -1,9 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
 
-export function FloatingMessenger() {
-  // Liên kết trực tiếp đến hộp thư Messenger của T'Petie
-  const messengerUrl = "https://m.me/thoitrangtreemtpetie"; 
+/** Nút chat Messenger; đường dẫn lấy từ nội dung quản trị, để trống thì ẩn nút. */
+export function FloatingMessenger({ messengerUrl }: { messengerUrl?: string }) {
+  if (!messengerUrl) return null;
 
   return (
     <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50">

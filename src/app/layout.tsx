@@ -14,6 +14,7 @@ import { NavigationProgress } from '@/components/layout/NavigationProgress';
 import { PublicChrome } from '@/components/layout/PublicChrome';
 import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
+import { getCollections } from '@/server/catalog/queries';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -45,8 +46,11 @@ export default async function RootLayout({
   const ga4Id = /^G-[A-Z0-9]+$/.test(process.env.NEXT_PUBLIC_GA4_ID || '')
     ? process.env.NEXT_PUBLIC_GA4_ID : undefined;
   // Nhận diện thương hiệu và cấu hình bán hàng lấy từ database, không còn số liệu viết cứng.
-  const [siteContent, commerceSettings] = await Promise.all([getSiteContent(), getCommerceSettings()]);
+  // Menu bộ sưu tập đọc từ cache máy chủ (làm mới khi admin sửa bộ sưu tập), không gọi API mỗi lần chuyển trang.
+  const [siteContent, commerceSettings, collections] = await Promise.all([getSiteContent(), getCommerceSettings(), getCollections()]);
   const brandAssets = siteContent.brand_assets;
+  const collectionNav = collections.filter((item) => item.showInMenu)
+    .map((item) => ({ label: item.title, href: `/collections/${item.id}` }));
 
   return (
     <html lang="vi">
@@ -102,13 +106,13 @@ export default async function RootLayout({
                 <Suspense fallback={null}><NavigationProgress /></Suspense>
                 {/* Khu vực quản trị có khung riêng nên các thành phần của trang khách được ẩn ở đó. */}
                 <PublicChrome
-                  header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />}
+                  header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} collectionNav={collectionNav} />}
                   floating={<>
                     <MiniCart freeShippingThreshold={commerceSettings?.freeShippingThreshold ?? null} />
                     <MobileBottomNav />
-                    <FloatingMessenger />
+                    <FloatingMessenger messengerUrl={siteContent.contact_info?.messengerUrl} />
                   </>}
-                  footer={<Footer logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />}
+                  footer={<Footer logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} contact={siteContent.contact_info} />}
                 >
                   <main className="flex-1 pb-16 md:pb-0">{children}</main>
                 </PublicChrome>

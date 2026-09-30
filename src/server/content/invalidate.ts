@@ -5,7 +5,8 @@ import { SITE_CONTENT_TAG } from './site-content';
 export function invalidateCollections(slug?: string) {
   revalidateTag('collections');
   revalidateTag('products');
-  revalidatePath('/');
+  // Menu bộ sưu tập nằm ở layout gốc nên làm mới toàn bộ cây trang, giống nhận diện thương hiệu.
+  revalidatePath('/', 'layout');
   revalidatePath('/collections');
   if (slug) revalidatePath(`/collections/${slug}`);
 }

@@ -2,7 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import { SITE_CONTENT_KEYS, parseSiteContent } from '@/lib/content/site-content';
-import type { AboutPageContent, BrandAssets, CategoryPageContent, CategoryPagesContent, HomeFeaturesSection,
+import type { AboutPageContent, BrandAssets, CategoryPageContent, ContactInfo, CategoryPagesContent, HomeFeaturesSection,
   HomeHero, HomeLayout, HomeSections, SalePageContent, SiteContentKey, SiteContentValue, SizeGuide,
   TestimonialsSectionContent } from '@/lib/content/site-content';
 
@@ -14,6 +14,7 @@ export type SiteContentMap = {
   home_layout: HomeLayout | null;
   home_features: HomeFeaturesSection | null;
   brand_assets: BrandAssets | null;
+  contact_info: ContactInfo | null;
   sale_page: SalePageContent | null;
   about_page: AboutPageContent | null;
   category_pages: CategoryPagesContent | null;
@@ -43,6 +44,7 @@ export const getSiteContent = unstable_cache(async (): Promise<SiteContentMap> =
     home_layout: safeParse('home_layout', rows),
     home_features: safeParse('home_features', rows),
     brand_assets: safeParse('brand_assets', rows),
+    contact_info: safeParse('contact_info', rows),
     sale_page: safeParse('sale_page', rows),
     about_page: safeParse('about_page', rows),
     category_pages: safeParse('category_pages', rows),

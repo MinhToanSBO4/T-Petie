@@ -27,6 +27,15 @@ const content = {
   },
   testimonials_section: { eyebrow: 'Lời chia sẻ của khách hàng', title: "Mẹ nói gì về T'Petie?" },
   brand_assets: { logoUrl: '', logoAlt: "T'Petie - Made for little souls" },
+  // Giá trị đang hiển thị trên website trước khi chuyển sang quản trị được.
+  contact_info: {
+    hotline: '035 999 5381', hotlineHours: '8:30 – 23:00',
+    zaloUrl: 'https://zalo.me/0359995381', zaloLabel: "Zalo Official: T'Petie",
+    messengerUrl: 'https://m.me/thoitrangtreemtpetie', facebookUrl: 'https://www.facebook.com/thoitrangtreemtpetie/',
+    tiktokUrl: 'https://www.tiktok.com/@tpetie', instagramUrl: 'https://www.instagram.com/tpetie.design/',
+    commitment: 'Thương hiệu thời trang thiết kế trẻ em, nâng niu từng bước chạm đầu đời của bé yêu.',
+    madeIn: 'Thiết kế & May đo tại Việt Nam', copyrightName: "T'Petie Vietnam",
+  },
   sale_page: {
     bannerUrl: '', bannerAlt: "Ưu đãi T'Petie",
     title: 'Ưu đãi cho bé yêu', description: 'Giá và số lượng được cập nhật từ cửa hàng.',
