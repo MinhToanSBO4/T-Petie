@@ -12,6 +12,7 @@ import {
   User as UserIcon,
   LogOut,
   ChevronDown,
+  ShieldCheck,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -250,6 +251,16 @@ export function Header({ logoUrl, logoAlt }: { logoUrl?: string; logoAlt?: strin
                     </div>
 
                     <div className="py-1 text-xs text-charcoal-900">
+                      {user.role !== 'user' && (
+                        <Link
+                          href={user.role === 'admin' ? '/admin' : '/admin/products'}
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center space-x-2 px-3.5 py-2 hover:bg-honey-50 font-bold text-honey-700"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-honey-600" />
+                          <span>Trang quản trị</span>
+                        </Link>
+                      )}
                       <Link
                         href="/dashboard"
                         onClick={() => setIsUserMenuOpen(false)}

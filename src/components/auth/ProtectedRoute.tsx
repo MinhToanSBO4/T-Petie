@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types/auth';
-import { ShieldAlert, ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, Lock, Sparkles, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 interface ProtectedRouteProps {
@@ -22,6 +22,12 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
       router.push(`/account?returnUrl=${encodeURIComponent(pathname)}`);
     }
   }, [isLoading, isAuthenticated, router, pathname]);
+
+  // Tài khoản quản trị và nhân viên không dùng khu vực mua hàng của khách.
+  useEffect(() => {
+    if (isLoading || !user || requiredRole !== 'user' || user.role === 'user') return;
+    router.replace(user.role === 'admin' ? '/admin' : '/admin/products');
+  }, [isLoading, user, requiredRole, router]);
 
   // Đang tải phiên đăng nhập
   if (isLoading) {
@@ -62,6 +68,25 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
           className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95"
         >
           Đến Trang Đăng Nhập
+        </Link>
+      </div>
+    );
+  }
+
+  // Tài khoản quản trị/nhân viên: hiển thị trong lúc chuyển về khu quản trị.
+  if (requiredRole === 'user' && user.role !== 'user') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center space-y-3" role="status">
+        <div className="w-14 h-14 rounded-3xl bg-honey-100 text-honey-700 flex items-center justify-center">
+          <ShieldCheck className="w-7 h-7" />
+        </div>
+        <h2 className="text-lg font-bold font-heading text-charcoal-900">Đang chuyển về trang quản trị</h2>
+        <p className="text-xs text-charcoal-500 max-w-sm">
+          Tài khoản <strong>{user.name || user.email}</strong> thuộc khu vực quản trị nên không dùng giao diện mua hàng của khách.
+        </p>
+        <Link href={user.role === 'admin' ? '/admin' : '/admin/products'}
+          className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95">
+          Vào trang quản trị
         </Link>
       </div>
     );

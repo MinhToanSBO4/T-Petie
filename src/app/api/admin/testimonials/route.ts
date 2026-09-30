@@ -1,17 +1,30 @@
 import { NextResponse } from 'next/server';
 import { parseTestimonialInput } from '@/lib/content/testimonial-input';
+import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 import { getStaffSession } from '@/server/auth/staff-session';
 import { invalidateTestimonials } from '@/server/content/invalidate';
 import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const testimonials = await prisma.customerTestimonial.findMany({
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-  });
-  return NextResponse.json({ testimonials }, { headers: { 'Cache-Control': 'no-store' } });
+  const searchParams = new URL(request.url).searchParams;
+  const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
+  const search = parseSearch(searchParams);
+  const status = searchParams.get('filter') || '';
+  const where = {
+    ...(search ? { OR: [{ customerName: { contains: search, mode: 'insensitive' as const } },
+      { quote: { contains: search, mode: 'insensitive' as const } },
+      { location: { contains: search, mode: 'insensitive' as const } }] } : {}),
+    ...(status === 'published' ? { isPublished: true, consentConfirmed: true }
+      : status === 'draft' ? { OR: [{ isPublished: false }, { consentConfirmed: false }] } : {}),
+  };
+  const [testimonials, total] = await Promise.all([
+    prisma.customerTestimonial.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }], skip, take }),
+    prisma.customerTestimonial.count({ where }),
+  ]);
+  return NextResponse.json({ ...paginated(testimonials, total, page, limit) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: Request) {

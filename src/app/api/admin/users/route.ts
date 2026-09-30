@@ -5,9 +5,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
+import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 
-// GET: Lấy danh sách toàn bộ người dùng trong hệ thống (Chỉ Admin)
-export async function GET() {
+// GET: Lấy danh sách người dùng trong hệ thống, có tìm kiếm và phân trang (Chỉ Admin)
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -19,9 +20,26 @@ export async function GET() {
       );
     }
 
-    const users = await prisma.user.findMany({
-      where: { deletedAt: null },
+    const searchParams = new URL(request.url).searchParams;
+    const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
+    const search = parseSearch(searchParams);
+    const roleFilter = searchParams.get('filter') || '';
+    const where = {
+      deletedAt: null,
+      ...(roleFilter === 'user' || roleFilter === 'staff' || roleFilter === 'admin' ? { role: roleFilter } : {}),
+      ...(search ? { OR: [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search, mode: 'insensitive' as const } },
+        { username: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search, mode: 'insensitive' as const } },
+      ] } : {}),
+    };
+
+    const [users, total] = await Promise.all([prisma.user.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
       select: {
         id: true,
         name: true,
@@ -42,7 +60,7 @@ export async function GET() {
         createdAt: true,
         lastLoginAt: true,
       },
-    });
+    }), prisma.user.count({ where })]);
 
     // Định dạng lại theo type User của ứng dụng
     const formattedUsers = users.map((u) => ({
@@ -71,7 +89,7 @@ export async function GET() {
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : undefined,
     }));
 
-    return NextResponse.json({ success: true, users: formattedUsers });
+    return NextResponse.json({ success: true, ...paginated(formattedUsers, total, page, limit) });
   } catch (error) {
     console.error('Error in Admin GET /api/admin/users:', error);
     return NextResponse.json({ error: 'Lỗi server khi tải danh sách người dùng' }, { status: 500 });

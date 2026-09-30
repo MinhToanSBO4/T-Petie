@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 
 type Customer = {
   id: string; name: string | null; email: string | null; username: string | null;
@@ -10,29 +11,24 @@ type Customer = {
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '—';
 
-export function CustomerManager({ initialCustomers }: { initialCustomers: Customer[] }) {
-  const [customers, setCustomers] = useState(initialCustomers);
-  const [search, setSearch] = useState('');
+async function fetchCustomers(query: TableQuery) {
+  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: 'user' });
+  const response = await fetch(`/api/admin/users?${params}`, { cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Không tải được khách hàng');
+  return { items: data.items as Customer[], total: data.total as number, page: data.page as number, pages: data.pages as number };
+}
+
+export function CustomerManager() {
+  const [selected, setSelected] = useState<Customer | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return customers;
-    return customers.filter((customer) => [customer.name, customer.email, customer.username, customer.phone]
-      .some((value) => value?.toLowerCase().includes(query)));
-  }, [customers, search]);
-
-  const refresh = async () => {
-    const response = await fetch('/api/admin/users', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Không tải lại được danh sách khách hàng');
-    const data = await response.json();
-    setCustomers((data.users || []).filter((user: Customer & { role: string }) => user.role === 'user'));
-  };
+  const [error, setError] = useState('');
 
   const change = async (customer: Customer, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete' && !window.confirm(`Xóa tài khoản của ${customer.name || customer.email || customer.id}? Đơn hàng cũ vẫn được giữ lại.`)) return;
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setError('');
     try {
       const response = action === 'delete'
         ? await fetch(`/api/admin/users/${customer.id}`, { method: 'DELETE' })
@@ -40,44 +36,68 @@ export function CustomerManager({ initialCustomers }: { initialCustomers: Custom
             body: JSON.stringify({ status: action === 'block' ? 'blocked' : 'active' }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Thao tác thất bại');
-      await refresh();
       setMessage(action === 'delete' ? 'Đã xóa tài khoản khách hàng.'
         : action === 'block' ? 'Đã khóa tài khoản; phiên đăng nhập cũ sẽ hết hiệu lực.' : 'Đã mở lại tài khoản.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Có lỗi xảy ra'); }
+      setSelected(null);
+      setReloadKey((key) => key + 1);
+    } catch (changeError) { setError(changeError instanceof Error ? changeError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
 
-  return <div className="space-y-6">
-    <header><h1 className="mt-2 text-3xl font-bold font-heading">Khách hàng</h1>
-      <p className="mt-1 text-sm text-charcoal-600">Tài khoản khách đăng ký trên website. Khóa tài khoản sẽ vô hiệu hóa phiên đăng nhập hiện có.</p>
+  if (selected) return <div className="space-y-4">
+    <header className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 className="text-lg font-bold">{selected.name || 'Chưa đặt tên'}</h2>
+        <p className="text-xs text-charcoal-500">{selected.email || selected.username || selected.id}</p>
+      </div>
+      <button type="button" onClick={() => setSelected(null)} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-    <label className="block max-w-md text-sm font-semibold">Tìm theo tên, email hoặc số điện thoại
-      <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="VD: 0912..."
-        className="mt-1 block w-full rounded-xl border border-cream-300 p-3" />
-    </label>
-
-    <section className="space-y-3">
-      <h2 className="text-xl font-bold">Danh sách ({filtered.length})</h2>
-      {filtered.map((customer) => <article key={customer.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-200 bg-white p-4">
-        <div className="min-w-0">
-          <h3 className="font-bold text-charcoal-900">{customer.name || 'Chưa đặt tên'}</h3>
-          <p className="text-xs text-charcoal-600">{customer.email || customer.username || customer.id}</p>
-          <p className="text-xs text-charcoal-600">{customer.phone || 'Chưa có số điện thoại'}{customer.city ? ` · ${customer.city}` : ''} · {customer.points} điểm</p>
-          <p className="text-xs text-charcoal-400">Tham gia {formatDate(customer.createdAt)} · Đăng nhập gần nhất {formatDate(customer.lastLoginAt)}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${customer.status === 'active' ? 'bg-sage-100 text-sage-800' : 'bg-blush-100 text-blush-700'}`}>
-            {customer.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}
-          </span>
-          {customer.status === 'active'
-            ? <button disabled={busy} onClick={() => void change(customer, 'block')} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">Khóa</button>
-            : <button disabled={busy} onClick={() => void change(customer, 'unblock')} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">Mở khóa</button>}
-          <button disabled={busy} onClick={() => void change(customer, 'delete')} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-red-700">Xóa</button>
-        </div>
-      </article>)}
-      {filtered.length === 0 && <p className="rounded-2xl border border-dashed p-6 text-sm text-charcoal-600">Không có khách hàng phù hợp.</p>}
+    <section className="grid gap-3 rounded-2xl border border-cream-200 bg-white p-5 sm:grid-cols-2">
+      {[
+        ['Email', selected.email || '—'], ['Tên đăng nhập', selected.username || '—'],
+        ['Số điện thoại', selected.phone || '—'], ['Tỉnh/thành', selected.city || '—'],
+        ['Điểm tích lũy', String(selected.points)], ['Trạng thái', selected.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'],
+        ['Tham gia', formatDate(selected.createdAt)], ['Đăng nhập gần nhất', formatDate(selected.lastLoginAt)],
+      ].map(([label, value]) => <div key={label}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-charcoal-500">{label}</p>
+        <p className="text-sm text-charcoal-900">{value}</p>
+      </div>)}
     </section>
+
+    <div className="flex flex-wrap gap-2">
+      {selected.status === 'active'
+        ? <button type="button" disabled={busy} onClick={() => void change(selected, 'block')}
+            className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Khóa tài khoản</button>
+        : <button type="button" disabled={busy} onClick={() => void change(selected, 'unblock')}
+            className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Mở khóa</button>}
+      <button type="button" disabled={busy} onClick={() => void change(selected, 'delete')}
+        className="min-h-11 rounded-xl px-5 text-sm font-semibold text-red-700 disabled:opacity-50">Xóa tài khoản</button>
+    </div>
+  </div>;
+
+  const columns: Column<Customer>[] = [
+    { key: 'name', header: 'Khách hàng', render: (row) => <div>
+        <p className="font-semibold text-charcoal-900">{row.name || 'Chưa đặt tên'}</p>
+        <p className="text-xs text-charcoal-500">{row.email || row.username || row.id}</p>
+      </div> },
+    { key: 'phone', header: 'Điện thoại', render: (row) => row.phone || '—' },
+    { key: 'city', header: 'Tỉnh/thành', render: (row) => row.city || '—' },
+    { key: 'points', header: 'Điểm', render: (row) => row.points },
+    { key: 'joined', header: 'Tham gia', render: (row) => <span className="text-xs text-charcoal-600">{formatDate(row.createdAt)}</span> },
+    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+      row.status === 'active' ? 'bg-sage-100 text-sage-800' : 'bg-blush-100 text-blush-700'}`}>
+      {row.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</span> },
+  ];
+
+  return <div className="space-y-4">
+    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
+    <DataTable columns={columns} fetchPage={fetchCustomers} reloadKey={reloadKey}
+      searchPlaceholder="Tìm theo tên, email hoặc số điện thoại"
+      emptyText="Chưa có khách hàng nào."
+      onRowClick={(row) => setSelected(row)} />
+    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết, khóa hoặc xóa tài khoản.</p>
   </div>;
 }

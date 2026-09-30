@@ -8,13 +8,14 @@ import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedTestimonials } from '@/server/content/testimonials';
+import { getFeaturedReviews } from '@/server/content/reviews';
 import { getSiteContent } from '@/server/content/site-content';
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [products, collections, testimonials, content] = await Promise.all([
-    getProducts(), getCollections(), getPublishedTestimonials(), getSiteContent(),
+  const [products, collections, testimonials, featuredReviews, content] = await Promise.all([
+    getProducts(), getCollections(), getPublishedTestimonials(), getFeaturedReviews(), getSiteContent(),
   ]);
 
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 8);
@@ -88,7 +89,8 @@ export default async function HomePage() {
       {features && features.items.length > 0 && <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
         <FeatureCarousel section={features} />
       </section>}
-      <TestimonialsSection testimonials={testimonials} section={content.testimonials_section} />
+      {/* Đánh giá khách hàng: ưu tiên đánh giá sản phẩm do quản trị viên chọn hiển thị. */}
+      <TestimonialsSection testimonials={featuredReviews.length > 0 ? featuredReviews : testimonials} section={content.testimonials_section} />
     </div>
   );
 }

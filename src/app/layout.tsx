@@ -11,6 +11,7 @@ import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { MiniCart } from '@/components/cart/MiniCart';
 import { FloatingMessenger } from '@/components/layout/FloatingMessenger';
 import { NavigationProgress } from '@/components/layout/NavigationProgress';
+import { PublicChrome } from '@/components/layout/PublicChrome';
 import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
 import { Suspense } from 'react';
@@ -99,23 +100,18 @@ export default async function RootLayout({
             <ToastProvider>
               <CartProvider>
                 <Suspense fallback={null}><NavigationProgress /></Suspense>
-                {/* Header Sticky */}
-                <Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />
-
-                {/* Main Content Area */}
-                <main className="flex-1 pb-16 md:pb-0">{children}</main>
-
-                {/* Mini Cart Slide-in Drawer */}
-                <MiniCart freeShippingThreshold={commerceSettings?.freeShippingThreshold ?? null} />
-
-                {/* Mobile Bottom Navigation */}
-                <MobileBottomNav />
-
-                {/* Floating Messenger */}
-                <FloatingMessenger />
-
-                {/* Footer */}
-                <Footer logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />
+                {/* Khu vực quản trị có khung riêng nên các thành phần của trang khách được ẩn ở đó. */}
+                <PublicChrome
+                  header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />}
+                  floating={<>
+                    <MiniCart freeShippingThreshold={commerceSettings?.freeShippingThreshold ?? null} />
+                    <MobileBottomNav />
+                    <FloatingMessenger />
+                  </>}
+                  footer={<Footer logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />}
+                >
+                  <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                </PublicChrome>
               </CartProvider>
             </ToastProvider>
           </AuthProvider>

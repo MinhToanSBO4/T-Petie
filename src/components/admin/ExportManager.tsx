@@ -66,10 +66,6 @@ export function ExportManager() {
   return <div className="space-y-6">
     <header>
       <h1 className="text-3xl font-bold font-heading">Xuất dữ liệu</h1>
-      <p className="mt-1 text-sm text-charcoal-600">
-        File Excel gồm: thời gian, mã đơn, khách hàng, điện thoại, địa chỉ, sản phẩm, tổng tiền,
-        mã giảm giá, ghi chú, kênh tiếp cận, trạng thái và số lần mua. Tiến trình chạy nền nên bạn không phải chờ.
-      </p>
     </header>
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm text-charcoal-900">{message}</p>}
 

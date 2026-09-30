@@ -34,6 +34,16 @@ async function request(path, method = 'GET', cookie = '', body) {
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
+/** Trang chủ là ISR: lần tải đầu sau khi ghi có thể còn bản cũ nên chờ tối đa vài giây. */
+async function waitForHomepage(marker, expected = true) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const html = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
+    if (html.includes(marker) === expected) return true;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+  return false;
+}
+
 async function main() {
   const suffix = Date.now().toString(36);
   const slug = `content-check-${suffix}`;
@@ -53,8 +63,8 @@ async function main() {
     cookie = await makeAccount('admin');
     staffCookie = await makeAccount('staff');
     const initial = await request('/api/admin/collections', 'GET', cookie);
-    assert(initial.status === 200 && Array.isArray(initial.data.collections), 'Admin collections unavailable.');
-    const sample = initial.data.collections.find((item) => item.bannerUrl);
+    assert(initial.status === 200 && Array.isArray(initial.data.items), 'Admin collections unavailable.');
+    const sample = initial.data.items.find((item) => item.bannerUrl);
     assert(sample, 'A stored collection is needed to provide a valid banner for the test.');
     const staffCollections = await request('/api/admin/collections', 'GET', staffCookie);
     assert(staffCollections.status === 200, 'Staff collection access failed.');
@@ -66,15 +76,13 @@ async function main() {
     collectionId = created.data.id;
     let publicCollections = await request('/api/collections');
     assert(publicCollections.data.collections.some((item) => item.id === slug && item.showInMenu), 'New menu collection missing from public API.');
-    let homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
-    assert(homepage.includes(collection.title), 'New collection missing from homepage.');
+    assert(await waitForHomepage(collection.title), 'New collection missing from homepage.');
     const updated = await request(`/api/admin/collections/${collectionId}`, 'PATCH', cookie,
       { ...collection, showInMenu: false, showOnHome: false });
     assert(updated.status === 200, `Collection update failed: ${updated.status} ${updated.data.error || ''}`);
     publicCollections = await request('/api/collections');
     assert(publicCollections.data.collections.some((item) => item.id === slug && !item.showInMenu), 'Updated menu setting missing from public API.');
-    homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
-    assert(!homepage.includes(collection.title), 'Hidden collection still appeared on homepage.');
+    assert(await waitForHomepage(collection.title, false), 'Hidden collection still appeared on homepage.');
 
     const draft = { customerName: 'Content check', quote, location: '', rating: 5, sortOrder: 998,
       consentConfirmed: false, isPublished: false };
@@ -83,13 +91,11 @@ async function main() {
     const testimonial = await request('/api/admin/testimonials', 'POST', staffCookie, draft);
     assert(testimonial.status === 201, `Testimonial create failed: ${testimonial.status} ${testimonial.data.error || ''}`);
     testimonialId = testimonial.data.id;
-    homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
-    assert(!homepage.includes(quote), 'Unpublished testimonial appeared on homepage.');
+    assert(await waitForHomepage(quote, false), 'Unpublished testimonial appeared on homepage.');
     const published = await request(`/api/admin/testimonials/${testimonialId}`, 'PATCH', staffCookie,
       { ...draft, consentConfirmed: true, isPublished: true });
     assert(published.status === 200, `Testimonial publish failed: ${published.status} ${published.data.error || ''}`);
-    homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
-    assert(homepage.includes(quote), 'Published testimonial missing from homepage.');
+    assert(await waitForHomepage(quote), 'Published testimonial missing from homepage.');
 
     // Cấu hình nội dung website: admin sửa tiêu đề khối trang chủ và thấy thay đổi trên trang chủ.
     const siteContent = await request('/api/admin/site-content', 'GET', cookie);
@@ -100,8 +106,7 @@ async function main() {
     const updatedSections = await request('/api/admin/site-content/home_sections', 'PUT', cookie,
       { ...sectionsBefore, collections: { ...sectionsBefore.collections, eyebrow: marker } });
     assert(updatedSections.status === 200, `Site content update failed: ${updatedSections.status} ${updatedSections.data.error || ''}`);
-    homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
-    assert(homepage.includes(marker), 'Updated home section content missing from homepage.');
+    assert(await waitForHomepage(marker), 'Updated home section content missing from homepage.');
     const staffContent = await request('/api/admin/site-content', 'GET', staffCookie);
     assert(staffContent.status === 200, 'Staff site content access failed.');
     const anonymousContent = await request('/api/admin/site-content');

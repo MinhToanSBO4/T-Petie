@@ -3,22 +3,34 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { authOptions } from '@/server/auth/options';
 import { isSameOrigin } from '@/server/security/origin';
+import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.status !== 'active' || !['admin', 'staff'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
-  const [rows, collections] = await Promise.all([
-    prisma.product.findMany({ orderBy: { createdAt: 'desc' }, take: 200,
+  const searchParams = new URL(request.url).searchParams;
+  const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
+  const search = parseSearch(searchParams);
+  const status = searchParams.get('filter') || '';
+  const where = {
+    ...(search ? { OR: [{ name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
+      { slug: { contains: search, mode: 'insensitive' as const } }] } : {}),
+    ...(status === 'active' ? { isActive: true } : status === 'hidden' ? { isActive: false } : {}),
+  };
+  const [rows, total, collections] = await Promise.all([
+    prisma.product.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take,
       include: { images: { orderBy: { sortOrder: 'asc' } }, variants: { orderBy: { size: 'asc' } } } }),
+    prisma.product.count({ where }),
     prisma.collection.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
       select: { id: true, title: true } }),
   ]);
-  return NextResponse.json({ collections, products: rows.map((row) => ({
+  return NextResponse.json({ collections, ...paginated(rows.map((row) => ({
     id: row.id, slug: row.slug, sku: row.sku, name: row.name, active: row.isActive,
     price: Number(row.basePrice), description: row.description || '',
     originalPrice: row.originalPrice === null ? null : Number(row.originalPrice),
@@ -27,7 +39,7 @@ export async function GET() {
     images: row.images.map((image) => ({ id: image.id, url: image.url })),
     variants: row.variants.map((variant) => ({ id: variant.id, size: variant.size, stock: variant.stock,
       price: Number(variant.price), weightRange: variant.weightRange || '', ageRange: variant.ageRange || '' })),
-  })) });
+  })), total, page, limit) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: Request) {

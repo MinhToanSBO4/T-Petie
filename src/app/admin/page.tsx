@@ -1,17 +1,11 @@
-import Link from 'next/link';
-import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminPage } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 const currency = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 
 export default async function AdminPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.status !== 'active') redirect('/login?callbackUrl=/admin');
-  if (session.user.role === 'staff') redirect('/admin/products');
-  if (session.user.role !== 'admin') redirect('/dashboard');
+  await requireAdminPage('/admin');
   const since = new Date();
   since.setMonth(since.getMonth() - 5);
   since.setDate(1);

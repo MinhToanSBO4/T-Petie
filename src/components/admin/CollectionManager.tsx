@@ -1,124 +1,136 @@
 'use client';
 
 import { useState } from 'react';
+import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 import { MediaPicker, MediaListPicker } from '@/components/admin/MediaPicker';
 import type { AdminCollection } from '@/types/admin-content';
 
-type Draft = {
-  title: string; slug: string; subtitle: string; story: string; bannerUrl: string;
-  lookbookUrls: string[]; themeColor: string; accentColor: string; season: string; badge: string;
-  sortOrder: string; isActive: boolean; showInMenu: boolean; showOnHome: boolean;
-};
+type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; collection: AdminCollection };
 
-const emptyDraft = (): Draft => ({ title: '', slug: '', subtitle: '', story: '', bannerUrl: '',
-  lookbookUrls: [], themeColor: '#fff8ee', accentColor: '#d97706', season: '', badge: '',
-  sortOrder: '0', isActive: true, showInMenu: true, showOnHome: true });
+const field = 'mt-1 block w-full rounded-xl border p-3';
 
-function toDraft(item: AdminCollection): Draft {
-  return { title: item.title, slug: item.slug, subtitle: item.subtitle || '', story: item.story || '',
-    bannerUrl: item.bannerUrl, lookbookUrls: item.lookbookUrls,
-    themeColor: item.themeColor || '#fff8ee', accentColor: item.accentColor || '#d97706',
-    season: item.season || '', badge: item.badge || '', sortOrder: String(item.sortOrder),
-    isActive: item.isActive, showInMenu: item.showInMenu, showOnHome: item.showOnHome };
+async function fetchCollections(query: TableQuery) {
+  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
+  const response = await fetch(`/api/admin/collections?${params}`, { cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Không tải được bộ sưu tập');
+  return { items: data.items as AdminCollection[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
 
-export function CollectionManager({ initialCollections }: { initialCollections: AdminCollection[] }) {
-  const [collections, setCollections] = useState(initialCollections);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [busy, setBusy] = useState(false);
+export function CollectionManager() {
+  const [view, setView] = useState<View>({ mode: 'list' });
+  const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
+  const back = (text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
 
-  const change = (key: keyof Draft, value: string | boolean | string[]) => setDraft((current) => ({ ...current, [key]: value }));
-  const refresh = async () => {
-    const response = await fetch('/api/admin/collections', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Không tải lại được bộ sưu tập');
-    const data = await response.json();
-    setCollections(data.collections);
-    window.dispatchEvent(new Event('tpetie:collections-updated'));
-  };
-  const save = async (event: React.FormEvent) => {
+  if (view.mode !== 'list') return <CollectionForm collection={view.mode === 'edit' ? view.collection : null} onDone={back} />;
+
+  const columns: Column<AdminCollection>[] = [
+    { key: 'banner', header: 'Banner', className: 'w-24', render: (row) => row.bannerUrl
+      ? <img src={row.bannerUrl} alt={row.title} className="h-12 w-20 rounded-lg object-cover" />
+      : <span className="text-xs text-charcoal-400">—</span> },
+    { key: 'title', header: 'Bộ sưu tập', render: (row) => <div>
+        <p className="font-semibold text-charcoal-900">{row.title}</p>
+        <p className="text-xs text-charcoal-500">/{row.slug}{row.season ? ` · ${row.season}` : ''}</p>
+      </div> },
+    { key: 'products', header: 'Sản phẩm', render: (row) => row.productCount },
+    { key: 'order', header: 'Thứ tự', render: (row) => row.sortOrder },
+    { key: 'show', header: 'Hiển thị', render: (row) => <span className="text-xs text-charcoal-600">
+        {row.isActive ? 'Đang bán' : 'Lưu trữ'} · Menu: {row.isActive && row.showInMenu ? 'Có' : 'Không'} · Trang chủ: {row.isActive && row.showOnHome ? 'Có' : 'Không'}
+      </span> },
+  ];
+
+  return <div className="space-y-4">
+    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
+    <DataTable columns={columns} fetchPage={fetchCollections} reloadKey={reloadKey}
+      searchPlaceholder="Tìm theo tên hoặc slug"
+      filters={[{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Lưu trữ' }]}
+      emptyText="Chưa có bộ sưu tập nào."
+      onRowClick={(row) => setView({ mode: 'edit', collection: row })}
+      toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
+        className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm bộ sưu tập</button>} />
+    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết và chỉnh sửa bộ sưu tập.</p>
+  </div>;
+}
+
+/** Tạo mới hoặc chỉnh sửa một bộ sưu tập. */
+function CollectionForm({ collection, onDone }: { collection: AdminCollection | null; onDone: (message?: string) => void }) {
+  const editing = Boolean(collection);
+  const [draft, setDraft] = useState({
+    title: collection?.title || '', slug: collection?.slug || '', subtitle: collection?.subtitle || '',
+    story: collection?.story || '', bannerUrl: collection?.bannerUrl || '', lookbookUrls: collection?.lookbookUrls || [],
+    themeColor: collection?.themeColor || '#fff8ee', accentColor: collection?.accentColor || '#d97706',
+    season: collection?.season || '', badge: collection?.badge || '', sortOrder: String(collection?.sortOrder ?? 0),
+    isActive: collection?.isActive ?? true, showInMenu: collection?.showInMenu ?? true, showOnHome: collection?.showOnHome ?? true,
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setMessage('');
+    setBusy(true); setError('');
     try {
-      const response = await fetch(editingId ? `/api/admin/collections/${editingId}` : '/api/admin/collections', {
-        method: editingId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(editing ? `/api/admin/collections/${collection!.id}` : '/api/admin/collections', {
+        method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...draft, sortOrder: Number(draft.sortOrder) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không lưu được bộ sưu tập');
-      await refresh();
-      setEditingId(null); setDraft(emptyDraft()); setMessage('Đã lưu bộ sưu tập. Menu và trang chủ sẽ hiển thị theo cấu hình mới.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Có lỗi xảy ra'); }
-    finally { setBusy(false); }
-  };
-  const remove = async (item: AdminCollection) => {
-    if (!window.confirm(`Xóa ${item.title} khỏi website? Nếu có sản phẩm, bộ sưu tập sẽ được lưu trữ để giữ liên kết dữ liệu.`)) return;
-    setBusy(true); setMessage('');
-    try {
-      const response = await fetch(`/api/admin/collections/${item.id}`, { method: 'DELETE' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không xóa được bộ sưu tập');
-      await refresh();
-      if (editingId === item.id) { setEditingId(null); setDraft(emptyDraft()); }
-      setMessage(data.archived ? 'Đã lưu trữ bộ sưu tập có sản phẩm.' : 'Đã xóa bộ sưu tập.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Có lỗi xảy ra'); }
+      onDone(editing ? 'Đã lưu bộ sưu tập.' : `Đã tạo bộ sưu tập ${draft.title}.`);
+    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
 
-  return <div className="space-y-8">
-    <header><h1 className="mt-2 text-3xl font-bold font-heading">Bộ sưu tập</h1>
-      <p className="mt-1 text-sm text-charcoal-600">Thêm, sắp xếp và chọn nơi hiển thị. Menu khách hàng tự lấy danh sách đang bật.</p>
+  return <form onSubmit={submit} className="space-y-5 rounded-2xl border border-cream-200 bg-white p-5">
+    <header className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-lg font-bold">{editing ? 'Sửa bộ sưu tập' : 'Thêm bộ sưu tập mới'}</h2>
+      <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm text-charcoal-900">{message}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-    <section aria-labelledby="collection-list-heading" className="space-y-3">
-      <div className="flex items-center justify-between gap-3"><h2 id="collection-list-heading" className="text-xl font-bold">Danh sách ({collections.length})</h2>
-        <button type="button" onClick={() => { setEditingId(null); setDraft(emptyDraft()); }}
-          className="min-h-11 rounded-xl bg-honey-600 px-4 text-sm font-bold text-white">Thêm bộ sưu tập</button></div>
-      {collections.map((item) => <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-200 bg-white p-4">
-        <div className="flex items-center gap-3 min-w-0">{item.bannerUrl && <img src={item.bannerUrl} alt="" className="size-14 rounded-xl object-cover bg-cream-100" />}
-          <div><h3 className="font-bold text-charcoal-900">{item.title}</h3>
-            <p className="text-xs text-charcoal-600">/{item.slug} · {item.productCount} sản phẩm · Thứ tự {item.sortOrder}</p>
-            <p className="text-xs text-charcoal-600">{item.isActive ? 'Đang bán' : 'Lưu trữ'} · Menu: {item.isActive && item.showInMenu ? 'Có' : 'Không'} · Trang chủ: {item.isActive && item.showOnHome ? 'Có' : 'Không'}</p>
-          </div></div>
-        <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => { setEditingId(item.id); setDraft(toDraft(item)); document.getElementById('collection-editor')?.scrollIntoView(); }}
-          className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">Sửa</button>
-          {item.isActive && <button type="button" disabled={busy} onClick={() => void remove(item)} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-red-700">Xóa</button>}
-        </div>
-      </article>)}
-      {collections.length === 0 && <p className="rounded-2xl border border-dashed p-6 text-sm text-charcoal-600">Chưa có bộ sưu tập.</p>}
-    </section>
-
-    <form id="collection-editor" onSubmit={save} className="rounded-2xl border border-cream-200 bg-white p-5 sm:p-6 space-y-5">
-      <h2 className="text-xl font-bold">{editingId ? 'Sửa bộ sưu tập' : 'Tạo bộ sưu tập'}</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-semibold">Tên bộ sưu tập<input required minLength={2} maxLength={100} value={draft.title} onChange={(e) => change('title', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <label className="text-sm font-semibold">Slug URL<input required readOnly={!!editingId} maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={draft.slug} onChange={(e) => change('slug', e.target.value)} className="mt-1 block w-full rounded-xl border p-3 read-only:bg-cream-100" /></label>
-        <div className="sm:col-span-2">
-          <MediaPicker label="Ảnh banner" value={draft.bannerUrl} altText={draft.title} onError={setMessage}
-            onChange={(bannerUrl) => change('bannerUrl', bannerUrl)} />
-        </div>
-        <label className="text-sm font-semibold">Phụ đề<input maxLength={200} value={draft.subtitle} onChange={(e) => change('subtitle', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <label className="text-sm font-semibold">Mùa / chủ đề<input maxLength={100} value={draft.season} onChange={(e) => change('season', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <label className="text-sm font-semibold">Nhãn<input maxLength={80} value={draft.badge} onChange={(e) => change('badge', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <label className="text-sm font-semibold">Thứ tự hiển thị<input type="number" min="0" max="999" value={draft.sortOrder} onChange={(e) => change('sortOrder', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <label className="text-sm font-semibold sm:col-span-2">Câu chuyện<textarea maxLength={5000} rows={4} value={draft.story} onChange={(e) => change('story', e.target.value)} className="mt-1 block w-full rounded-xl border p-3" /></label>
-        <div className="sm:col-span-2">
-          <MediaListPicker label="Ảnh lookbook" values={draft.lookbookUrls} onError={setMessage}
-            onChange={(lookbookUrls) => change('lookbookUrls', lookbookUrls)} />
-        </div>
-        <label className="text-sm font-semibold">Màu nền<input type="color" value={draft.themeColor} onChange={(e) => change('themeColor', e.target.value)} className="mt-1 block h-11 w-full rounded-xl border p-1" /></label>
-        <label className="text-sm font-semibold">Màu nhấn<input type="color" value={draft.accentColor} onChange={(e) => change('accentColor', e.target.value)} className="mt-1 block h-11 w-full rounded-xl border p-1" /></label>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <label className="text-sm font-semibold">Tên bộ sưu tập
+        <input className={field} required minLength={2} maxLength={100} value={draft.title}
+          onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Slug URL
+        <input className={`${field} read-only:bg-cream-100`} required readOnly={editing} maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          value={draft.slug} onChange={(event) => setDraft({ ...draft, slug: event.target.value.toLowerCase() })} /></label>
+      <div className="sm:col-span-2">
+        <MediaPicker label="Ảnh banner" value={draft.bannerUrl} altText={draft.title} onError={setError}
+          onChange={(bannerUrl) => setDraft({ ...draft, bannerUrl })} />
       </div>
-      <div className="flex flex-wrap gap-5 text-sm font-semibold">
-        {(['isActive', 'showInMenu', 'showOnHome'] as const).map((key) => <label key={key} className="flex items-center gap-2 min-h-11">
-          <input type="checkbox" checked={draft[key]} onChange={(e) => change(key, e.target.checked)} className="size-5" />
-          {{ isActive: 'Đang hoạt động', showInMenu: 'Hiện ở menu', showOnHome: 'Hiện ở trang chủ' }[key]}
+      <label className="text-sm font-semibold">Phụ đề
+        <input className={field} maxLength={200} value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Mùa / chủ đề
+        <input className={field} maxLength={100} value={draft.season} onChange={(event) => setDraft({ ...draft, season: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Nhãn
+        <input className={field} maxLength={80} value={draft.badge} onChange={(event) => setDraft({ ...draft, badge: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Thứ tự hiển thị
+        <input className={field} type="number" min="0" max="999" value={draft.sortOrder}
+          onChange={(event) => setDraft({ ...draft, sortOrder: event.target.value })} /></label>
+      <label className="text-sm font-semibold sm:col-span-2">Câu chuyện
+        <textarea className={field} rows={4} maxLength={5000} value={draft.story}
+          onChange={(event) => setDraft({ ...draft, story: event.target.value })} /></label>
+      <div className="sm:col-span-2">
+        <MediaListPicker label="Ảnh lookbook" values={draft.lookbookUrls} onError={setError}
+          onChange={(lookbookUrls) => setDraft({ ...draft, lookbookUrls })} />
+      </div>
+      <label className="text-sm font-semibold">Màu nền
+        <input className={`${field} h-11 p-1`} type="color" value={draft.themeColor}
+          onChange={(event) => setDraft({ ...draft, themeColor: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Màu nhấn
+        <input className={`${field} h-11 p-1`} type="color" value={draft.accentColor}
+          onChange={(event) => setDraft({ ...draft, accentColor: event.target.value })} /></label>
+    </div>
+    <div className="flex flex-wrap gap-5 text-sm font-semibold">
+      {([['isActive', 'Đang hoạt động'], ['showInMenu', 'Hiện ở menu'], ['showOnHome', 'Hiện ở trang chủ']] as const)
+        .map(([key, label]) => <label key={key} className="flex min-h-11 items-center gap-2">
+          <input type="checkbox" className="size-5" checked={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.checked })} /> {label}
         </label>)}
-      </div>
-      <button disabled={busy || !draft.bannerUrl} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang lưu…' : 'Lưu bộ sưu tập'}</button>
-      {!draft.bannerUrl && <p className="text-xs text-charcoal-500">Cần tải lên ảnh banner trước khi lưu.</p>}
-    </form>
-  </div>;
+    </div>
+    <button disabled={busy || !draft.bannerUrl} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
+      {busy ? 'Đang lưu…' : editing ? 'Lưu bộ sưu tập' : 'Tạo bộ sưu tập'}
+    </button>
+    {!draft.bannerUrl && <p className="text-xs text-charcoal-500">Cần tải lên ảnh banner trước khi lưu.</p>}
+  </form>;
 }

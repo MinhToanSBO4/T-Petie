@@ -1,12 +1,21 @@
 import { notFound } from 'next/navigation';
-import { getProducts } from '@/server/catalog/queries';
+import { getProducts, getProductBySlug, getRelatedProducts } from '@/server/catalog/queries';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 
 export const revalidate = 60;
 
-export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
+/**
+ * Dựng sẵn các trang sản phẩm phổ biến lúc build để khách không gặp độ trễ truy vấn
+ * ở lần truy cập đầu tiên. Sản phẩm mới vẫn được dựng theo yêu cầu nhờ ISR.
+ */
+export async function generateStaticParams() {
   const products = await getProducts();
-  const product = products.find((entry) => entry.slug === params.slug || entry.id === params.slug || entry.sku === params.slug);
+  return products.slice(0, 100).map((product) => ({ slug: product.slug }));
+}
+
+export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
+  const product = await getProductBySlug(params.slug);
   if (!product) notFound();
-  return <ProductDetailClient product={product} allProducts={products} />;
+  const relatedProducts = await getRelatedProducts(product.id, product.collectionId || null, 4);
+  return <ProductDetailClient product={product} relatedProducts={relatedProducts} />;
 }

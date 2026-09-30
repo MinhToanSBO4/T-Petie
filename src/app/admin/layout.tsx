@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getStaffSession } from '@/server/auth/staff-session';
+import { requireStaffPage } from '@/server/auth/staff-session';
 import { AdminSidebar, type AdminNavItem } from '@/components/admin/AdminSidebar';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +10,7 @@ const ADMIN_ITEMS: AdminNavItem[] = [
   { href: '/admin/collections', label: 'Bộ sưu tập' },
   { href: '/admin/content', label: 'Nội dung website' },
   { href: '/admin/customers', label: 'Khách hàng' },
+  { href: '/admin/reviews', label: 'Đánh giá sản phẩm' },
   { href: '/admin/feedback', label: 'Feedback' },
   { href: '/admin/staff', label: 'Nhân viên' },
   { href: '/admin/settings', label: 'Cấu hình bán hàng' },
@@ -30,13 +30,12 @@ const STAFF_ITEMS: AdminNavItem[] = [
  * một trang thêm mới dưới /admin/* không thể vô tình mở cho người chưa đăng nhập.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getStaffSession();
-  if (!session) redirect('/login?callbackUrl=/admin');
+  const session = await requireStaffPage('/admin');
   const items = session.user.role === 'admin' ? ADMIN_ITEMS : STAFF_ITEMS;
-  return <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 py-8 lg:flex lg:gap-8">
+  return <div className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:gap-8">
     <aside className="lg:w-60 lg:shrink-0">
-      <p className="mb-3 hidden text-xs font-bold uppercase tracking-widest text-honey-600 lg:block">T&apos;Petie / Quản trị</p>
-      <AdminSidebar items={items} />
+      <AdminSidebar items={items} userName={session.user.name || session.user.email || 'Tài khoản quản trị'}
+        userRole={session.user.role} />
     </aside>
     <main className="min-w-0 flex-1">{children}</main>
   </div>;

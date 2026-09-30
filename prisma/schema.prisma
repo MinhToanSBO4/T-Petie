@@ -83,6 +83,7 @@ model Product {
   collection Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
   images ProductImage[]
   variants ProductVariant[]
+  reviews ProductReview[]
   orderItems OrderItem[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -154,6 +155,24 @@ model Collection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("collections")
+}
+
+/// Đánh giá sản phẩm do khách hàng gửi. Quản trị viên duyệt và chọn đánh giá hiển thị ở trang chủ.
+model ProductReview {
+  id           String   @id @default(cuid())
+  productId    String
+  userId       String?
+  customerName String
+  rating       Int
+  content      String   @db.Text
+  isApproved   Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([productId, isApproved])
+  @@index([isFeatured, isApproved])
+  @@map("product_reviews")
 }
 
 model CustomerTestimonial {

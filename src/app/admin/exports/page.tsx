@@ -1,12 +1,9 @@
-import { redirect } from 'next/navigation';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminPage } from '@/server/auth/staff-session';
 import { ExportManager } from '@/components/admin/ExportManager';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminExportsPage() {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') redirect('/login?callbackUrl=/admin/exports');
+  await requireAdminPage('/admin/exports');
   return <ExportManager />;
 }

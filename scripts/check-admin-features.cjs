@@ -58,8 +58,8 @@ async function main() {
     staffCookie = await makeAccount('staff');
 
     const list = await request('/api/admin/products', 'GET', cookie);
-    assert(list.status === 200 && list.data.products?.length > 0, 'Admin product list unavailable.');
-    const product = list.data.products[0];
+    assert(list.status === 200 && list.data.items?.length > 0, 'Admin product list unavailable.');
+    const product = list.data.items[0];
     productId = product.id;
     variantId = product.variants[0]?.id;
     originalName = product.name;
@@ -72,7 +72,7 @@ async function main() {
     const renamed = await request(`/api/admin/products/${productId}`, 'PATCH', cookie, { product: { name: marker } });
     assert(renamed.status === 200, `Product rename failed: ${renamed.status} ${renamed.data.error || ''}`);
     const afterRename = await request('/api/admin/products', 'GET', cookie);
-    assert(afterRename.data.products.find((row) => row.id === productId)?.name === marker, 'Renamed product not stored.');
+    assert(afterRename.data.items.find((row) => row.id === productId)?.name === marker, 'Renamed product not stored.');
     const restored = await request(`/api/admin/products/${productId}`, 'PATCH', cookie, { product: { name: originalName } });
     assert(restored.status === 200, 'Failed to restore product name.');
 
@@ -80,7 +80,7 @@ async function main() {
     const repriced = await request(`/api/admin/products/${productId}`, 'PATCH', cookie, { variantId, price: originalPrice + 1000 });
     assert(repriced.status === 200, `Variant price update failed: ${repriced.status}`);
     const afterPrice = await request('/api/admin/products', 'GET', cookie);
-    const variants = afterPrice.data.products.find((row) => row.id === productId).variants;
+    const variants = afterPrice.data.items.find((row) => row.id === productId).variants;
     assert(variants.find((row) => row.id === variantId).price === originalPrice + 1000, 'Variant price not stored.');
     await request(`/api/admin/products/${productId}`, 'PATCH', cookie, { variantId, price: originalPrice });
 
@@ -91,21 +91,22 @@ async function main() {
     assert(duplicate.status === 409, 'Duplicate size was accepted.');
 
     // Mã giảm giá: đặt thời hạn và giới hạn lượt, sau đó xóa.
-    const coupon = await request('/api/admin/commerce', 'PATCH', cookie, { kind: 'coupon', code: couponCode, type: 'FIXED',
+    const coupon = await request('/api/admin/coupons', 'PATCH', cookie, { code: couponCode, type: 'FIXED',
       value: 5000, minSubtotal: 0, active: true, requiresLogin: false, usageLimit: 5,
       startsAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
     assert(coupon.status === 200, `Coupon with schedule failed: ${coupon.status} ${coupon.data.error || ''}`);
     const commerce = await request('/api/admin/commerce', 'GET', cookie);
-    const saved = commerce.data.coupons.find((row) => row.code === couponCode);
+    const couponList = await request('/api/admin/coupons?q=' + couponCode, 'GET', cookie);
+    const saved = couponList.data.items.find((row) => row.code === couponCode);
     assert(saved?.usageLimit === 5 && saved?.startsAt && saved?.expiresAt, 'Coupon schedule not stored.');
-    const removed = await request(`/api/admin/commerce?code=${couponCode}`, 'DELETE', cookie);
+    const removed = await request(`/api/admin/coupons?code=${couponCode}`, 'DELETE', cookie);
     assert(removed.status === 200, `Coupon delete failed: ${removed.status} ${removed.data.error || ''}`);
 
     // Phân quyền: nhân viên sửa được sản phẩm nhưng không xóa được mã giảm giá và không tạo được sản phẩm.
     const staffPatch = await request(`/api/admin/products/${productId}`, 'PATCH', staffCookie, { variantId, stock: 0 });
     assert(staffPatch.status === 200, `Staff stock update failed: ${staffPatch.status}`);
     await request(`/api/admin/products/${productId}`, 'PATCH', staffCookie, { variantId, stock: variants.find((row) => row.id === variantId).stock });
-    const staffDeleteCoupon = await request('/api/admin/commerce?code=MEMBERVIP', 'DELETE', staffCookie);
+    const staffDeleteCoupon = await request('/api/admin/coupons?code=MEMBERVIP', 'DELETE', staffCookie);
     assert(staffDeleteCoupon.status === 403, 'Staff was allowed to delete a coupon.');
     const staffCreateProduct = await request('/api/admin/products', 'POST', staffCookie, { name: 'X', sku: 'X-1', slug: 'x-1', price: 1, size: 'S', stock: 1 });
     assert(staffCreateProduct.status === 403, 'Staff was allowed to create a product.');

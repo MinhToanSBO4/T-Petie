@@ -26,10 +26,11 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
+import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
 import { trackViewItem, trackEvent } from '@/client/analytics/tracker';
 
-export function ProductDetailClient({ product, allProducts }: { product: Product; allProducts: Product[] }) {
+export function ProductDetailClient({ product, relatedProducts }: { product: Product; relatedProducts: Product[] }) {
   const router = useRouter();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -106,10 +107,6 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
       router.push('/girls');
     }
   };
-
-  const relatedProducts = allProducts
-    .filter((p) => p.id !== product.id && p.category === product.category)
-    .slice(0, 4);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-8">
@@ -447,6 +444,9 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
           <span>Mua Ngay ({formatPriceCompact(selectedSize.price)})</span>
         </button>
       </div>
+
+      {/* Đánh giá sản phẩm từ khách hàng */}
+      <ProductReviews productId={product.id} productName={product.name} />
 
       {/* Sản phẩm liên quan */}
       <div className="pt-8 border-t border-cream-200">

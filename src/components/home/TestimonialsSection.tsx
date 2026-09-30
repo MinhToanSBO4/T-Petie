@@ -1,8 +1,14 @@
-import type { PublicTestimonial } from '@/types/testimonial';
+import Link from 'next/link';
 import type { TestimonialsSectionContent } from '@/lib/content/site-content';
 
+/** Một thẻ đánh giá hiển thị ở trang chủ: có thể là đánh giá sản phẩm hoặc feedback khách. */
+export type TestimonialCard = {
+  id: string; customerName: string; quote: string; rating: number;
+  location?: string | null; productName?: string; productSlug?: string;
+};
+
 export function TestimonialsSection({ testimonials, section }: {
-  testimonials: PublicTestimonial[]; section?: TestimonialsSectionContent | null;
+  testimonials: TestimonialCard[]; section?: TestimonialsSectionContent | null;
 }) {
   if (testimonials.length === 0) return null;
 
@@ -26,8 +32,12 @@ export function TestimonialsSection({ testimonials, section }: {
             <span aria-hidden="true" className="grid size-10 place-items-center rounded-full bg-sage-100 text-sage-800 font-bold">
               {item.customerName.charAt(0).toLocaleUpperCase('vi-VN')}
             </span>
-            <span><strong className="block text-sm text-charcoal-900">{item.customerName}</strong>
-              {item.location && <span className="text-xs text-charcoal-500">{item.location}</span>}
+            <span className="min-w-0">
+              <strong className="block text-sm text-charcoal-900">{item.customerName}</strong>
+              {item.location && <span className="block text-xs text-charcoal-500">{item.location}</span>}
+              {item.productName && item.productSlug && <Link href={`/products/${item.productSlug}`}
+                className="block truncate text-xs text-honey-700 hover:underline">Về sản phẩm: {item.productName}</Link>}
+              {item.productName && !item.productSlug && <span className="block truncate text-xs text-charcoal-500">Về sản phẩm: {item.productName}</span>}
             </span>
           </figcaption>
         </figure>

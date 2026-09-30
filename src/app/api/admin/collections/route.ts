@@ -1,19 +1,30 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { parseCollectionInput } from '@/lib/content/collection-input';
+import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 import { getStaffSession } from '@/server/auth/staff-session';
 import { invalidateCollections } from '@/server/content/invalidate';
 import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const rows = await prisma.collection.findMany({
-    include: { _count: { select: { products: true } } },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-  });
-  return NextResponse.json({ collections: rows.map(({ _count, ...row }) => ({ ...row, productCount: _count.products })) },
+  const searchParams = new URL(request.url).searchParams;
+  const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
+  const search = parseSearch(searchParams);
+  const status = searchParams.get('filter') || '';
+  const where = {
+    ...(search ? { OR: [{ title: { contains: search, mode: 'insensitive' as const } },
+      { slug: { contains: search, mode: 'insensitive' as const } }] } : {}),
+    ...(status === 'active' ? { isActive: true } : status === 'hidden' ? { isActive: false } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.collection.findMany({ where, include: { _count: { select: { products: true } } },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], skip, take }),
+    prisma.collection.count({ where }),
+  ]);
+  return NextResponse.json({ ...paginated(rows.map(({ _count, ...row }) => ({ ...row, productCount: _count.products })), total, page, limit) },
     { headers: { 'Cache-Control': 'no-store' } });
 }
 
