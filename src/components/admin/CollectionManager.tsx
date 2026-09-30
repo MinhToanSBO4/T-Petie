@@ -31,13 +31,14 @@ export function CollectionManager() {
       : <span className="text-xs text-charcoal-400">—</span> },
     { key: 'title', header: 'Bộ sưu tập', render: (row) => <div>
         <p className="font-semibold text-charcoal-900">{row.title}</p>
-        <p className="text-xs text-charcoal-500">/{row.slug}{row.season ? ` · ${row.season}` : ''}</p>
+        <p className="text-xs text-charcoal-500">{row.season || 'Chưa gắn mùa/chủ đề'}</p>
       </div> },
     { key: 'products', header: 'Sản phẩm', render: (row) => row.productCount },
     { key: 'order', header: 'Thứ tự', render: (row) => row.sortOrder },
     { key: 'show', header: 'Hiển thị', render: (row) => <span className="text-xs text-charcoal-600">
         {row.isActive ? 'Đang bán' : 'Lưu trữ'} · Menu: {row.isActive && row.showInMenu ? 'Có' : 'Không'} · Trang chủ: {row.isActive && row.showOnHome ? 'Có' : 'Không'}
       </span> },
+    { key: 'action', header: '', render: (row) => <button type="button" onClick={(event) => { event.stopPropagation(); setView({ mode: 'edit', collection: row }); }} className="min-h-9 whitespace-nowrap rounded-lg border border-cream-300 px-3 text-xs font-bold">Chỉnh sửa</button> },
   ];
 
   return <div className="space-y-4">

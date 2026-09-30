@@ -41,13 +41,14 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
       : <span className="text-xs text-charcoal-400">—</span> },
     { key: 'name', header: 'Sản phẩm', render: (row) => <div>
         <p className="font-semibold text-charcoal-900">{row.name}</p>
-        <p className="text-xs text-charcoal-500">{row.sku} · /{row.slug}</p>
+        <p className="text-xs text-charcoal-500">Mã sản phẩm: {row.sku}</p>
       </div> },
     { key: 'price', header: 'Giá', render: (row) => formatPrice(row.price) },
     { key: 'stock', header: 'Tồn kho', render: (row) => <span className={totalStock(row) === 0 ? 'font-bold text-red-700' : ''}>{totalStock(row)}</span> },
     { key: 'sizes', header: 'Size', render: (row) => <span className="text-xs text-charcoal-600">{row.variants.map((variant) => variant.size).join(', ') || '—'}</span> },
-    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${
       row.active ? 'bg-sage-100 text-sage-800' : 'bg-cream-200 text-charcoal-600'}`}>{row.active ? 'Đang bán' : 'Đang ẩn'}</span> },
+    { key: 'action', header: '', render: (row) => <button type="button" onClick={(event) => { event.stopPropagation(); setView({ mode: 'edit', product: row }); }} className="min-h-9 whitespace-nowrap rounded-lg border border-cream-300 px-3 text-xs font-bold">Chỉnh sửa</button> },
   ];
 
   return <div className="space-y-4">
