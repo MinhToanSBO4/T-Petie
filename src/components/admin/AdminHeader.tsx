@@ -20,8 +20,13 @@ export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false);
     };
+    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, []);
 
   return <header className="sticky top-0 z-40 border-b border-cream-200 bg-white shadow-sm">
@@ -40,7 +45,7 @@ export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
           <ChevronDown className={`h-3.5 w-3.5 text-charcoal-400 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
 
-        {open && <div role="menu" className="absolute right-0 mt-2 w-60 rounded-2xl border border-cream-200 bg-white py-2 shadow-2xl">
+        {open && <div role="menu" className="absolute right-0 mt-2 w-60 origin-top-right rounded-2xl border border-cream-200 bg-white py-2 shadow-2xl motion-safe:animate-scale-up">
           <div className="border-b border-cream-100 px-4 py-2">
             <p className="truncate text-sm font-bold text-charcoal-900">{userName}</p>
             <p className="text-[11px] text-charcoal-500">{userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}</p>

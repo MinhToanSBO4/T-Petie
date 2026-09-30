@@ -6,10 +6,46 @@
   :root {
     --font-be-vietnam-pro: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-quicksand: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Màu nhấn mật ong của giao diện khách (kênh R G B để Tailwind ghép độ trong suốt).
+       200–400 và 800–900 theo thang amber của Tailwind, vì 600/700 vốn trùng amber. */
+    --cream-50: 255 253 249; /* #FFFDF9 */
+    --cream-100: 255 248 238; /* #FFF8EE */
+    --cream-200: 245 235 225; /* #F5EBE1 */
+    --cream-300: 234 220 207; /* #EADCCF */
+    --honey-50: 255 251 240; /* #FFFBF0 */
+    --honey-100: 255 242 214; /* #FFF2D6 */
+    --honey-200: 253 230 138; /* #FDE68A */
+    --honey-300: 252 211 77; /* #FCD34D */
+    --honey-400: 251 191 36; /* #FBBF24 */
+    --honey-500: 245 166 35; /* #F5A623 */
+    --honey-600: 217 119 6; /* #D97706 */
+    --honey-700: 180 83 9; /* #B45309 */
+    --honey-800: 146 64 14; /* #92400E */
+    --honey-900: 120 53 15; /* #78350F */
+  }
+
+  /* Khu quản trị: hồng pastel. Chữ 700 trên nền trắng 5.98:1, chữ trắng trên nút 600 4.66:1,
+     chữ 800 trên nền 100 7.04:1 — đều đạt WCAG 2.2 AA. */
+  .admin-theme {
+    /* Trung tính ngả hồng; chữ charcoal-500 trên nền 100 vẫn đạt 4.53:1 như bản cũ. */
+    --cream-50: 255 250 252; /* #FFFAFC */
+    --cream-100: 255 247 250; /* #FFF7FA */
+    --cream-200: 245 227 235; /* #F5E3EB */
+    --cream-300: 236 209 221; /* #ECD1DD */
+    --honey-50: 255 245 248; /* #FFF5F8 */
+    --honey-100: 253 232 239; /* #FDE8EF */
+    --honey-200: 249 210 224; /* #F9D2E0 */
+    --honey-300: 243 180 202; /* #F3B4CA */
+    --honey-400: 234 143 176; /* #EA8FB0 */
+    --honey-500: 220 110 151; /* #DC6E97 */
+    --honey-600: 190 76 123; /* #BE4C7B */
+    --honey-700: 166 62 105; /* #A63E69 */
+    --honey-800: 131 50 85; /* #833255 */
+    --honey-900: 102 40 69; /* #662845 */
   }
 
   body {
-    background-color: #FFFDF9;
+    background-color: rgb(var(--cream-50));
     color: #2D3142;
     font-family: var(--font-be-vietnam-pro);
     -webkit-tap-highlight-color: transparent;
@@ -27,7 +63,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #EADCCF;
+  background: rgb(var(--cream-300));
   border-radius: 9999px;
 }
 
@@ -44,7 +80,7 @@
   .shimmer {
     position: relative;
     overflow: hidden;
-    background-color: #F8F3ED;
+    background-color: rgb(var(--cream-200) / 0.7);
   }
   .shimmer::after {
     position: absolute;
@@ -62,3 +98,17 @@
   }
 }
 
+
+/* Hiệu ứng vào của biểu đồ trang quản trị: thanh mọc từ gốc.
+   Chỉ chạy một lần khi dữ liệu xuất hiện; tắt hẳn khi người dùng chọn giảm chuyển động. */
+@keyframes chart-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.chart-grow {
+  transform-origin: left center;
+  animation: chart-grow 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-grow { animation: none; }
+}
