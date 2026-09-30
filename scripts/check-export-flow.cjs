@@ -15,6 +15,8 @@ const cookies = (response) => response.headers.getSetCookie().map((value) => val
 const EXPECTED_HEADERS = ['Thời gian', 'Mã đơn', 'Tên khách hàng', 'Số điện thoại', 'Địa chỉ',
   'Sản phẩm (tên + size + số lượng)', 'Tổng tiền (VND)', 'Mã giảm giá', 'Ghi chú', 'Kênh tiếp cận',
   'Trạng thái đơn', 'Số lần mua'];
+const EXPECTED_SHEETS = ['Đơn hàng', 'Chi tiết sản phẩm', 'Thanh toán & giao hàng', 'Khách hàng', 'Nhân sự',
+  'Sản phẩm & tồn kho', 'Mã giảm giá', 'Đánh giá'];
 
 async function login(username, password) {
   const csrf = await fetch(new URL('/api/auth/csrf', base));
@@ -61,7 +63,10 @@ async function main() {
       if (job.status === 'completed' || job.status === 'failed') break;
     }
     assert(job?.status === 'completed', `Export job did not complete: ${job?.status} ${job?.error || ''}`);
-    assert(job.fileUrl?.startsWith('https://res.cloudinary.com/'), 'Export file was not stored on Cloudinary.');
+    // API không được trả đường dẫn file (chứa dữ liệu khách); đường dẫn chỉ nằm trong database.
+    assert(!('fileUrl' in job), 'Export API exposes the storage URL.');
+    const stored = await prisma.exportJob.findUnique({ where: { id: jobId }, select: { fileUrl: true } });
+    assert(stored?.fileUrl?.startsWith('https://res.cloudinary.com/'), 'Export file was not stored on Cloudinary.');
 
     const download = await fetch(new URL(`/api/admin/export/${jobId}/download`, base), { headers: { cookie } });
     assert(download.status === 200, `Download failed: ${download.status}`);
@@ -71,11 +76,13 @@ async function main() {
     const headers = workbook.worksheets[0].getRow(1).values.slice(1);
     assert(JSON.stringify(headers) === JSON.stringify(EXPECTED_HEADERS),
       `Unexpected headers: ${JSON.stringify(headers)}`);
+    const sheets = workbook.worksheets.map((sheet) => sheet.name);
+    assert(JSON.stringify(sheets) === JSON.stringify(EXPECTED_SHEETS), `Unexpected tabs: ${JSON.stringify(sheets)}`);
 
     const anonymous = await fetch(new URL(`/api/admin/export/${jobId}/download`, base));
     assert(anonymous.status === 403, 'Anonymous download was allowed.');
 
-    console.log(`Async export verified: immediate trigger, background processing, ${headers.length} columns, protected download.`);
+    console.log(`Async export verified: immediate trigger, background processing, ${sheets.length} tabs, ${headers.length} order columns, protected download.`);
   } finally {
     if (jobId) await prisma.exportJob.deleteMany({ where: { id: jobId } });
     if (accountId) await prisma.user.deleteMany({ where: { id: accountId } });

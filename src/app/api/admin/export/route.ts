@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import { isSameOrigin } from '@/server/security/origin';
-import { runOrderExportJob } from '@/server/orders/export-orders';
+import { EXPORT_JOB_FIELDS, runOrderExportJob } from '@/server/orders/export-orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function GET() {
     where: { status: { in: ['pending', 'processing'] }, createdAt: { lt: new Date(Date.now() - STALE_JOB_MS) } },
     data: { status: 'failed', error: 'Tiến trình bị gián đoạn, vui lòng chạy lại.', completedAt: new Date() },
   });
-  const jobs = await prisma.exportJob.findMany({ orderBy: { createdAt: 'desc' }, take: 20 });
+  const jobs = await prisma.exportJob.findMany({ orderBy: { createdAt: 'desc' }, take: 20, select: EXPORT_JOB_FIELDS });
   return NextResponse.json({ jobs }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
@@ -32,7 +32,8 @@ export async function POST(request: Request) {
   if (running > 0) {
     return NextResponse.json({ error: 'Đang có tiến trình xuất dữ liệu chạy. Vui lòng chờ trong giây lát.' }, { status: 409 });
   }
-  const job = await prisma.exportJob.create({ data: { requestedById: session.user.id, status: 'pending' } });
+  const job = await prisma.exportJob.create({ data: { requestedById: session.user.id, status: 'pending' },
+    select: EXPORT_JOB_FIELDS });
   // Chạy nền, không chặn phản hồi; trạng thái được theo dõi qua bảng export_jobs.
   void runOrderExportJob(job.id);
   return NextResponse.json({ job }, { status: 202 });

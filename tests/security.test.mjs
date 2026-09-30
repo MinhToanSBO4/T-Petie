@@ -45,3 +45,11 @@ test('every admin API route uses the shared role guards instead of ad-hoc checks
     assert.doesNotMatch(source, /getServerSession/, `${route} must not re-implement the role check`);
   }
 });
+
+test('export API never sends the storage URL of customer data to the browser', () => {
+  for (const path of ['../src/app/api/admin/export/route.ts', '../src/app/api/admin/export/[id]/route.ts']) {
+    const source = read(path);
+    assert.match(source, /select: EXPORT_JOB_FIELDS/);
+  }
+  assert.doesNotMatch(read('../src/server/orders/export-orders.ts').match(/EXPORT_JOB_FIELDS = \{[^}]*\}/)[0], /fileUrl/);
+});

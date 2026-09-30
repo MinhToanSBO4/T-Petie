@@ -1,73 +1,61 @@
 import 'server-only';
-import ExcelJS from 'exceljs';
 import { prisma } from '@/server/db/client';
 import { uploadRawFileToCloudinary } from '@/server/media/cloudinary';
-
-const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const MAX_ORDERS = 10000;
-
-/** Địa chỉ giao hàng đầy đủ từ các trường đã lưu. */
-function fullAddress(order: { shippingAddress: string; ward: string | null; district: string; city: string }) {
-  return [order.shippingAddress, order.ward, order.district, order.city].filter(Boolean).join(', ');
-}
+import { buildExportWorkbook } from '@/lib/export/workbook';
+import { ORDER_STATUS_LABELS } from '@/lib/orders/status';
 
 /**
- * Dựng file Excel đơn hàng theo đúng thứ tự cột đã chốt:
- * thời gian, mã đơn, khách, điện thoại, địa chỉ, sản phẩm, tổng tiền,
- * mã giảm giá, ghi chú, kênh tiếp cận, trạng thái, số lần mua.
+ * Trường trả về cho giao diện. Không gồm fileUrl: file chứa thông tin khách hàng nên chỉ được tải
+ * qua /download (kiểm tra quyền mỗi lần), không để lộ đường dẫn lưu trữ ra trình duyệt.
  */
-export async function buildOrdersWorkbook(): Promise<{ buffer: Buffer; orderCount: number }> {
-  const orders = await prisma.order.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: MAX_ORDERS,
-    include: { items: true },
-  });
-  const phones = [...new Set(orders.map((order) => order.customerPhone))];
-  const counts = phones.length ? await prisma.order.groupBy({
-    by: ['customerPhone'],
-    where: { customerPhone: { in: phones } },
-    _count: { _all: true },
-  }) : [];
-  const purchaseCount = new Map(counts.map((row) => [row.customerPhone, row._count._all]));
+export const EXPORT_JOB_FIELDS = { id: true, status: true, fileName: true, orderCount: true, error: true,
+  createdAt: true, completedAt: true } as const;
 
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "T'Petie";
-  const sheet = workbook.addWorksheet('Đơn hàng');
-  sheet.columns = [
-    { header: 'Thời gian', key: 'createdAt', width: 22 },
-    { header: 'Mã đơn', key: 'orderCode', width: 26 },
-    { header: 'Tên khách hàng', key: 'customerName', width: 26 },
-    { header: 'Số điện thoại', key: 'phone', width: 16 },
-    { header: 'Địa chỉ', key: 'address', width: 50 },
-    { header: 'Sản phẩm (tên + size + số lượng)', key: 'items', width: 60 },
-    { header: 'Tổng tiền (VND)', key: 'total', width: 18 },
-    { header: 'Mã giảm giá', key: 'couponCode', width: 16 },
-    { header: 'Ghi chú', key: 'note', width: 32 },
-    { header: 'Kênh tiếp cận', key: 'source', width: 18 },
-    { header: 'Trạng thái đơn', key: 'status', width: 16 },
-    { header: 'Số lần mua', key: 'purchaseCount', width: 14 },
-  ];
-  sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF263F33' } };
-  sheet.getRow(1).alignment = { vertical: 'middle', wrapText: true };
+const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const MAX_ROWS = 10000;
 
-  for (const order of orders) {
-    sheet.addRow({
-      createdAt: order.createdAt.toLocaleString('vi-VN'),
-      orderCode: order.orderCode,
-      customerName: order.customerName,
-      phone: order.customerPhone,
-      address: fullAddress(order),
-      items: order.items.map((item) => `${item.productName} / ${item.size} ×${item.quantity}`).join('; '),
-      total: Number(order.totalAmount),
-      couponCode: order.couponCode || '',
-      note: order.orderNote || '',
-      source: order.source || '',
-      status: order.orderStatus,
-      purchaseCount: purchaseCount.get(order.customerPhone) || 1,
-    });
-  }
+/**
+ * Gom toàn bộ dữ liệu quản trị cho file Excel: đơn hàng, chi tiết sản phẩm, thanh toán,
+ * khách hàng, nhân sự, tồn kho, mã giảm giá, đánh giá. Chỉ chọn trường cần xuất (không lấy mật khẩu).
+ */
+export async function buildAdminWorkbook(): Promise<{ buffer: Buffer; orderCount: number }> {
+  // Runtime chỉ có 1 kết nối database nên các truy vấn chạy lần lượt; mỗi truy vấn đều có giới hạn.
+  const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: MAX_ROWS,
+    include: { items: true, user: { select: { username: true, email: true } } } });
+  const users = await prisma.user.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: MAX_ROWS,
+    select: { id: true, name: true, email: true, username: true, phone: true, address: true, city: true, role: true,
+      status: true, points: true, babyName: true, babyBirthDate: true, babyWeight: true, babyHeight: true,
+      recommendedSize: true, createdAt: true, lastLoginAt: true } });
+  const orderCounts = await prisma.order.groupBy({ by: ['userId'], where: { userId: { not: null } }, _count: { _all: true } });
+  const spend = await prisma.order.groupBy({ by: ['userId'], where: { userId: { not: null }, orderStatus: 'COMPLETED' },
+    _sum: { totalAmount: true } });
+  const variants = await prisma.productVariant.findMany({ take: MAX_ROWS,
+    orderBy: [{ product: { name: 'asc' } }, { size: 'asc' }],
+    include: { product: { select: { name: true, sku: true, categoryName: true, isActive: true,
+      collection: { select: { title: true } } } } } });
+  const sold = await prisma.orderItem.groupBy({ by: ['variantId'], where: { order: { orderStatus: { not: 'CANCELLED' } } },
+    _sum: { quantity: true } });
+  const coupons = await prisma.coupon.findMany({ orderBy: { code: 'asc' } });
+  const reviews = await prisma.productReview.findMany({ orderBy: { createdAt: 'desc' }, take: MAX_ROWS,
+    include: { product: { select: { name: true } } } });
 
+  const countByUser = new Map(orderCounts.map((row) => [row.userId, row._count._all]));
+  const spendByUser = new Map(spend.map((row) => [row.userId, Number(row._sum.totalAmount || 0)]));
+  const soldByVariant = new Map(sold.map((row) => [row.variantId, row._sum.quantity || 0]));
+
+  const workbook = buildExportWorkbook({
+    orders: orders.map((order) => ({ ...order, accountLabel: order.user?.username || order.user?.email || null })),
+    customers: users.filter((user) => user.role === 'user').map((user) => ({ ...user,
+      orderCount: countByUser.get(user.id) || 0, completedSpend: spendByUser.get(user.id) || 0 })),
+    staff: users.filter((user) => user.role !== 'user'),
+    variants: variants.map((variant) => ({ productName: variant.product.name, productSku: variant.product.sku,
+      collection: variant.product.collection?.title || null, category: variant.product.categoryName,
+      sku: variant.sku, size: variant.size, weightRange: variant.weightRange, ageRange: variant.ageRange,
+      price: variant.price, stock: variant.stock, productActive: variant.product.isActive, variantActive: variant.isActive,
+      soldQuantity: soldByVariant.get(variant.id) || 0 })),
+    coupons,
+    reviews: reviews.map((review) => ({ ...review, productName: review.product.name })),
+  }, ORDER_STATUS_LABELS);
   const buffer = await workbook.xlsx.writeBuffer();
   return { buffer: Buffer.from(buffer), orderCount: orders.length };
 }
@@ -79,8 +67,9 @@ export async function buildOrdersWorkbook(): Promise<{ buffer: Buffer; orderCoun
 export async function runOrderExportJob(jobId: string): Promise<void> {
   try {
     await prisma.exportJob.update({ where: { id: jobId }, data: { status: 'processing' } });
-    const { buffer, orderCount } = await buildOrdersWorkbook();
-    const fileName = `tpetie-orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const { buffer, orderCount } = await buildAdminWorkbook();
+    // Ngày theo giờ Việt Nam để tên file khớp ngày chủ shop bấm xuất.
+    const fileName = `tpetie-du-lieu-${new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)}.xlsx`;
     const uploaded = await uploadRawFileToCloudinary(buffer, fileName, EXPORT_MIME);
     if (!uploaded) throw new Error('Không tải được file lên Cloudinary');
     await prisma.exportJob.update({ where: { id: jobId },
