@@ -6,62 +6,91 @@ import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { parseProductPatch, parseVariantInput, parseVariantPatch } from '@/lib/content/product-input';
 
+export const dynamic = 'force-dynamic';
+
+const isCloudinaryUrl = (value: unknown) =>
+  typeof value === 'string' && /^https:\/\/res\.cloudinary\.com\/[^"]*$/.test(value) && value.length <= 500;
+
+/**
+ * Lưu mọi thay đổi của một sản phẩm trong một yêu cầu duy nhất:
+ * thông tin sản phẩm, giá/tồn của từng size, size mới và danh sách ảnh theo đúng thứ tự hiển thị.
+ * Ảnh chỉ được thêm/xóa/sắp xếp khi yêu cầu này chạy, nên thao tác trên giao diện có thể hủy bỏ.
+ */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.status !== 'active' || !['admin', 'staff'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
+  const raw = await request.text();
+  if (raw.length > 200_000) return NextResponse.json({ error: 'Dữ liệu quá lớn' }, { status: 413 });
   let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
-  const keys = Object.keys(body);
+  try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
+
   try {
-    // Sửa tồn kho và/hoặc giá của một biến thể.
-    if (keys.includes('variantId') && typeof body.variantId === 'string') {
-      const patch = parseVariantPatch(body);
-      const updated = await prisma.productVariant.updateMany({ where: { id: body.variantId, productId: params.id }, data: patch });
-      if (!updated.count) return NextResponse.json({ error: 'Không tìm thấy biến thể' }, { status: 404 });
-      revalidateTag('products');
-      return NextResponse.json({ success: true });
-    }
-    // Thêm biến thể (size) mới cho sản phẩm.
-    if (keys.length === 1 && keys[0] === 'newVariant') {
-      const variant = parseVariantInput(body.newVariant);
-      const product = await prisma.product.findUnique({ where: { id: params.id }, select: { sku: true } });
-      if (!product) return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
-      const existing = await prisma.productVariant.count({ where: { productId: params.id, size: variant.size } });
-      if (existing) return NextResponse.json({ error: 'Size này đã tồn tại cho sản phẩm' }, { status: 409 });
-      const created = await prisma.productVariant.create({ data: { productId: params.id, sku: `${product.sku}-${variant.size}`,
-        size: variant.size, price: variant.price, stock: variant.stock,
-        weightRange: variant.weightRange, ageRange: variant.ageRange } });
-      revalidateTag('products');
-      return NextResponse.json({ id: created.id }, { status: 201 });
-    }
-    // Sửa thông tin sản phẩm.
-    if (keys.length === 1 && keys[0] === 'product') {
-      const patch = parseProductPatch(body.product);
-      const updated = await prisma.product.update({ where: { id: params.id }, data: patch }).catch(() => null);
-      if (!updated) return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc bộ sưu tập không hợp lệ' }, { status: 404 });
-      revalidateTag('products');
-      revalidateTag('collections');
-      return NextResponse.json({ success: true });
-    }
-    // Thêm ảnh từ thư viện media.
-    if (keys.length === 1 && keys[0] === 'imageUrl' && typeof body.imageUrl === 'string') {
-      let url: URL;
-      try { url = new URL(body.imageUrl); } catch { return NextResponse.json({ error: 'URL ảnh không hợp lệ' }, { status: 400 }); }
-      if (url.protocol !== 'https:' || url.hostname !== 'res.cloudinary.com') {
-        return NextResponse.json({ error: 'Chỉ nhận ảnh HTTPS từ Cloudinary' }, { status: 400 });
+    const productPatch = body.product === undefined ? null : parseProductPatch(body.product);
+    const variantPatches = Array.isArray(body.variants)
+      ? body.variants.map((item) => {
+          const row = item as Record<string, unknown>;
+          if (typeof row.id !== 'string') throw new Error('Thông tin biến thể không hợp lệ');
+          return { id: row.id, ...parseVariantPatch(row) };
+        })
+      : [];
+    const newVariants = Array.isArray(body.newVariants) ? body.newVariants.map(parseVariantInput) : [];
+    let images: string[] | null = null;
+    if (body.images !== undefined) {
+      if (!Array.isArray(body.images) || body.images.length > 20 || !body.images.every(isCloudinaryUrl)) {
+        throw new Error('Danh sách ảnh không hợp lệ');
       }
-      const product = await prisma.product.findUnique({ where: { id: params.id } });
-      if (!product) return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
-      await prisma.productImage.create({ data: { productId: params.id, url: url.toString(), altText: product.name } });
-      revalidateTag('products');
-      return NextResponse.json({ success: true });
+      images = body.images as string[];
     }
-    return NextResponse.json({ error: 'Thao tác không được hỗ trợ' }, { status: 400 });
+    if (!productPatch && variantPatches.length === 0 && newVariants.length === 0 && images === null) {
+      throw new Error('Không có thay đổi hợp lệ');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { id: params.id }, select: { id: true, sku: true, name: true } });
+      if (!product) throw new Error('Không tìm thấy sản phẩm');
+
+      if (productPatch) await tx.product.update({ where: { id: product.id }, data: productPatch });
+
+      for (const patch of variantPatches) {
+        const { id, ...data } = patch;
+        const updated = await tx.productVariant.updateMany({ where: { id, productId: product.id }, data });
+        if (updated.count !== 1) throw new Error('Không tìm thấy biến thể');
+      }
+
+      for (const variant of newVariants) {
+        const existing = await tx.productVariant.count({ where: { productId: product.id, size: variant.size } });
+        if (existing > 0) throw new Error(`Size ${variant.size} đã tồn tại cho sản phẩm`);
+        await tx.productVariant.create({ data: { productId: product.id, sku: `${product.sku}-${variant.size}`,
+          size: variant.size, price: variant.price, stock: variant.stock,
+          weightRange: variant.weightRange, ageRange: variant.ageRange } });
+      }
+
+      if (images !== null) {
+        const current = await tx.productImage.findMany({ where: { productId: product.id } });
+        // Xóa ảnh không còn trong danh sách mới.
+        const removed = current.filter((image) => !images!.includes(image.url)).map((image) => image.id);
+        if (removed.length > 0) await tx.productImage.deleteMany({ where: { id: { in: removed } } });
+        // Cập nhật thứ tự và thêm ảnh mới theo đúng thứ tự gửi lên.
+        for (const [index, url] of images.entries()) {
+          const existing = current.find((image) => image.url === url);
+          if (existing) {
+            await tx.productImage.update({ where: { id: existing.id }, data: { sortOrder: index, isPrimary: index === 0 } });
+          } else {
+            await tx.productImage.create({ data: { productId: product.id, url, altText: product.name,
+              sortOrder: index, isPrimary: index === 0 } });
+          }
+        }
+      }
+    });
+
+    revalidateTag('products');
+    revalidateTag('collections');
+    return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof Error && /không hợp lệ|Không có thay đổi/.test(error.message)) {
+    if (error instanceof Error && /không hợp lệ|Không có thay đổi|Không tìm thấy|đã tồn tại/.test(error.message)) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error('Product update failed:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
@@ -8,18 +8,20 @@ import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 import { TestimonialsSection, type TestimonialCard } from '@/components/home/TestimonialsSection';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS } from '@/lib/content/site-content';
+import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, type HomeBlockId } from '@/lib/content/site-content';
 import type { Collection } from '@/types/collection';
 import type { Product } from '@/types/product';
 
 type HomeFeatureRow = { id: string; src: string; icon: string; title: string; description: string; objectPosition: string };
 type SizeGuideRow = { size: string; age: string; weight: string; height: string };
-type LinkDraft = { title: string; linkLabel: string; linkHref: string };
+type ImageDraft = { imageUrl: string; imageAlt: string };
+type LinkDraft = { title: string; linkLabel: string; linkHref: string; productIds: string[] } & ImageDraft;
 type ContentDraft = {
-  home_hero: { shopLabel: string; shopHref: string; lookbookLabel: string; lookbookHref: string; defaultBadge: string };
+  home_hero: { shopLabel: string; shopHref: string; lookbookLabel: string; lookbookHref: string; defaultBadge: string; slides: { id: string; imageUrl: string; imageAlt: string; icon: string; title: string; description: string; badge: string; href: string; objectPosition: string }[] } & ImageDraft;
   home_sections: { bestSellers: LinkDraft; sale: LinkDraft; collections: LinkDraft & { eyebrow: string } };
+  home_layout: { order: HomeBlockId[] };
   home_features: { eyebrow: string; title: string; items: HomeFeatureRow[] };
-  testimonials_section: { eyebrow: string; title: string };
+  testimonials_section: { eyebrow: string; title: string } & ImageDraft;
   brand_assets: { logoUrl: string; logoAlt: string };
   sale_page: { bannerUrl: string; bannerAlt: string; title: string; description: string };
   about_page: { heroImageUrl: string; heroImageAlt: string; heroTitle: string; heroDescription: string;
@@ -38,12 +40,13 @@ const HOME_SECTION_TITLES: Partial<Record<ContentKey, string>> = {
   testimonials_section: 'Sửa khối đánh giá khách hàng',
 };
 
-const emptyLink = (): LinkDraft => ({ title: '', linkLabel: '', linkHref: '' });
+const emptyLink = (): LinkDraft => ({ title: '', linkLabel: '', linkHref: '', productIds: [], imageUrl: '', imageAlt: '' });
 const emptyDraft = (): ContentDraft => ({
-  home_hero: { shopLabel: '', shopHref: '', lookbookLabel: '', lookbookHref: '', defaultBadge: '' },
+  home_hero: { shopLabel: '', shopHref: '', lookbookLabel: '', lookbookHref: '', defaultBadge: '', imageUrl: '', imageAlt: '', slides: [] },
   home_sections: { bestSellers: emptyLink(), sale: emptyLink(), collections: { ...emptyLink(), eyebrow: '' } },
+  home_layout: { order: [...HOME_BLOCK_IDS] },
   home_features: { eyebrow: '', title: '', items: [] },
-  testimonials_section: { eyebrow: '', title: '' },
+  testimonials_section: { eyebrow: '', title: '', imageUrl: '', imageAlt: '' },
   brand_assets: { logoUrl: '', logoAlt: '' },
   sale_page: { bannerUrl: '', bannerAlt: '', title: '', description: '' },
   about_page: { heroImageUrl: '', heroImageAlt: '', heroTitle: '', heroDescription: '',
@@ -59,6 +62,7 @@ function toDraft(content: Record<string, unknown> | null): ContentDraft {
   const pick = <T,>(key: ContentKey, fallback: T): T =>
     (content[key] && typeof content[key] === 'object' ? { ...(fallback as object), ...(content[key] as object) } : fallback) as T;
   draft.home_hero = pick('home_hero', draft.home_hero);
+  draft.home_layout = pick('home_layout', draft.home_layout);
   const sections = pick('home_sections', draft.home_sections);
   draft.home_sections = { bestSellers: { ...emptyLink(), ...sections.bestSellers }, sale: { ...emptyLink(), ...sections.sale },
     collections: { ...emptyLink(), ...sections.collections, eyebrow: sections.collections.eyebrow || '' } };
@@ -93,27 +97,48 @@ function TextField({ label, value, onChange, maxLength = 160, placeholder }: {
   </label>;
 }
 
-function LinkFields({ legend, value, onChange, eyebrow }: {
-  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean;
+const DESTINATIONS = [{ label: 'Không dẫn đi đâu', value: '' }, { label: 'Trang sản phẩm', value: '/girls' }, { label: 'Bộ sưu tập', value: '/collections' }, { label: 'Ưu đãi', value: '/sale' }, { label: 'Giới thiệu', value: '/about' }];
+function DestinationField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="text-sm font-semibold">{label}<select value={DESTINATIONS.some((item) => item.value === value) ? value : ''} onChange={(event) => onChange(event.target.value)} className={field}>{DESTINATIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
+}
+
+function ProductSelector({ products, selected, onChange }: { products: Product[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  const [query, setQuery] = useState('');
+  const matches = products.filter((product) => product.name.toLocaleLowerCase('vi-VN').includes(query.toLocaleLowerCase('vi-VN')));
+  const chosen = selected.map((id) => products.find((product) => product.id === id)).filter((product): product is Product => Boolean(product));
+  return <div className="space-y-3 rounded-xl border border-cream-200 p-3"><div className="flex items-center justify-between"><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}</p></div>
+    <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm sản phẩm theo tên…" className="w-full rounded-lg border p-2 text-sm" />
+    {query && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...selected, product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={product.thumbnail} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
+    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={product.thumbnail} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(selected.filter((id) => id !== product.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
+  </div>;
+}
+
+function LinkFields({ legend, value, onChange, eyebrow, products }: {
+  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean; products: Product[];
 }) {
   return <fieldset className="space-y-3 rounded-2xl border border-cream-200 p-4">
     <legend className="px-2 text-sm font-bold">{legend}</legend>
+    <MediaPicker label="Ảnh minh họa" value={value.imageUrl} altText={value.imageAlt}
+      onChange={(imageUrl) => onChange({ ...value, imageUrl })} />
     <div className="grid gap-3 sm:grid-cols-2">
+      <TextField label="Mô tả ảnh (alt)" value={value.imageAlt} maxLength={200}
+        onChange={(imageAlt) => onChange({ ...value, imageAlt })} />
       <TextField label="Tiêu đề khối" value={value.title} onChange={(title) => onChange({ ...value, title })} />
       {eyebrow && <TextField label="Dòng nhãn nhỏ phía trên" value={value.eyebrow || ''} maxLength={80}
         onChange={(next) => onChange({ ...value, eyebrow: next })} />}
       <TextField label="Nhãn liên kết" value={value.linkLabel} maxLength={60} onChange={(linkLabel) => onChange({ ...value, linkLabel })} />
-      <TextField label="Đường dẫn liên kết" value={value.linkHref} maxLength={300} placeholder="/collections"
+      <DestinationField label="Nút sẽ mở" value={value.linkHref}
         onChange={(linkHref) => onChange({ ...value, linkHref })} />
     </div>
+    <ProductSelector products={products} selected={value.productIds} onChange={(productIds) => onChange({ ...value, productIds })} />
   </fieldset>;
 }
 
 /** Bọc một khối thật của trang khách hàng và gắn nút Sửa ở góc. */
-function EditableSection({ label, active, onEdit, children }: {
-  label: string; active: boolean; onEdit: () => void; children: React.ReactNode;
+function EditableSection({ label, active, onEdit, children, style }: {
+  label: string; active: boolean; onEdit: () => void; children: React.ReactNode; style?: React.CSSProperties;
 }) {
-  return <section className={`relative rounded-3xl transition-shadow ${active ? 'ring-2 ring-honey-500' : 'hover:ring-2 hover:ring-honey-300'}`}>
+  return <section style={style} className={`relative rounded-3xl transition-shadow ${active ? 'ring-2 ring-honey-500' : 'hover:ring-2 hover:ring-honey-300'}`}>
     <div className="pointer-events-none absolute -top-3 left-3 z-20 rounded-full bg-charcoal-900/85 px-3 py-1 text-[11px] font-bold text-white">
       {label}
     </div>
@@ -147,9 +172,36 @@ const previewImage = (url: string, label: string) => url
   ? <img src={url} alt={label} className="h-24 w-full rounded-lg object-cover" />
   : <p className="text-xs text-charcoal-500">Chưa cấu hình ảnh</p>;
 
-export function SiteContentManager({ initialContent, collections, bestSellers, saleProducts, testimonials }: {
+const HOME_BLOCK_LABELS: Record<HomeBlockId, string> = {
+  hero: 'Hero trang chủ', bestSellers: 'Sản phẩm bán chạy', sale: 'Sản phẩm ưu đãi',
+  collections: 'Bộ sưu tập nổi bật', features: 'Ảnh chủ đề', testimonials: 'Đánh giá khách hàng',
+};
+
+/** Danh sách kéo-thả dùng HTML Drag and Drop, chỉ đổi thứ tự chứ không làm mất khối. */
+function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: (order: HomeBlockId[]) => void }) {
+  const [dragged, setDragged] = useState<HomeBlockId | null>(null);
+  const move = (target: HomeBlockId) => {
+    if (!dragged || dragged === target) return;
+    const next = order.filter((id) => id !== dragged);
+    next.splice(next.indexOf(target), 0, dragged);
+    onChange(next);
+    setDragged(null);
+  };
+  return <section className="mb-6 rounded-2xl border border-cream-200 bg-cream-50 p-4">
+    <h2 className="font-heading text-base font-bold">Thứ tự các khối trang chủ</h2>
+    <p className="mt-1 text-xs text-charcoal-600">Giữ biểu tượng ⠿ rồi kéo một khối đến vị trí mong muốn. Nhấn Lưu tất cả thay đổi để áp dụng trên website.</p>
+    <ol className="mt-3 space-y-2">{order.map((id, index) => <li key={id} draggable
+      onDragStart={() => setDragged(id)} onDragEnd={() => setDragged(null)} onDragOver={(event) => event.preventDefault()}
+      onDrop={() => move(id)} className={`flex cursor-grab items-center gap-3 rounded-xl border bg-white px-3 py-3 text-sm font-semibold active:cursor-grabbing ${dragged === id ? 'border-honey-500 opacity-50' : 'border-cream-200'}`}>
+      <span aria-hidden="true" className="text-lg text-charcoal-400">⠿</span><span className="text-charcoal-500">{index + 1}.</span>{HOME_BLOCK_LABELS[id]}
+    </li>)}</ol>
+  </section>;
+}
+
+export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, testimonials }: {
   initialContent: Record<string, unknown>;
   collections: Collection[];
+  products: Product[];
   bestSellers: Product[];
   saleProducts: Product[];
   testimonials: TestimonialCard[];
@@ -160,6 +212,7 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const revisionRef = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -172,6 +225,7 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
   }, []);
 
   const update = <K extends ContentKey>(key: K, value: ContentDraft[K]) => {
+    revisionRef.current += 1;
     setDraft((current) => ({ ...current, [key]: value }));
     setDirty((current) => current.includes(key) ? current : [...current, key]);
   };
@@ -179,21 +233,26 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
 
   const saveAll = async () => {
     if (dirty.length === 0) return;
+    const keysToSave = [...dirty];
+    const savedRevision = revisionRef.current;
     setSaving(true); setMessage(''); setError('');
     const failed: ContentKey[] = [];
     try {
-      for (const key of dirty) {
+      for (const key of keysToSave) {
         const response = await fetch(`/api/admin/site-content/${key}`, { method: 'PUT',
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft[key]) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) { failed.push(key); setError(data.error || `Không lưu được khối ${key}`); }
       }
       if (failed.length === 0) {
-        setMessage(`Đã lưu ${dirty.length} khối nội dung. Website sẽ hiển thị nội dung mới trong ít phút.`);
-        setDirty([]);
+        const changedDuringSave = revisionRef.current !== savedRevision;
+        setMessage(changedDuringSave
+          ? `Đã lưu ${keysToSave.length} khối. Bạn còn thay đổi mới chưa được lưu.`
+          : `Đã lưu ${keysToSave.length} khối nội dung. Website sẽ hiển thị nội dung mới trong ít phút.`);
+        if (!changedDuringSave) setDirty([]);
         window.dispatchEvent(new Event('tpetie:site-content-updated'));
       } else {
-        setDirty(failed);
+        if (revisionRef.current === savedRevision) setDirty(failed);
       }
     } finally { setSaving(false); }
   };
@@ -202,7 +261,8 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
 
   return <div className="pb-24">
     {/* Thanh công cụ chỉnh sửa */}
-    <div className="sticky top-0 z-30 -mx-4 mb-6 border-b border-cream-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+    {/* Thanh công cụ nằm dưới header quản trị đang cố định. */}
+    <div className="sticky top-16 z-30 -mx-4 mb-6 border-b border-cream-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold font-heading">Chỉnh sửa nội dung website</h1>
@@ -221,15 +281,17 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
 
     {message && <p role="status" className="mb-4 rounded-xl bg-cream-100 p-3 text-sm text-charcoal-900">{message}</p>}
     {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    <HomeOrderEditor order={draft.home_layout.order} onChange={(order) => update('home_layout', { order })} />
 
     {/* Mô phỏng trang chủ bằng chính các khối thật */}
-    <div className="space-y-10">
-      {collections.length > 0 && <EditableSection label="1. Hero trang chủ" active={editing === 'home_hero'} onEdit={() => toggle('home_hero')}>
+    <div className="flex flex-col gap-10">
+      {(collections.length > 0 || draft.home_hero.imageUrl) && <EditableSection style={{ order: draft.home_layout.order.indexOf('hero') }} label="Hero trang chủ" active={editing === 'home_hero'} onEdit={() => toggle('home_hero')}>
         <HeroCarousel collections={collections} hero={draft.home_hero} />
       </EditableSection>}
 
-      {bestSellers.length > 0 && <EditableSection label="2. Sản phẩm bán chạy" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
+      {bestSellers.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('bestSellers') }} label="Sản phẩm bán chạy" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
+          {sections.bestSellers.imageUrl && <img src={sections.bestSellers.imageUrl} alt={sections.bestSellers.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.bestSellers.title || 'Sản phẩm bán chạy'}</h2>
             {sections.bestSellers.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.bestSellers.linkLabel} →</span>}
@@ -238,8 +300,9 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
         </div>
       </EditableSection>}
 
-      {saleProducts.length > 0 && <EditableSection label="3. Sản phẩm ưu đãi" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
+      {saleProducts.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('sale') }} label="Sản phẩm ưu đãi" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
+          {sections.sale.imageUrl && <img src={sections.sale.imageUrl} alt={sections.sale.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.sale.title || 'Sản phẩm ưu đãi'}</h2>
             {sections.sale.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.sale.linkLabel}</span>}
@@ -248,8 +311,9 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
         </div>
       </EditableSection>}
 
-      {collections.length > 0 && <EditableSection label="4. Bộ sưu tập nổi bật" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
+      {collections.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('collections') }} label="Bộ sưu tập nổi bật" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
+          {sections.collections.imageUrl && <img src={sections.collections.imageUrl} alt={sections.collections.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-4 flex items-center justify-between">
             <div>
               {sections.collections.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-600">{sections.collections.eyebrow}</p>}
@@ -261,11 +325,11 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
         </div>
       </EditableSection>}
 
-      {draft.home_features.items.length > 0 && <EditableSection label="5. Ảnh chủ đề" active={editing === 'home_features'} onEdit={() => toggle('home_features')}>
+      {draft.home_features.items.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('features') }} label="Ảnh chủ đề" active={editing === 'home_features'} onEdit={() => toggle('home_features')}>
         <div className="px-1"><FeatureCarousel section={draft.home_features} /></div>
       </EditableSection>}
 
-      {testimonials.length > 0 && <EditableSection label="6. Đánh giá khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
+      {testimonials.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Đánh giá khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
         <TestimonialsSection testimonials={testimonials} section={draft.testimonials_section} />
       </EditableSection>}
     </div>
@@ -410,7 +474,15 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
             className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">Đóng</button>
         </header>
 
-        {editing === 'home_hero' && <div className="grid gap-3 sm:grid-cols-2">
+        {editing === 'home_hero' && <div className="space-y-3">
+          <p className="rounded-xl bg-cream-100 p-3 text-xs text-charcoal-600">Danh sách ảnh Hero hoạt động giống phần Ảnh chủ đề: thêm nhiều ảnh, mỗi ảnh có nội dung riêng.</p>
+          {draft.home_hero.slides.map((slide, index) => <div key={slide.id} className="space-y-2 rounded-2xl border border-cream-200 p-3">
+            <div className="flex justify-between"><strong>Ảnh Hero {index + 1}</strong><button type="button" className="text-sm text-red-700" onClick={() => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.filter((_, position) => position !== index) })}>Xóa ảnh</button></div>
+            <MediaPicker label="Ảnh nền" value={slide.imageUrl} altText={slide.imageAlt} onError={setError} onChange={(imageUrl) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, imageUrl } : item) })} />
+            <div className="grid gap-2 sm:grid-cols-2"><TextField label="Mô tả ảnh (alt)" value={slide.imageAlt} onChange={(imageAlt) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, imageAlt } : item) })} /><TextField label="Biểu tượng (emoji)" value={slide.icon} onChange={(icon) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, icon } : item) })} /><TextField label="Tiêu đề" value={slide.title} onChange={(title) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, title } : item) })} /><TextField label="Mô tả" value={slide.description} onChange={(description) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, description } : item) })} /><TextField label="Vị trí ảnh" value={slide.objectPosition} placeholder="center center" onChange={(objectPosition) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, objectPosition } : item) })} /><DestinationField label="Bấm vào ảnh sẽ mở" value={slide.href} onChange={(href) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, href } : item) })} /></div>
+          </div>)}
+          {draft.home_hero.slides.length < 12 && <button type="button" className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold" onClick={() => update('home_hero', { ...draft.home_hero, slides: [...draft.home_hero.slides, { id: `hero-${Date.now().toString(36)}`, imageUrl: '', imageAlt: '', icon: '✨', title: '', description: '', badge: '', href: '', objectPosition: 'center center' }] })}>Thêm ảnh Hero</button>}
+          <div className="grid gap-3 sm:grid-cols-2">
           <TextField label="Nhãn nút mua sắm" value={draft.home_hero.shopLabel} maxLength={60}
             onChange={(shopLabel) => update('home_hero', { ...draft.home_hero, shopLabel })} />
           <TextField label="Liên kết nút mua sắm" value={draft.home_hero.shopHref} maxLength={300} placeholder="/girls"
@@ -421,14 +493,14 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
             onChange={(lookbookHref) => update('home_hero', { ...draft.home_hero, lookbookHref })} />
           <TextField label="Nhãn mặc định của banner" value={draft.home_hero.defaultBadge} maxLength={60}
             onChange={(defaultBadge) => update('home_hero', { ...draft.home_hero, defaultBadge })} />
-        </div>}
+          </div></div>}
 
         {editing === 'home_sections' && <div className="space-y-4">
-          <LinkFields legend="Sản phẩm bán chạy" value={draft.home_sections.bestSellers}
+          <LinkFields legend="Sản phẩm bán chạy" products={products} value={draft.home_sections.bestSellers}
             onChange={(bestSellers) => update('home_sections', { ...draft.home_sections, bestSellers })} />
-          <LinkFields legend="Sản phẩm ưu đãi" value={draft.home_sections.sale}
+          <LinkFields legend="Sản phẩm ưu đãi" products={products} value={draft.home_sections.sale}
             onChange={(sale) => update('home_sections', { ...draft.home_sections, sale })} />
-          <LinkFields legend="Bộ sưu tập nổi bật" eyebrow value={draft.home_sections.collections}
+          <LinkFields legend="Bộ sưu tập nổi bật" products={products} eyebrow value={draft.home_sections.collections}
             onChange={(next) => update('home_sections', { ...draft.home_sections,
               collections: { ...next, eyebrow: next.eyebrow || '' } })} />
         </div>}
@@ -475,7 +547,11 @@ export function SiteContentManager({ initialContent, collections, bestSellers, s
             Nội dung đánh giá lấy từ khách hàng đã gửi và được duyệt ở mục &ldquo;Đánh giá sản phẩm&rdquo;.
             Tại đây chỉ chỉnh tiêu đề khối hiển thị ở trang chủ.
           </p>
+          <MediaPicker label="Ảnh minh họa đánh giá" value={draft.testimonials_section.imageUrl} altText={draft.testimonials_section.imageAlt} onError={setError}
+            onChange={(imageUrl) => update('testimonials_section', { ...draft.testimonials_section, imageUrl })} />
           <div className="grid gap-3 sm:grid-cols-2">
+            <TextField label="Mô tả ảnh (alt)" value={draft.testimonials_section.imageAlt} maxLength={200}
+              onChange={(imageAlt) => update('testimonials_section', { ...draft.testimonials_section, imageAlt })} />
             <TextField label="Dòng nhãn nhỏ" value={draft.testimonials_section.eyebrow} maxLength={80}
               onChange={(eyebrow) => update('testimonials_section', { ...draft.testimonials_section, eyebrow })} />
             <TextField label="Tiêu đề khối" value={draft.testimonials_section.title} maxLength={160}

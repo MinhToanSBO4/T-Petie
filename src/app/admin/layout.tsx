@@ -1,5 +1,7 @@
 import { requireStaffPage } from '@/server/auth/staff-session';
+import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar, type AdminNavItem } from '@/components/admin/AdminSidebar';
+import { getSiteContent } from '@/server/content/site-content';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +34,18 @@ const STAFF_ITEMS: AdminNavItem[] = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireStaffPage('/admin');
   const items = session.user.role === 'admin' ? ADMIN_ITEMS : STAFF_ITEMS;
-  return <div className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:gap-8">
-    <aside className="lg:w-60 lg:shrink-0">
-      <AdminSidebar items={items} userName={session.user.name || session.user.email || 'Tài khoản quản trị'}
-        userRole={session.user.role} />
-    </aside>
-    <main className="min-w-0 flex-1">{children}</main>
+  const brandAssets = (await getSiteContent()).brand_assets;
+  const userName = session.user.name || session.user.email || 'Tài khoản quản trị';
+
+  return <div className="min-h-screen">
+    <AdminHeader logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt}
+      userName={userName} userRole={session.user.role} />
+    <div className="flex w-full items-start gap-4 px-4 py-6 sm:px-6 lg:gap-8">
+      {/* Sidebar luôn nằm bên trái và giữ nguyên vị trí khi cuộn nội dung. */}
+      <aside className="sticky top-20 w-36 shrink-0 self-start sm:w-44 lg:w-60 max-h-[calc(100vh-6rem)] overflow-y-auto">
+        <AdminSidebar items={items} />
+      </aside>
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
   </div>;
 }

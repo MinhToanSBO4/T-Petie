@@ -1,0 +1,57 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { signOut } from 'next-auth/react';
+import { ChevronDown, LogOut, User as UserIcon } from 'lucide-react';
+
+/**
+ * Header của khu quản trị: chỉ gồm tên thương hiệu và nút tài khoản.
+ * Menu tài khoản chứa chức năng đăng xuất.
+ */
+export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
+  logoUrl?: string; logoAlt?: string; userName: string; userRole: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Đóng menu khi bấm ra ngoài.
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return <header className="sticky top-0 z-40 border-b border-cream-200 bg-white shadow-sm">
+    <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <Link href="/admin" className="flex items-center gap-2">
+        {logoUrl
+          ? <img src={logoUrl} alt={logoAlt || "T'Petie"} className="h-9 w-auto object-contain" />
+          : <span className="font-heading text-lg font-bold text-honey-700">T&apos;Petie</span>}
+      </Link>
+
+      <div ref={menuRef} className="relative">
+        <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu"
+          className="flex min-h-11 items-center gap-2 rounded-full border border-cream-300 bg-white px-3 text-sm font-semibold text-charcoal-800 hover:border-honey-300">
+          <UserIcon className="h-4 w-4 text-honey-600" />
+          <span className="hidden max-w-[160px] truncate sm:inline">{userName}</span>
+          <ChevronDown className={`h-3.5 w-3.5 text-charcoal-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {open && <div role="menu" className="absolute right-0 mt-2 w-60 rounded-2xl border border-cream-200 bg-white py-2 shadow-2xl">
+          <div className="border-b border-cream-100 px-4 py-2">
+            <p className="truncate text-sm font-bold text-charcoal-900">{userName}</p>
+            <p className="text-[11px] text-charcoal-500">{userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}</p>
+          </div>
+          <button type="button" role="menuitem" onClick={() => void signOut({ callbackUrl: '/' })}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-blush-700 hover:bg-blush-50">
+            <LogOut className="h-4 w-4" />
+            Đăng xuất
+          </button>
+        </div>}
+      </div>
+    </div>
+  </header>;
+}

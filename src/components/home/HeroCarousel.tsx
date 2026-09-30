@@ -8,29 +8,35 @@ import type { Collection } from '@/types/collection';
 import type { HomeHero } from '@/lib/content/site-content';
 
 export function HeroCarousel({ collections, hero }: { collections: Collection[]; hero?: HomeHero | null }) {
+  // Ảnh do quản trị viên chọn là hero độc lập, kể cả khi chưa có bộ sưu tập hiển thị ở trang chủ.
+  const slides = hero?.slides.length
+    ? hero.slides.map((slide) => ({ ...slide, title: slide.title || "T'Petie", bannerImage: slide.imageUrl, themeColor: '#fff8ee', href: slide.href || '/' }))
+    : hero?.imageUrl
+    ? [{ id: 'custom-hero', title: hero.imageAlt || "T'Petie", bannerImage: hero.imageUrl, imageAlt: hero.imageAlt, icon: '', description: '', objectPosition: 'center center', themeColor: '#fff8ee', badge: hero.defaultBadge, href: hero.shopHref || '/' }]
+    : collections.map((collection) => ({ ...collection, imageAlt: collection.title, icon: '', description: '', objectPosition: 'center center', href: `/collections/${collection.id}` }));
   const [currentIndex, setCurrentIndex] = useState(0);
-  const activeIndex = collections.length ? currentIndex % collections.length : 0;
+  const activeIndex = slides.length ? currentIndex % slides.length : 0;
 
   // Auto slide every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % collections.length);
+      setCurrentIndex((prev) => (prev + 1) % slides.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [collections.length]);
+  }, [slides.length]);
 
-  const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % collections.length);
-  const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + collections.length) % collections.length);
+  const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % slides.length);
+  const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
   const goToSlide = (index: number) => setCurrentIndex(index);
 
   return (
     <div className="relative rounded-3xl overflow-hidden border border-cream-200 shadow-soft bg-cream-50 group">
       {/* Banner Container */}
       <div className="relative w-full aspect-[4/3] sm:aspect-[16/7] md:aspect-[21/8] overflow-hidden flex items-center justify-center">
-        {collections.map((collection, index) => (
+        {slides.map((collection, index) => (
           <Link
             key={collection.id}
-            href={`/collections/${collection.id}`}
+            href={collection.href}
             data-track={`click_hero_banner_${collection.id}`}
             className={`absolute inset-0 transition-transform duration-700 ease-in-out flex items-center justify-center ${
               index === activeIndex ? 'translate-x-0' : index < activeIndex ? '-translate-x-full' : 'translate-x-full'
@@ -39,14 +45,15 @@ export function HeroCarousel({ collections, hero }: { collections: Collection[];
           >
             <Image
               src={collection.bannerImage}
-              alt={collection.title}
+              alt={collection.imageAlt || collection.title}
               fill
               priority={index === 0}
               quality={75}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 1400px"
               className="object-cover transition-transform duration-500 group-hover:scale-[1.01]"
-              style={{ objectPosition: 'center center' }}
+              style={{ objectPosition: collection.objectPosition || 'center center' }}
             />
+            {(collection.icon || collection.description) && <div className="absolute bottom-8 left-8 max-w-md text-white drop-shadow-lg"><span className="text-3xl">{collection.icon}</span><h2 className="mt-1 font-heading text-2xl font-bold">{collection.title}</h2><p className="text-sm">{collection.description}</p></div>}
           </Link>
         ))}
 
@@ -68,7 +75,7 @@ export function HeroCarousel({ collections, hero }: { collections: Collection[];
         
         {/* Dots Navigation */}
         <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
-          {collections.map((_, index) => (
+          {slides.map((_, index) => (
             <button
               key={index}
               onClick={(e) => { e.preventDefault(); goToSlide(index); }}
@@ -86,10 +93,10 @@ export function HeroCarousel({ collections, hero }: { collections: Collection[];
         <div className="flex items-center space-x-2 text-xs sm:text-sm text-charcoal-700 text-center sm:text-left transition-opacity duration-300">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-honey-500 text-white text-[11px] font-bold shrink-0 shadow-sm">
             <Sparkles className="w-3 h-3 mr-1" />
-            {collections[activeIndex]?.badge || hero?.defaultBadge}
+            {slides[activeIndex]?.badge || hero?.defaultBadge}
           </span>
           <span>
-            <strong>{collections[activeIndex]?.title}</strong>
+            <strong>{slides[activeIndex]?.title}</strong>
           </span>
         </div>
 

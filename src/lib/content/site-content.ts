@@ -7,13 +7,26 @@ export type HomeFeature = { id: string; src: string; icon: string; title: string
 export type HomeFeaturesSection = { eyebrow: string; title: string; items: HomeFeature[] };
 
 /** Nút hành động của hero trang chủ. */
+export type HomeHeroSlide = { id: string; imageUrl: string; imageAlt: string; icon: string; title: string; description: string; badge: string; href: string; objectPosition: string };
 export type HomeHero = { shopLabel: string; shopHref: string; lookbookLabel: string; lookbookHref: string;
-  defaultBadge: string };
+  defaultBadge: string; imageUrl: string; imageAlt: string; slides: HomeHeroSlide[] };
 
-export type LinkSection = { title: string; linkLabel: string; linkHref: string };
+/** Ảnh minh họa độc lập của một khối nội dung trên trang chủ. */
+export type BlockImage = { imageUrl: string; imageAlt: string };
+export type LinkSection = { title: string; linkLabel: string; linkHref: string; productIds: string[] } & BlockImage;
 /** Tiêu đề và liên kết của các khối trên trang chủ. */
 export type HomeSections = { bestSellers: LinkSection; sale: LinkSection;
   collections: LinkSection & { eyebrow: string } };
+
+/** Các khối trang chủ có thể kéo-thả, luôn hiển thị đủ một lần. */
+export const HOME_BLOCK_IDS = ['hero', 'bestSellers', 'sale', 'collections', 'features', 'testimonials'] as const;
+export type HomeBlockId = (typeof HOME_BLOCK_IDS)[number];
+export type HomeLayout = { order: HomeBlockId[] };
+
+/** Trả các khối theo đúng thứ tự đã lưu để DOM, bàn phím và trình đọc màn hình cùng nhất quán. */
+export function orderHomeBlocks<T>(blocks: Record<HomeBlockId, T>, order: readonly HomeBlockId[]): T[] {
+  return order.map((id) => blocks[id]);
+}
 
 /** Nhận diện thương hiệu dùng chung cho Header, Footer và các trang. */
 export type BrandAssets = { logoUrl: string; logoAlt: string };
@@ -31,7 +44,7 @@ export type CategoryPageContent = { id: string; imageUrl: string; imageAlt: stri
 export type CategoryPagesContent = { items: CategoryPageContent[] };
 
 /** Khối đánh giá khách hàng ở cuối trang chủ. */
-export type TestimonialsSectionContent = { eyebrow: string; title: string };
+export type TestimonialsSectionContent = { eyebrow: string; title: string } & BlockImage;
 
 /** Các trang danh mục có thể cấu hình ảnh chủ đề; trùng với đoạn đường dẫn tương ứng. */
 export const CATEGORY_PAGE_IDS = ['girls', 'tops', 'bottoms', 'dresses', 'sets'] as const;
@@ -91,7 +104,16 @@ function optionalImageUrl(value: unknown): string {
 function linkSection(value: unknown, titleMax = 120): LinkSection {
   const row = record(value);
   return { title: optionalText(row.title, titleMax), linkLabel: optionalText(row.linkLabel, 60),
-    linkHref: row.linkHref ? contentHref(row.linkHref) : '' };
+    linkHref: row.linkHref ? contentHref(row.linkHref) : '', imageUrl: optionalImageUrl(row.imageUrl),
+    imageAlt: optionalText(row.imageAlt, 200), productIds: contentIds(row.productIds) };
+}
+
+function contentIds(value: unknown, max = 12): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > max) throw new Error('Invalid site content ids');
+  const ids = value.filter((item) => item !== '').map((item) => contentText(item, 80));
+  if (new Set(ids).size !== ids.length) throw new Error('Invalid site content ids');
+  return ids;
 }
 
 export function parseHomeFeatures(value: unknown): HomeFeature[] {
@@ -120,10 +142,21 @@ export function parseHomeFeaturesSection(value: unknown): HomeFeaturesSection {
 
 export function parseHomeHero(value: unknown): HomeHero {
   const row = record(value);
+  const rawSlides = (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).slides))
+    ? (value as Record<string, unknown>).slides as unknown[] : [];
+  const slides = rawSlides
+    ? rawSlides.map((item): HomeHeroSlide => {
+      const slide = record(item);
+      return { id: contentText(slide.id, 80), imageUrl: imageUrl(slide.imageUrl), imageAlt: optionalText(slide.imageAlt, 200),
+        icon: optionalText(slide.icon, 12), title: optionalText(slide.title, 160), description: optionalText(slide.description, 500),
+        badge: optionalText(slide.badge, 60), href: slide.href ? contentHref(slide.href) : '', objectPosition: optionalText(slide.objectPosition, 40) || 'center center' };
+    }) : [];
+  if (slides.length > 12 || new Set(slides.map((slide) => slide.id)).size !== slides.length) throw new Error('Invalid hero slides');
   return {
     shopLabel: optionalText(row.shopLabel, 60), shopHref: row.shopHref ? contentHref(row.shopHref) : '',
     lookbookLabel: optionalText(row.lookbookLabel, 60), lookbookHref: row.lookbookHref ? contentHref(row.lookbookHref) : '',
     defaultBadge: optionalText(row.defaultBadge, 60),
+    imageUrl: optionalImageUrl(row.imageUrl), imageAlt: optionalText(row.imageAlt, 200), slides,
   };
 }
 
@@ -132,6 +165,16 @@ export function parseHomeSections(value: unknown): HomeSections {
   const collections = linkSection(row.collections);
   return { bestSellers: linkSection(row.bestSellers), sale: linkSection(row.sale),
     collections: { ...collections, eyebrow: optionalText(record(row.collections).eyebrow, 80) } };
+}
+
+export function parseHomeLayout(value: unknown): HomeLayout {
+  const row = record(value);
+  if (!Array.isArray(row.order) || row.order.length !== HOME_BLOCK_IDS.length) throw new Error('Invalid home layout');
+  const order = row.order.map((item) => contentText(item, 40) as HomeBlockId);
+  if (new Set(order).size !== HOME_BLOCK_IDS.length || order.some((item) => !(HOME_BLOCK_IDS as readonly string[]).includes(item))) {
+    throw new Error('Invalid home layout');
+  }
+  return { order };
 }
 
 export function parseBrandAssets(value: unknown): BrandAssets {
@@ -173,7 +216,8 @@ export function parseCategoryPages(value: unknown): CategoryPagesContent {
 
 export function parseTestimonialsSection(value: unknown): TestimonialsSectionContent {
   const row = record(value);
-  return { eyebrow: optionalText(row.eyebrow, 80), title: optionalText(row.title, 160) };
+  return { eyebrow: optionalText(row.eyebrow, 80), title: optionalText(row.title, 160),
+    imageUrl: optionalImageUrl(row.imageUrl), imageAlt: optionalText(row.imageAlt, 200) };
 }
 
 export function parseSizeGuide(value: unknown): SizeGuide {
@@ -195,6 +239,7 @@ export function parseSizeGuide(value: unknown): SizeGuide {
 export const SITE_CONTENT_PARSERS = {
   home_hero: parseHomeHero,
   home_sections: parseHomeSections,
+  home_layout: parseHomeLayout,
   home_features: parseHomeFeaturesSection,
   brand_assets: parseBrandAssets,
   sale_page: parseSalePage,

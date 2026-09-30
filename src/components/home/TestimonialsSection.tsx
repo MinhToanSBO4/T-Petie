@@ -13,6 +13,8 @@ export function TestimonialsSection({ testimonials, section }: {
   if (testimonials.length === 0) return null;
 
   return <section aria-labelledby="customer-feedback-title" className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
+    {section?.imageUrl && <img src={section.imageUrl} alt={section.imageAlt || ''}
+      className="mb-6 h-40 w-full rounded-3xl object-cover sm:h-56" />}
     <div className="mb-6 text-center">
       {section?.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-700">{section.eyebrow}</p>}
       {section?.title && <h2 id="customer-feedback-title" className="mt-2 text-xl sm:text-3xl font-bold font-heading text-charcoal-900">

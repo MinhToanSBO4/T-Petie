@@ -33,18 +33,20 @@ async function main() {
   if (!guideResponse.ok || !sizeGuide) throw new Error('Size guide is missing from DB or API');
   const guide = await guideResponse.json();
   assert.deepEqual(guide, sizeGuide.data, 'Size guide API differs from DB');
-  if (!homeFeatures || !Array.isArray(homeFeatures.data) || homeFeatures.data.length === 0) {
-    throw new Error('Home features are missing from DB');
-  }
+  // home_features lưu dạng { eyebrow, title, items } (bản cũ là mảng trần).
+  const rawFeatures = homeFeatures?.data;
+  const featureItems = Array.isArray(rawFeatures) ? rawFeatures
+    : Array.isArray(rawFeatures?.items) ? rawFeatures.items : [];
+  if (featureItems.length === 0) throw new Error('Home features are missing from DB');
   const homeResponse = await fetch(base);
   if (!homeResponse.ok) throw new Error('Homepage did not respond successfully');
   const html = await homeResponse.text();
   const rendered = (feature) => html.includes(feature.title) || html.includes(feature.title.replaceAll('&', '&amp;'));
-  if (homeFeatures.data.some((feature) => !rendered(feature))) {
-    const missing = homeFeatures.data.filter((feature) => !rendered(feature)).map((feature) => feature.id);
+  if (featureItems.some((feature) => !rendered(feature))) {
+    const missing = featureItems.filter((feature) => !rendered(feature)).map((feature) => feature.id);
     throw new Error(`Homepage does not render DB feature ids: ${missing.join(', ')}`);
   }
-  console.log(`DB/API match: ${dbProducts.length} products, ${dbCollections.length} collections; ${dbUsers} active user records, size guide and ${homeFeatures.data.length} home features`);
+  console.log(`DB/API match: ${dbProducts.length} products, ${dbCollections.length} collections; ${dbUsers} active user records, size guide and ${featureItems.length} home features`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; })
