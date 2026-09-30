@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { getSession, signIn, signOut, useSession } from 'next-auth/react';
 import { AuthCredentials, BabyProfile, RegisterData, User, UserRole, UserStatus } from '@/types/auth';
 import { trackLogin, trackLogout } from '@/client/analytics/tracker';
@@ -53,10 +53,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAdminUsers(users);
     return users;
   }, []);
-
-  useEffect(() => {
-    if (user?.role === 'admin' && user.status === 'active') void fetchAdminUsers();
-  }, [user?.role, user?.status, fetchAdminUsers]);
 
   const login = async (credentials: AuthCredentials): Promise<Result> => {
     const result = await signIn('credentials', {

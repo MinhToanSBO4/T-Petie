@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 
 type Settings = { shippingFee: number; freeShippingThreshold: number };
@@ -39,6 +40,7 @@ async function fetchCoupons(query: TableQuery) {
 }
 
 export function CommerceManager({ initialSettings }: { initialSettings: Settings }) {
+  const router = useRouter();
   const [settings, setSettings] = useState(initialSettings);
   const [editing, setEditing] = useState<{ mode: 'create' } | { mode: 'edit'; code: string; draft: CouponDraft } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -54,6 +56,8 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không lưu được cấu hình');
       setMessage('Đã lưu phí giao hàng.');
+      // Xóa bản trang đã lưu trong trình duyệt để quay lại trang này thấy đúng giá trị mới.
+      router.refresh();
     } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };

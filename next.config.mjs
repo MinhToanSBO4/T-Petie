@@ -18,7 +18,12 @@ const contentSecurityPolicy = [
 
 const nextConfig = {
   poweredByHeader: false,
-  experimental: { cpus: 2 },
+  experimental: {
+    cpus: 2,
+    // Trình duyệt giữ trang đã dựng trong 5 phút: quay lại trang vừa xem không gọi lại máy chủ/database.
+    // Mọi thao tác lưu gọi router.refresh() để xóa bộ nhớ này, nên không thấy dữ liệu cũ sau khi sửa.
+    staleTimes: { dynamic: 300, static: 300 },
+  },
   webpack(config) {
     // This workspace is on exFAT, where Webpack's disk snapshots are unreliable.
     // This changes module compilation caching, not catalog data caching.

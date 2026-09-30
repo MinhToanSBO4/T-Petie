@@ -18,11 +18,15 @@ const formatPrice = (value: number) => `${value.toLocaleString('vi-VN')}₫`;
 /** Tổng tồn kho của sản phẩm trên mọi size đang bán. */
 const totalStock = (product: ProductRow) => product.variants.reduce((sum, variant) => sum + variant.stock, 0);
 
+/** Danh sách bộ sưu tập đi kèm mỗi lần tải bảng sản phẩm; form sửa dùng lại, không gọi API thêm. */
+let collectionOptions: CollectionOption[] | null = null;
+
 async function fetchProducts(query: TableQuery) {
   const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
   const response = await fetch(`/api/admin/products?${params}`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Không tải được sản phẩm');
+  if (Array.isArray(data.collections)) collectionOptions = data.collections;
   return { items: data.items as ProductRow[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
 
@@ -131,13 +135,14 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
     id: variant.id, size: variant.size, stock: String(variant.stock), price: String(variant.price) })));
   const [images, setImages] = useState(product.images.map((image) => image.url));
   const [newVariants, setNewVariants] = useState<{ size: string; price: string; stock: string }[]>([]);
-  const [collections, setCollections] = useState<CollectionOption[]>([]);
+  const [collections, setCollections] = useState<CollectionOption[]>(collectionOptions || []);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   // Nạp danh sách bộ sưu tập một lần để chọn cho sản phẩm.
   useEffect(() => {
+    if (collectionOptions) return;
     const controller = new AbortController();
     fetch('/api/admin/collections?limit=50', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('unavailable')))
