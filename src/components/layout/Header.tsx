@@ -17,7 +17,7 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
 
-export function Header() {
+export function Header({ logoUrl, logoAlt }: { logoUrl?: string; logoAlt?: string } = {}) {
   const pathname = usePathname();
   const { totalItems, openMiniCart, cartBounceTrigger } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
@@ -35,14 +35,14 @@ export function Header() {
         .then((data) => {
           if (Array.isArray(data.collections)) setCollectionNav(data.collections
             .filter((item: { showInMenu: boolean }) => item.showInMenu)
-            .map((item: { id: string; title: string }) => ({ label: item.title, href: `/bo-suu-tap/${item.id}` })));
+            .map((item: { id: string; title: string }) => ({ label: item.title, href: `/collections/${item.id}` })));
         }).catch(() => {});
     };
     refreshCollections();
     window.addEventListener('tpetie:collections-updated', refreshCollections);
     return () => { controller.abort(); window.removeEventListener('tpetie:collections-updated', refreshCollections); };
   }, [pathname]);
-  const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/bo-suu-tap'
+  const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections'
     ? { ...item, children: collectionNav } : item);
   const { scrollY } = useScroll();
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,11 +100,15 @@ export function Header() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo Brand (Ngoài cùng bên trái) */}
           <Link href="/" className="flex items-center group py-1">
-            <img
-              src="/images/logo.png"
-              alt="T'Petie - Made for little souls"
-              className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
-            />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={logoAlt || "T'Petie - Made for little souls"}
+                className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+              />
+            ) : (
+              <span className="font-heading font-bold text-xl sm:text-2xl text-honey-700 group-hover:text-honey-600 transition-colors">T&apos;Petie</span>
+            )}
           </Link>
 
           {/* Navigation Menu Desktop (Thứ tự: Trang Chủ | Về Chúng Tôi | Bộ Sưu Tập | Ưu Đãi) */}
@@ -247,7 +251,7 @@ export function Header() {
 
                     <div className="py-1 text-xs text-charcoal-900">
                       <Link
-                        href="/dang-nhap"
+                        href="/dashboard"
                         onClick={() => setIsUserMenuOpen(false)}
                         className="flex items-center space-x-2 px-3.5 py-2 hover:bg-cream-100 font-semibold text-charcoal-900"
                       >
@@ -273,7 +277,7 @@ export function Header() {
               </div>
             ) : (
               <Link
-                href="/dang-nhap"
+                href="/login"
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-cream-300 hover:border-honey-300 bg-white hover:bg-cream-50 text-xs font-bold text-charcoal-700 transition-all active:scale-95 shadow-2xs"
               >
                 <UserIcon className="w-3.5 h-3.5 text-honey-600" />
@@ -324,7 +328,7 @@ export function Header() {
                 e.preventDefault();
                 if (searchQuery.trim()) {
                   setIsSearchOpen(false);
-                  window.location.href = `/be-gai?q=${encodeURIComponent(searchQuery.trim())}`;
+                  window.location.href = `/girls?q=${encodeURIComponent(searchQuery.trim())}`;
                 }
               }}
               className="mt-4 relative"
@@ -350,7 +354,7 @@ export function Header() {
                     onClick={() => {
                       setSearchQuery(keyword);
                       setIsSearchOpen(false);
-                      window.location.href = `/be-gai?q=${encodeURIComponent(keyword)}`;
+                      window.location.href = `/girls?q=${encodeURIComponent(keyword)}`;
                     }}
                     className="text-xs px-3 py-1.5 rounded-full bg-cream-100 hover:bg-honey-100 text-charcoal-700 font-medium transition-colors"
                   >

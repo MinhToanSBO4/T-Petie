@@ -15,7 +15,7 @@ export async function GET() {
     id: order.orderCode, date: order.createdAt.toISOString(), status: order.orderStatus,
     total: Number(order.totalAmount), items: order.items.map((item) => ({
       name: item.productName, size: item.size, qty: item.quantity, price: Number(item.totalPrice),
-      img: item.product.images[0]?.url || '/images/logo.png',
+      img: item.product.images[0]?.url || '',
     })),
   })) });
 }

@@ -1,47 +1,45 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import ExcelJS from 'exceljs';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
+import { isSameOrigin } from '@/server/security/origin';
+import { runOrderExportJob } from '@/server/orders/export-orders';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+/** Tiến trình chạy quá lâu coi như bị gián đoạn (ví dụ máy chủ dừng giữa chừng) để còn chạy lại. */
+const STALE_JOB_MS = 2 * 60 * 1000;
+
+async function requireAdmin() {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  return session?.user?.role === 'admin' && session.user.status === 'active' ? session : null;
+}
+
+/** Danh sách các lần xuất dữ liệu gần đây để giao diện theo dõi tiến trình. */
+export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  await prisma.exportJob.updateMany({
+    where: { status: { in: ['pending', 'processing'] }, createdAt: { lt: new Date(Date.now() - STALE_JOB_MS) } },
+    data: { status: 'failed', error: 'Tiến trình bị gián đoạn, vui lòng chạy lại.', completedAt: new Date() },
+  });
+  const jobs = await prisma.exportJob.findMany({ orderBy: { createdAt: 'desc' }, take: 20 });
+  return NextResponse.json({ jobs }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+/**
+ * Kích hoạt xuất đơn hàng: trả về ngay mã tiến trình, file được dựng ở nền
+ * nên người dùng không phải chờ và sẽ nhận thông báo khi hoàn tất.
+ */
+export async function POST(request: Request) {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
+  const running = await prisma.exportJob.count({ where: { status: { in: ['pending', 'processing'] } } });
+  if (running > 0) {
+    return NextResponse.json({ error: 'Đang có tiến trình xuất dữ liệu chạy. Vui lòng chờ trong giây lát.' }, { status: 409 });
   }
-  const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 10000, include: { items: true } });
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "T'Petie";
-  const sheet = workbook.addWorksheet('Đơn hàng');
-  sheet.columns = [
-    { header: 'Mã đơn', key: 'code', width: 24 },
-    { header: 'Ngày tạo', key: 'created', width: 23 },
-    { header: 'Khách hàng', key: 'name', width: 28 },
-    { header: 'Số điện thoại', key: 'phone', width: 18 },
-    { header: 'Trạng thái', key: 'status', width: 18 },
-    { header: 'Tạm tính (VND)', key: 'subtotal', width: 20 },
-    { header: 'Phí vận chuyển (VND)', key: 'shipping', width: 24 },
-    { header: 'Giảm giá (VND)', key: 'discount', width: 20 },
-    { header: 'Tổng tiền (VND)', key: 'total', width: 20 },
-    { header: 'Sản phẩm', key: 'items', width: 70 },
-  ];
-  sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF263F33' } };
-  for (const order of orders) {
-    sheet.addRow({
-      code: order.orderCode, created: order.createdAt.toISOString(), name: order.customerName,
-      phone: order.customerPhone, status: order.orderStatus,
-      subtotal: Number(order.subtotal), shipping: Number(order.shippingFee),
-      discount: Number(order.discountAmount), total: Number(order.totalAmount),
-      items: order.items.map((item) => `${item.productName} / ${item.size} ×${item.quantity}`).join('; '),
-    });
-  }
-  const buffer = await workbook.xlsx.writeBuffer();
-  return new Response(buffer as BodyInit, { headers: {
-    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'Content-Disposition': `attachment; filename="tpetie-orders-${new Date().toISOString().slice(0, 10)}.xlsx"`,
-    'Cache-Control': 'no-store',
-  } });
+  const session = await getServerSession(authOptions);
+  const job = await prisma.exportJob.create({ data: { requestedById: session?.user?.id || null, status: 'pending' } });
+  // Chạy nền, không chặn phản hồi; trạng thái được theo dõi qua bảng export_jobs.
+  void runOrderExportJob(job.id);
+  return NextResponse.json({ job }, { status: 202 });
 }

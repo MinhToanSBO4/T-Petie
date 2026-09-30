@@ -6,7 +6,7 @@ import { prisma } from '@/server/db/client';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminFeedbackPage() {
-  if (!(await getStaffSession())) redirect('/dang-nhap?callbackUrl=/admin/feedback');
+  if (!(await getStaffSession())) redirect('/login?callbackUrl=/admin/feedback');
   const testimonials = await prisma.customerTestimonial.findMany({
     select: { id: true, customerName: true, quote: true, rating: true, location: true,
       sortOrder: true, consentConfirmed: true, isPublished: true },

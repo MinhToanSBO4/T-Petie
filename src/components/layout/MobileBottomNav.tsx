@@ -12,8 +12,8 @@ export function MobileBottomNav() {
 
   const navItems = [
     { label: 'Trang Chủ', href: '/', icon: Home },
-    { label: 'Sản Phẩm', href: '/be-gai', icon: Shirt },
-    { label: 'Bộ Sưu Tập', href: '/bo-suu-tap', icon: Sparkles, badge: 'Mới' },
+    { label: 'Sản Phẩm', href: '/girls', icon: Shirt },
+    { label: 'Bộ Sưu Tập', href: '/collections', icon: Sparkles, badge: 'Mới' },
     { label: 'Ưu Đãi', href: '/sale', icon: Percent, badge: 'Hot' },
   ];
 

@@ -38,7 +38,7 @@ async function main() {
   const suffix = Date.now().toString(36);
   const slug = `content-check-${suffix}`;
   const quote = `Content management verification ${suffix}: service was excellent and the clothes fit beautifully.`;
-  let collectionId; let testimonialId; let cookie; let staffCookie; const accountIds = [];
+  let collectionId; let testimonialId; let cookie; let staffCookie; let sectionsBefore; const accountIds = [];
   try {
     const anonymous = await request('/api/admin/collections');
     assert(anonymous.status === 403, 'Collection administration allowed anonymous access.');
@@ -91,8 +91,30 @@ async function main() {
     homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
     assert(homepage.includes(quote), 'Published testimonial missing from homepage.');
 
-    console.log('Collection menu configuration and testimonial publishing verified through authenticated APIs and homepage.');
+    // Cấu hình nội dung website: admin sửa tiêu đề khối trang chủ và thấy thay đổi trên trang chủ.
+    const siteContent = await request('/api/admin/site-content', 'GET', cookie);
+    assert(siteContent.status === 200 && siteContent.data.content, 'Admin site content unavailable.');
+    sectionsBefore = siteContent.data.content.home_sections;
+    assert(sectionsBefore && sectionsBefore.collections, 'Home sections content is not seeded.');
+    const marker = `Kiểm tra nội dung ${suffix}`;
+    const updatedSections = await request('/api/admin/site-content/home_sections', 'PUT', cookie,
+      { ...sectionsBefore, collections: { ...sectionsBefore.collections, eyebrow: marker } });
+    assert(updatedSections.status === 200, `Site content update failed: ${updatedSections.status} ${updatedSections.data.error || ''}`);
+    homepage = await fetch(base, { cache: 'no-store' }).then((response) => response.text());
+    assert(homepage.includes(marker), 'Updated home section content missing from homepage.');
+    const staffContent = await request('/api/admin/site-content', 'GET', staffCookie);
+    assert(staffContent.status === 200, 'Staff site content access failed.');
+    const anonymousContent = await request('/api/admin/site-content');
+    assert(anonymousContent.status === 403, 'Site content administration allowed anonymous access.');
+    const restored = await request('/api/admin/site-content/home_sections', 'PUT', cookie, sectionsBefore);
+    assert(restored.status === 200, 'Failed to restore home section content.');
+    sectionsBefore = undefined;
+
+    console.log('Collection menu configuration, testimonial publishing and site content configuration verified through authenticated APIs and homepage.');
   } finally {
+    if (sectionsBefore && cookie) {
+      await request('/api/admin/site-content/home_sections', 'PUT', cookie, sectionsBefore).catch(() => {});
+    }
     if (testimonialId) {
       const deleted = staffCookie && await request(`/api/admin/testimonials/${testimonialId}`, 'DELETE', staffCookie);
       if (!deleted || deleted.status !== 200) await prisma.customerTestimonial.deleteMany({ where: { id: testimonialId } });

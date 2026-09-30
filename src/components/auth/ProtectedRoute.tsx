@@ -19,7 +19,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(`/tai-khoan?returnUrl=${encodeURIComponent(pathname)}`);
+      router.push(`/account?returnUrl=${encodeURIComponent(pathname)}`);
     }
   }, [isLoading, isAuthenticated, router, pathname]);
 
@@ -58,7 +58,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
           Mẹ vui lòng đăng nhập tài khoản để truy cập vào tính năng này nhé.
         </p>
         <Link
-          href={`/tai-khoan?returnUrl=${encodeURIComponent(pathname)}`}
+          href={`/account?returnUrl=${encodeURIComponent(pathname)}`}
           className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95"
         >
           Đến Trang Đăng Nhập

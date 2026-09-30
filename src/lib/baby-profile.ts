@@ -16,7 +16,7 @@ export function toBabyProfile(user: BabyFields): BabyProfile | null {
     birthDate: user.babyBirthDate?.toISOString().slice(0, 10),
     weight: user.babyWeight ?? 0,
     height: user.babyHeight ?? 0,
-    gender: user.babyGender === 'be-gai' ? 'be-gai' : undefined,
+    gender: user.babyGender === 'girl' ? 'girl' : undefined,
     recommendedSize: user.recommendedSize ?? '',
   };
 }

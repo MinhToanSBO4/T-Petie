@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { HomeFeature } from '@/lib/content/site-content';
+import type { HomeFeaturesSection } from '@/lib/content/site-content';
 
-export function FeatureCarousel({ features }: { features: HomeFeature[] }) {
+export function FeatureCarousel({ section }: { section: HomeFeaturesSection }) {
+  const features = section.items;
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto slide every 5 seconds
@@ -24,12 +25,12 @@ export function FeatureCarousel({ features }: { features: HomeFeature[] }) {
 
   return (
     <div className="w-full text-center overflow-hidden">
-      <span className="text-xs font-bold text-honey-600 uppercase tracking-wider block mb-2">
-        Chất Lượng Là Danh Dự
-      </span>
-      <h2 className="text-xl sm:text-3xl font-bold font-heading text-charcoal-900 mb-6">
-        Những điều làm nên sự khác biệt của T'Petie
-      </h2>
+      {section.eyebrow && <span className="text-xs font-bold text-honey-600 uppercase tracking-wider block mb-2">
+        {section.eyebrow}
+      </span>}
+      {section.title && <h2 className="text-xl sm:text-3xl font-bold font-heading text-charcoal-900 mb-6">
+        {section.title}
+      </h2>}
 
       <div className="relative w-full aspect-[4/5] sm:aspect-[21/9] md:aspect-[2.5/1] rounded-none sm:rounded-2xl overflow-hidden group bg-cream-50">
         {features.map((feature, index) => (

@@ -12,6 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
+    "content:seed": "node scripts/seed-site-content.cjs",
+    "media:migrate": "node scripts/migrate-media.cjs",
     "accounts:provision": "ts-node --project tsconfig.seed.json prisma/seed.ts",
     "content:check": "node scripts/check-content-management.cjs"
   },

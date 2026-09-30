@@ -317,7 +317,7 @@ function DashboardContent() {
                 </div>
 
                 <Link
-                  href="/be-gai"
+                  href="/girls"
                   className="px-5 py-2 rounded-full bg-sage-600 hover:bg-sage-700 text-white text-xs font-bold shadow-sm transition-all shrink-0 active:scale-95 flex items-center space-x-1"
                 >
                   <span>Xem Đồ Size Này</span>
@@ -445,7 +445,7 @@ function DashboardContent() {
                       <div className="text-xs text-charcoal-600">
                         Tổng thanh toán: <strong className="text-sm font-bold text-honey-600 font-heading">{(order.total).toLocaleString('vi-VN')}đ</strong>
                       </div>
-                      <Link href={`/tra-cuu-don?code=${encodeURIComponent(order.id)}`}
+                      <Link href={`/order-lookup?code=${encodeURIComponent(order.id)}`}
                         className="px-4 py-1.5 rounded-full bg-white hover:bg-cream-100 border border-cream-300 text-xs font-bold text-charcoal-700 transition-all active:scale-95">
                         Tra cứu hành trình
                       </Link>

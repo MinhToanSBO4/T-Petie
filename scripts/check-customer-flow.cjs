@@ -29,7 +29,7 @@ async function main() {
     const profile = await fetch(new URL('/api/user/profile', base), { method: 'PATCH',
       headers: { 'Content-Type': 'application/json', cookie: sessionCookie, origin: base },
       body: JSON.stringify({ babyProfile: { name: 'Bé An', birthDate: '2024-01-02', weight: 11, height: 80,
-        gender: 'be-gai', recommendedSize: 'Size 2' } }) });
+        gender: 'girl', recommendedSize: 'Size 2' } }) });
     if (!profile.ok) throw new Error(`Baby profile save failed: HTTP ${profile.status}`);
     const refreshed = await fetch(new URL('/api/auth/session', base), { headers: { cookie: sessionCookie } });
     const after = await refreshed.json();

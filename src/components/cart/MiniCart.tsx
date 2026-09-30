@@ -8,12 +8,12 @@ import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles } from 'lucid
 import { useCart } from '@/context/CartContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 
-export function MiniCart() {
+export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: number | null }) {
   const { items, isMiniCartOpen, closeMiniCart, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
 
-  const freeShippingThreshold = 399000;
-  const progressPercent = Math.min(100, (totalPrice / freeShippingThreshold) * 100);
-  const remainingForFreeShip = Math.max(0, freeShippingThreshold - totalPrice);
+  // Ngưỡng miễn phí vận chuyển lấy từ cấu hình trong database; ẩn thanh tiến độ khi chưa tải được.
+  const progressPercent = freeShippingThreshold ? Math.min(100, (totalPrice / freeShippingThreshold) * 100) : 0;
+  const remainingForFreeShip = freeShippingThreshold ? Math.max(0, freeShippingThreshold - totalPrice) : 0;
 
   return (
     <AnimatePresence>
@@ -55,7 +55,7 @@ export function MiniCart() {
             </div>
 
             {/* Thanh tiến độ Freeship */}
-            <div className="px-4 py-2.5 bg-honey-50 border-b border-cream-200 text-xs text-honey-700">
+            {freeShippingThreshold !== null && <div className="px-4 py-2.5 bg-honey-50 border-b border-cream-200 text-xs text-honey-700">
               {remainingForFreeShip === 0 ? (
                 <div className="flex items-center space-x-1.5 font-semibold text-sage-700">
                   <Sparkles className="w-4 h-4 text-sage-500" />
@@ -72,7 +72,7 @@ export function MiniCart() {
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-            </div>
+            </div>}
 
             {/* Danh sách món hàng */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-cream-100">
@@ -158,7 +158,7 @@ export function MiniCart() {
                   </span>
                 </div>
                 <Link
-                    href="/gio-hang"
+                    href="/cart"
                     onClick={closeMiniCart}
                     data-track="view-full-cart"
                     className="w-full py-2.5 px-3 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold text-center flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95"

@@ -14,7 +14,13 @@ function pooledConnectionUrl() {
   const value = process.env.CONNECTION_STRING;
   if (!value) return undefined;
   const url = new URL(value);
-  if (!url.searchParams.has('connection_limit')) url.searchParams.set('connection_limit', '1');
+  if (!url.searchParams.has('connection_limit')) {
+    // Lúc build, Next dựng nhiều trang song song và mỗi trang chạy vài truy vấn cùng lúc,
+    // nên cần nhiều kết nối hơn. Runtime serverless vẫn giữ một kết nối cho mỗi tiến trình.
+    const building = process.env.NEXT_PHASE === 'phase-production-build';
+    url.searchParams.set('connection_limit', building ? '5' : '1');
+    if (building && !url.searchParams.has('pool_timeout')) url.searchParams.set('pool_timeout', '30');
+  }
   return url.toString();
 }
 

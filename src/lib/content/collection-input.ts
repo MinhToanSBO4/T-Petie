@@ -12,12 +12,12 @@ function text(value: unknown, max: number, required = false) {
   return value.trim() || null;
 }
 
+/** Ảnh phải nằm trong thư viện media trên Cloudinary; không chấp nhận đường dẫn tĩnh. */
 function imageUrl(value: unknown): string {
   if (typeof value !== 'string' || value.length > 500) throw new Error('URL ảnh không hợp lệ');
-  if (/^\/images\/[a-zA-Z0-9/_-]+\.(?:jpg|jpeg|png|webp|avif)$/.test(value) && !value.includes('..')) return value;
   try {
     const url = new URL(value);
-    if (url.protocol === 'https:' && ['res.cloudinary.com', 'i.ibb.co'].includes(url.hostname)) return url.toString();
+    if (url.protocol === 'https:' && url.hostname === 'res.cloudinary.com') return url.toString();
   } catch { /* invalid URL */ }
   throw new Error('URL ảnh không hợp lệ');
 }

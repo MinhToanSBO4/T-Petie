@@ -9,8 +9,8 @@ const currency = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'cur
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.status !== 'active') redirect('/dang-nhap?callbackUrl=/admin');
-  if (session.user.role === 'staff') redirect('/admin/san-pham');
+  if (!session?.user || session.user.status !== 'active') redirect('/login?callbackUrl=/admin');
+  if (session.user.role === 'staff') redirect('/admin/products');
   if (session.user.role !== 'admin') redirect('/dashboard');
   const since = new Date();
   since.setMonth(since.getMonth() - 5);
@@ -33,20 +33,10 @@ export default async function AdminPage() {
   });
   const revenue = months.reduce((sum, month) => sum + month.total, 0);
   const max = Math.max(...months.map((month) => month.total), 1);
-  return <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div><p className="text-xs uppercase tracking-widest font-bold text-honey-600">T&apos;Petie / Quản trị</p>
-        <h1 className="text-3xl font-bold font-heading">Tổng quan kinh doanh</h1>
-        <p className="text-sm text-charcoal-500">Dữ liệu 6 tháng gần nhất từ PostgreSQL</p></div>
-      <div className="flex gap-2">
-        <Link href="/admin/don-hang" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Đơn hàng</Link>
-        <Link href="/admin/san-pham" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Sản phẩm</Link>
-        <Link href="/admin/bo-suu-tap" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Bộ sưu tập</Link>
-        <Link href="/admin/feedback" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Feedback</Link>
-        <Link href="/admin/nhan-vien" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Nhân viên</Link>
-        <Link href="/admin/cau-hinh" className="px-4 py-2 rounded-xl bg-cream-100 font-semibold">Cấu hình bán hàng</Link>
-        <a href="/api/admin/export" className="px-4 py-2 rounded-xl bg-honey-600 text-white font-semibold">Xuất Excel</a>
-      </div>
+  return <div className="space-y-8">
+    <div>
+      <h1 className="text-3xl font-bold font-heading">Tổng quan kinh doanh</h1>
+      <p className="text-sm text-charcoal-500">Dữ liệu 6 tháng gần nhất từ PostgreSQL. Các chức năng quản trị nằm ở thanh điều hướng bên trái.</p>
     </div>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[

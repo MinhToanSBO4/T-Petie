@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
-  pages: { signIn: '/dang-nhap', error: '/dang-nhap' },
+  pages: { signIn: '/login', error: '/login' },
   providers: [
     CredentialsProvider({
       name: 'Email hoặc tên đăng nhập và mật khẩu',

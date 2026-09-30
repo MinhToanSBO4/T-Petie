@@ -63,7 +63,7 @@ export async function GET() {
             birthDate: u.babyBirthDate ? u.babyBirthDate.toISOString().split('T')[0] : undefined,
             weight: u.babyWeight || 10,
             height: u.babyHeight || 80,
-            gender: 'be-gai' as const,
+            gender: 'girl' as const,
             recommendedSize: u.recommendedSize || 'Size 2 (10 - 12kg)',
           }
         : undefined,

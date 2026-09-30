@@ -18,6 +18,7 @@ import {
   Share2,
   Gift,
   AlertTriangle,
+  ImageIcon,
 } from 'lucide-react';
 import { Product, ProductSizeOption } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
@@ -40,9 +41,9 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
   const [quantity, setQuantity] = useState(1);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
-  const productImages = product.images && product.images.length > 0
+  const productImages = (product.images && product.images.length > 0
     ? product.images
-    : [product.thumbnail || product.image || '/images/logo.png'];
+    : [product.thumbnail || product.image]).filter((src): src is string => Boolean(src));
 
   const { addToCart } = useCart();
   const { showToast } = useToast();
@@ -94,7 +95,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
       quantity,
     };
     sessionStorage.setItem('tpetie_buy_now', JSON.stringify(buyNowItem));
-    router.push('/mua-ngay');
+    router.push('/buy-now');
   };
 
   const handleBack = () => {
@@ -102,7 +103,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push('/be-gai');
+      router.push('/girls');
     }
   };
 
@@ -125,8 +126,8 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
 
         <Breadcrumb
           items={[
-            { label: 'Bé Gái', href: '/be-gai' },
-            { label: product.subcategoryName || 'Sản phẩm', href: `/be-gai/${product.subcategory || ''}` },
+            { label: 'Bé Gái', href: '/girls' },
+            { label: product.subcategoryName || 'Sản phẩm', href: `/girls/${product.subcategory || ''}` },
             { label: product.name },
           ]}
         />
@@ -141,14 +142,20 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
               layoutId={`product-image-${product.id}`}
               className="w-full h-full relative"
             >
-              <Image
-                src={productImages[selectedImageIndex] || productImages[0]}
-                alt={`${product.name} - Ảnh ${selectedImageIndex + 1}`}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover transition-all duration-300"
-              />
+              {productImages.length > 0 ? (
+                <Image
+                  src={productImages[selectedImageIndex] || productImages[0]}
+                  alt={`${product.name} - Ảnh ${selectedImageIndex + 1}`}
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover transition-all duration-300"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-charcoal-300" aria-hidden="true">
+                  <ImageIcon className="w-14 h-14" />
+                </div>
+              )}
             </motion.div>
 
             {/* Badges */}

@@ -1,29 +1,53 @@
 # T'Petie — đầu vào cần xác nhận trước khi mở bán
 
-Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma, không dùng catalog hoặc tài khoản giả trong mã chạy. Schema ứng dụng là `tpetie_app`. Dữ liệu lấy từ repo mẫu đã được nạp vào DB: 40 sản phẩm, 4 bộ sưu tập và 271 biến thể. Các tài khoản local hiện có nằm trong DB; tài khoản mới được tạo bằng lệnh từ biến môi trường. Đây là **dữ liệu mẫu đã lưu thật trong DB**, chưa phải dữ liệu kinh doanh được chủ cửa hàng duyệt.
+Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma. Schema ứng dụng là `tpetie_app`. Dữ liệu hiện có trong DB: 40 sản phẩm (40 đang bán), 271 biến thể, 4 bộ sưu tập, 50 ảnh trên Cloudinary, 8 khối nội dung `site_content`, 2 mã giảm giá, 0 đơn hàng. Tài khoản: 1 admin, 1 nhân viên, 1 khách. Đây là **dữ liệu mẫu đã lưu thật trong DB**, chưa phải dữ liệu kinh doanh được chủ cửa hàng duyệt.
 
 ## Cần bạn cung cấp hoặc xác nhận
 
-1. **Dữ liệu để bán thật:** rà giá, SKU, số tồn, ảnh, nội dung sản phẩm, các bộ sưu tập và chính sách bán hàng. Số đánh giá từ repo mẫu đã được bỏ vì không có đánh giá thật. Trang chủ lấy banner bộ sưu tập từ DB. Địa chỉ, thông tin liên hệ và nội dung chính sách còn trong các trang tĩnh cần chủ dự án xác nhận.
-2. **Thông tin giao hàng và ưu đãi:** phí 30.000đ, miễn phí từ 399.000đ, mã `TPETIE20` và `MEMBERVIP` hiện là bản ghi trong DB, có thể sửa trong `/admin/cau-hinh`. Cần xác nhận các mức này trước khi công khai.
-3. **Ảnh sản phẩm:** ảnh mẫu hiện là URL và asset của repo cũ. `.env` đã có Cloudinary nhưng cần tải ảnh thật qua trang quản trị và xác nhận CDN hoạt động; `CDN_URL` là địa chỉ trang quản lý, không phải URL phân phối ảnh.
-4. **Triển khai:** khi chuẩn bị Vercel, cung cấp domain chính thức, thông tin liên hệ và chính sách đã duyệt, khóa production mới, chuỗi Supabase transaction pooler và cấu hình môi trường. Đổi mật khẩu tài khoản local hiện có trước khi công khai. Một credential Supabase từng có trong tài liệu gốc đã được xóa khỏi file; nên xoay vòng credential đó.
-5. **Google OAuth:** theo yêu cầu, để phát triển sau. Cần Google Client ID, Client Secret và callback URI của domain triển khai để bật. Đăng nhập username/email và mật khẩu đang dùng DB.
-6. **Thanh toán và vận chuyển ngoài COD:** chưa có nhà cung cấp cổng thanh toán hoặc hãng vận chuyển. Nếu cần chuyển khoản/QR tự đối soát, webhook hay vận đơn tự động, cần tài khoản và thông số tích hợp tương ứng.
-7. **Feedback khách hàng:** cần nội dung thật và xác nhận khách đồng ý công bố tên, địa điểm, trích dẫn. Admin/nhân viên nhập tại `/admin/feedback`; bản nháp không hiện ra trang chủ. Không nạp feedback mẫu hoặc tự tạo đánh giá.
-8. **Nội dung giới thiệu và bảng size:** slide giới thiệu và số đo size từ bản mẫu đã chuyển vào bảng `site_content`, nhưng các tuyên bố về chất liệu, quy trình may và số đo vẫn cần chủ cửa hàng kiểm chứng trước khi công khai.
+1. **Dữ liệu để bán thật:** rà giá, SKU, số tồn, ảnh, nội dung sản phẩm, các bộ sưu tập và chính sách bán hàng. Địa chỉ, thông tin liên hệ và nội dung chính sách còn trong các trang tĩnh cần chủ dự án xác nhận.
+2. **Thông tin giao hàng và ưu đãi:** phí 30.000đ, miễn phí từ 399.000đ, mã `TPETIE20` và `MEMBERVIP` hiện là bản ghi trong DB, sửa tại `/admin/settings`. Cần xác nhận các mức này trước khi công khai.
+3. **Triển khai:** khi chuẩn bị Vercel, cung cấp domain chính thức, thông tin liên hệ và chính sách đã duyệt, khóa production mới, chuỗi Supabase transaction pooler và cấu hình môi trường. Đổi mật khẩu tài khoản local hiện có trước khi công khai. Một credential Supabase từng có trong tài liệu gốc đã được xóa khỏi file; nên xoay vòng credential đó.
+4. **Google OAuth:** mã nguồn đã sẵn sàng (provider chỉ được đăng ký khi có đủ biến môi trường). Cần Google Client ID, Client Secret và callback URI của domain triển khai để bật.
+5. **Thanh toán và vận chuyển ngoài COD:** chưa có nhà cung cấp cổng thanh toán hoặc hãng vận chuyển. Nếu cần chuyển khoản/QR tự đối soát, webhook hay vận đơn tự động, cần tài khoản và thông số tích hợp tương ứng.
+6. **Feedback khách hàng:** cần nội dung thật và xác nhận khách đồng ý công bố tên, địa điểm, trích dẫn. Admin/nhân viên nhập tại `/admin/feedback`; bản nháp không hiện ra trang chủ. Không nạp feedback mẫu hoặc tự tạo đánh giá.
+7. **Nội dung giới thiệu:** slide giới thiệu và số đo size nằm trong bảng `site_content`, sửa tại `/admin/content`, nhưng các tuyên bố về chất liệu, quy trình may và số đo vẫn cần chủ cửa hàng kiểm chứng trước khi công khai.
+8. **Nội dung website:** tiêu đề khối trang chủ, nút hero, ảnh chủ đề, banner ưu đãi, ảnh nền và khối mời gọi trang giới thiệu, ảnh tiêu đề trang danh mục, logo đều nằm trong `site_content`. Nội dung văn bản dài của 5 tab trang giới thiệu vẫn nằm trong mã nguồn, cần chủ dự án duyệt riêng.
+9. **Quyết định về các luồng chưa làm:** chương trình điểm thưởng (hiện chỉ hiển thị 0 điểm, chưa có API tích/tiêu) và khôi phục mật khẩu tự động cho khách hàng (hiện admin đặt lại được mật khẩu nhân viên; khách liên hệ cửa hàng). Cần quyết định có làm trước khi mở bán hay không.
+
+## Việc cần hoàn thiện trước khi mở bán
+
+1. **Đăng ký trả mã 409 khi email đã tồn tại** — cho phép dò email đã đăng ký. Đây là đánh đổi có chủ ý để giữ thông báo rõ ràng cho khách; nếu muốn kín hơn, đổi sang thông báo trung tính kèm gửi email xác nhận.
+2. **Hiệu năng khi catalog lớn dần:** API danh mục tải toàn bộ sản phẩm rồi mới phân trang trong bộ nhớ; trang chi tiết sản phẩm cũng nạp toàn bộ để tìm một sản phẩm. Chấp nhận được ở quy mô hiện tại, cần sửa trước khi catalog lên hàng nghìn sản phẩm.
+3. **Vài chỉ mục còn thiếu trong DB** (`OrderItem.productId`, `OrderItem.variantId`, `Order.couponCode`) — chưa ảnh hưởng ở quy mô hiện tại.
+4. **Sản phẩm mới chỉ tạo được một size** trong form tạo nhanh; các size khác thêm sau ở mục "Thêm size". Có thể gộp thành một form nếu thấy cần.
+
+## Đã kiểm chứng và hoạt động đúng
+
+- **Phân quyền ba vai trò:** mọi endpoint `/api/admin/*` xác thực và kiểm tra vai trò phía server. Khách chỉ truy cập hồ sơ và đơn của chính mình. Nhân viên quản lý tồn kho/ảnh sản phẩm, bộ sưu tập, nội dung, feedback; không tạo sản phẩm, không xử lý đơn, không vào cấu hình bán hàng, nhân viên, khách hàng, xuất Excel. Admin không thể tự hạ quyền, tự khóa, tự xóa; không thể nâng quyền admin qua API. Khu vực `/admin/*` có layout chặn tập trung nên trang thêm mới vẫn được bảo vệ.
+- **Phiên đăng nhập:** JWT 7 ngày, đọc lại DB mỗi request; đổi mật khẩu hoặc khóa tài khoản vô hiệu hóa phiên cũ ngay (fingerprint HMAC); mật khẩu băm bcrypt cost 12; đăng nhập giới hạn 10 lần/10 phút theo IP và tài khoản.
+- **Quản trị sản phẩm:** sửa tên, giá, giá gốc, phần trăm giảm, mô tả, bộ sưu tập, cờ hiển thị; sửa tồn kho và giá từng size; thêm size mới; tải/xóa/gắn ảnh từ thư viện media.
+- **Quản trị bán hàng:** phí giao hàng, ngưỡng miễn phí, mã giảm giá với loại/giá trị/đơn tối thiểu/thời gian hiệu lực/giới hạn lượt dùng/trạng thái; mã đã dùng cho đơn được chuyển sang ngừng hoạt động thay vì xóa để giữ lịch sử.
+- **Quản trị khách hàng:** danh sách, tìm kiếm, khóa/mở khóa (phiên cũ hết hiệu lực ngay), xóa mềm giữ lại đơn hàng.
+- **Quản trị nội dung:** khu vực `/admin/*` có thanh điều hướng riêng theo vai trò; trang tổng quan chỉ hiển thị số liệu kinh doanh. Trang Nội dung website hiển thị bản xem trước bám theo bố cục trang khách hàng, mỗi khối có nút Sửa và một nút Lưu tất cả thay đổi ở cuối trang: trang chủ (hero, tiêu đề khối, ảnh chủ đề), khối đánh giá khách hàng, banner ưu đãi, trang giới thiệu, ảnh trang danh mục, bảng hướng dẫn chọn size và logo.
+- **Xuất Excel bất đồng bộ:** bấm tạo file là nhận phản hồi ngay, file được dựng ở nền và tải lên Cloudinary, giao diện tự theo dõi và thông báo khi xong. File gồm 12 cột theo thứ tự: thời gian, mã đơn, tên khách hàng, số điện thoại, địa chỉ, sản phẩm (tên + size + số lượng), tổng tiền, mã giảm giá, ghi chú, kênh tiếp cận, trạng thái đơn, số lần mua. File chỉ tải được qua API có kiểm tra quyền admin.
+- **Dữ liệu và tiền:** giá, tồn kho, phí giao hàng và coupon luôn được tính lại phía server; không tin số tiền từ trình duyệt; chống bán vượt tồn kho bằng cập nhật có điều kiện; đơn hàng có khóa idempotency; tiền lưu bằng `BigInt`.
+- **Bảo mật đã có:** CSP (chỉ cho phép Cloudinary, Google Fonts, GA4, Clarity), HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, ẩn `X-Powered-By`; giới hạn tần suất cho đăng nhập, đăng ký, báo giá, thanh toán, tra cứu đơn (báo giá và mã giảm giá đếm riêng); kiểm tra `Origin` trên mọi endpoint ghi; giới hạn kích thước body; validator chặn URL ảnh và liên kết ngoài không hợp lệ; không có bí mật bị commit; `CONNECTION_STRING` chỉ ở server và được test ràng buộc.
+- **Kiến trúc:** phân lớp `src/app → src/server → Prisma` thực thi bằng `server-only` và test tự động; cache theo tag có thu hồi khi ghi; không có N+1.
 
 ## Giới hạn hiện tại
 
 - Giỏ hàng nằm trong bộ nhớ trình duyệt và không đồng bộ giữa thiết bị. Báo giá và đặt hàng đọc lại giá, tồn kho, phí giao hàng và coupon từ DB; dữ liệu cũ ở giỏ không quyết định tổng tiền đơn.
-- Các phần trong `docs/reference/db.sql` như nhiều địa chỉ, đánh giá, sổ tồn kho, hoàn tiền, điểm thưởng và nhật ký quản trị chưa có luồng hoàn chỉnh. Tài khoản mới bắt đầu với 0 điểm; giao diện không hiển thị điểm hoặc voucher tự tạo.
+- Các phần trong `docs/reference/db.sql` như nhiều địa chỉ, đánh giá sản phẩm, sổ tồn kho, hoàn tiền, điểm thưởng và nhật ký quản trị chưa có luồng hoàn chỉnh. Tài khoản mới bắt đầu với 0 điểm; giao diện không hiển thị điểm hoặc voucher tự tạo.
 - Chỉ có thanh toán COD. Cần kiểm thử staging, tải, giám sát lỗi, sao lưu/khôi phục DB và xử lý tranh chấp tồn kho trước khi nhận đơn thật ở quy mô lớn.
-- Catalog có cache máy chủ 60 giây và cache trong tab 60 giây. Vì vậy danh mục có thể hiển thị tồn kho cũ trong khoảng một phút; API báo giá và đặt hàng kiểm tra DB. Dev server biên dịch trang lần đầu nên thời gian tải lần đầu không phản ánh tốc độ bản production.
+- Catalog có cache máy chủ 60 giây và cache trong tab 60 giây. Vì vậy danh mục có thể hiển thị tồn kho cũ trong khoảng một phút; API báo giá và đặt hàng kiểm tra DB.
+- Tiến trình xuất Excel chạy nền trong cùng máy chủ; nếu máy chủ dừng giữa chừng, tiến trình được đánh dấu thất bại sau 2 phút và có thể chạy lại. Khi triển khai lên Vercel nên bật hàng đợi nền (ví dụ Vercel Cron hoặc queue) nếu cần xuất dữ liệu rất lớn.
 - Giao diện lấy từ repo mẫu và đã nối các trang chính với API/DB. Cần đối chiếu hình ảnh trên các cỡ màn hình nếu yêu cầu khớp từng điểm ảnh. Schema `public` trên Supabase không được ứng dụng sử dụng; xem bảng trong `tpetie_app`.
-- Catalog JSON và script seed cũ đã được xóa sau khi xác nhận DB có đủ 40 sản phẩm, 4 bộ sưu tập, 271 biến thể và toàn bộ ảnh local đang được tham chiếu. Database mới cần nhập catalog qua trang quản trị hoặc công cụ nhập dữ liệu riêng; migration không tự tạo sản phẩm kinh doanh mẫu.
+- Database mới cần nhập catalog qua trang quản trị hoặc công cụ nhập dữ liệu riêng; migration không tự tạo sản phẩm kinh doanh mẫu. Ảnh nội dung nằm trên Cloudinary, không còn ảnh tĩnh trong repo.
 
 ## Chạy và kiểm tra local
 
 Trong thư mục gốc: `npm ci` nếu chưa cài, `npm run dev`, mở `http://localhost:3000`. Không cần seed lại DB hiện tại. Dùng tài khoản đã có trong DB. Với database mới, đặt `ADMIN_*` và tùy chọn `STAFF_*` theo `.env.example`, rồi chạy `npm run accounts:provision`. Lệnh không đổi mật khẩu của tài khoản đã tồn tại. Không đưa mật khẩu vào Git.
 
-Chạy `npm test`, `npx tsc --noEmit`, `npm run build` (dừng dev server trước khi build trên Windows). Khi dev server chạy, dùng `npm run content:check`, `node scripts/verify-data-source.cjs`, `node scripts/check-commerce.cjs`, `node scripts/check-customer-flow.cjs`, `node scripts/check-order-flow.cjs`, `node scripts/check-new-product-flow.cjs` để đối chiếu API và DB. Các script ghi thử tự dọn dữ liệu thử sau khi hoàn thành.
+Chạy `npm test`, `npx tsc --noEmit`, `npm run build` (dừng dev server trước khi build trên Windows). Khi dev server chạy, dùng `npm run content:check`, `node scripts/check-export-flow.cjs`, `node scripts/check-admin-features.cjs`, `node scripts/verify-data-source.cjs`, `node scripts/check-commerce.cjs`, `node scripts/check-customer-flow.cjs`, `node scripts/check-order-flow.cjs`, `node scripts/check-new-product-flow.cjs`, `node scripts/check-staff-reset.cjs`, `node scripts/check-internal-links.cjs` để đối chiếu API và DB. Các script ghi thử tự dọn dữ liệu thử sau khi hoàn thành.
+
+Cấu hình nội dung khởi tạo: `npm run content:seed` chỉ tạo các khóa còn thiếu trong `site_content` nên không ghi đè phần đã sửa trong `/admin/content`. Chuyển ảnh lên Cloudinary: `npm run media:migrate` (cần khóa Cloudinary hợp lệ).

@@ -6,9 +6,9 @@ import { usePathname } from 'next/navigation';
 import { Heart, Phone, MessageCircle } from 'lucide-react';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 
-export function Footer() {
+export function Footer({ logoUrl, logoAlt }: { logoUrl?: string; logoAlt?: string } = {}) {
   const pathname = usePathname();
-  const isCollectionPage = pathname?.startsWith('/bo-suu-tap');
+  const isCollectionPage = pathname?.startsWith('/collections');
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
   return (
@@ -20,11 +20,15 @@ export function Footer() {
         {/* CỘT 1: LOGO & LỜI CAM KẾT */}
         <div className="space-y-3">
           <Link href="/" className="inline-block group">
-            <img
-              src="/images/logo.png"
-              alt="T'Petie - Made for little souls"
-              className="h-11 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
-            />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={logoAlt || "T'Petie - Made for little souls"}
+                className="h-11 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+              />
+            ) : (
+              <span className="font-heading font-bold text-xl text-honey-700 group-hover:text-honey-600 transition-colors">T&apos;Petie</span>
+            )}
           </Link>
           <p className="text-xs leading-relaxed text-charcoal-600">
             <strong className="font-bold text-charcoal-900 uppercase">LỜI CAM KẾT:</strong> Thương hiệu thời trang thiết kế trẻ em, nâng niu từng bước chạm đầu đời của bé yêu.
@@ -43,17 +47,17 @@ export function Footer() {
           </h4>
           <ul className="space-y-2 text-xs text-charcoal-600">
             <li>
-              <Link href="/chinh-sach-bao-mat" className="hover:text-honey-600 transition-colors block">
+              <Link href="/privacy-policy" className="hover:text-honey-600 transition-colors block">
                 Chính sách bảo mật
               </Link>
             </li>
             <li>
-              <Link href="/chinh-sach-doi-tra" className="hover:text-honey-600 transition-colors block">
+              <Link href="/return-policy" className="hover:text-honey-600 transition-colors block">
                 Chính sách đổi trả
               </Link>
             </li>
             <li>
-              <Link href="/chinh-sach-thanh-toan" className="hover:text-honey-600 transition-colors block">
+              <Link href="/payment-policy" className="hover:text-honey-600 transition-colors block">
                 Chính sách thanh toán
               </Link>
             </li>
@@ -67,7 +71,7 @@ export function Footer() {
           </h4>
           <ul className="space-y-2 text-xs text-charcoal-600">
             <li>
-              <Link href="/tra-cuu-don" className="hover:text-honey-600 transition-colors block">
+              <Link href="/order-lookup" className="hover:text-honey-600 transition-colors block">
                 Tra cứu đơn hàng
               </Link>
             </li>

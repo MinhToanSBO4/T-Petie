@@ -8,85 +8,87 @@ import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedTestimonials } from '@/server/content/testimonials';
-import { getHomeFeatures } from '@/server/content/site-content';
+import { getSiteContent } from '@/server/content/site-content';
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [products, collections, testimonials, homeFeatures] = await Promise.all([
-    getProducts(), getCollections(), getPublishedTestimonials(), getHomeFeatures(),
+  const [products, collections, testimonials, content] = await Promise.all([
+    getProducts(), getCollections(), getPublishedTestimonials(), getSiteContent(),
   ]);
 
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 8);
   const newArrivals = products.filter((p) => p.isNewArrival);
   const flashSaleProducts = products.filter((p) => p.isSale);
   const homepageCollections = collections.filter((collection) => collection.showOnHome);
+  const sections = content.home_sections;
+  const features = content.home_features;
 
   return (
     <div className="space-y-10 sm:space-y-14">
       {/* 1. HERO BANNER SECTION */}
       <section className="relative px-4 sm:px-6 pt-4 max-w-6xl mx-auto">
-        {homepageCollections.length > 0 && <HeroCarousel collections={homepageCollections} />}
+        {homepageCollections.length > 0 && <HeroCarousel collections={homepageCollections} hero={content.home_hero} />}
       </section>
 
 
 
       {/* 3. BEST SELLERS GRID */}
-      <section id="best-seller" className="px-4 sm:px-6 max-w-6xl mx-auto">
+      {bestSellers.length > 0 && <section id="best-seller" className="px-4 sm:px-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg sm:text-2xl font-bold font-heading text-charcoal-900">
-              Sản Phẩm Bán Chạy Nhất
+              {sections?.bestSellers.title}
             </h2>
           </div>
-          <Link
-            href="/be-gai"
+          {sections?.bestSellers.linkLabel && <Link
+            href={sections.bestSellers.linkHref || '/'}
             className="text-xs font-bold text-honey-600 hover:text-honey-700 flex items-center space-x-1"
           >
-            <span>Khám phá thêm</span>
+            <span>{sections.bestSellers.linkLabel}</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          </Link>}
         </div>
 
         <ProductGrid products={bestSellers} />
-      </section>
+      </section>}
 
       {/* 4. FLASH SALE BANNER SECTION */}
       {flashSaleProducts.length > 0 && <section id="flash-sale" className="px-4 sm:px-6 max-w-6xl mx-auto">
-        <div className="mb-6 flex items-center justify-between"><h2 className="font-heading text-lg font-bold sm:text-2xl">Sản phẩm đang ưu đãi</h2>
-          <Link href="/sale" className="text-xs font-bold text-honey-600">Xem tất cả →</Link></div>
+        <div className="mb-6 flex items-center justify-between"><h2 className="font-heading text-lg font-bold sm:text-2xl">{sections?.sale.title}</h2>
+          {sections?.sale.linkLabel && <Link href={sections.sale.linkHref || '/'} className="text-xs font-bold text-honey-600">{sections.sale.linkLabel}</Link>}</div>
         <ProductGrid products={flashSaleProducts.slice(0, 8)} />
       </section>}
 
-      {/* 5. BỘ SƯU TẬP LOOKBOOK CAROUSEL (4 BST) */}
+      {/* 5. BỘ SƯU TẬP LOOKBOOK CAROUSEL */}
       {homepageCollections.length > 0 && <section id="collections" className="px-4 sm:px-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-honey-600 uppercase tracking-wider mb-1">
+            {sections?.collections.eyebrow && <div className="flex items-center space-x-1.5 text-xs font-bold text-honey-600 uppercase tracking-wider mb-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Chuyện Của Mùa</span>
-            </div>
+              <span>{sections.collections.eyebrow}</span>
+            </div>}
             <h2 className="text-lg sm:text-2xl font-bold font-heading text-charcoal-900">
-              Bộ Sưu Tập Nổi Bật
+              {sections?.collections.title}
             </h2>
           </div>
-          <Link
-            href="/bo-suu-tap"
+          {sections?.collections.linkLabel && <Link
+            href={sections.collections.linkHref || '/'}
             className="text-xs font-bold text-honey-600 hover:text-honey-700 flex items-center space-x-1"
           >
-            <span>Xem Lookbook</span>
+            <span>{sections.collections.linkLabel}</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          </Link>}
         </div>
 
         <LookbookCarousel collections={homepageCollections} />
       </section>}
 
       {/* 6. VÌ SAO MẸ YÊU THÍCH T'PETIE */}
-      {homeFeatures.length > 0 && <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
-        <FeatureCarousel features={homeFeatures} />
+      {features && features.items.length > 0 && <section className="px-4 sm:px-6 max-w-6xl mx-auto pb-10">
+        <FeatureCarousel section={features} />
       </section>}
-      <TestimonialsSection testimonials={testimonials} />
+      <TestimonialsSection testimonials={testimonials} section={content.testimonials_section} />
     </div>
   );
 }

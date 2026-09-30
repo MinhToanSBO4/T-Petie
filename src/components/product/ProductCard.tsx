@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ShoppingBag } from 'lucide-react';
+import { ImageIcon, ShoppingBag } from 'lucide-react';
 import { Product } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
@@ -31,7 +31,7 @@ export function ProductCard({ product }: { product: Product }) {
       className="group bg-white rounded-2xl sm:rounded-3xl border border-cream-200 overflow-hidden shadow-card hover:shadow-soft transition-all flex flex-col justify-between"
     >
       <Link
-        href={`/san-pham/${product.slug}`}
+        href={`/products/${product.slug}`}
         data-track="select-item"
         data-item-id={product.id}
         data-item-name={product.name}
@@ -43,13 +43,22 @@ export function ProductCard({ product }: { product: Product }) {
             layoutId={`product-image-${product.id}`}
             className="w-full h-full relative"
           >
-            <Image
-              src={product.thumbnail || (product.images && product.images[0]) || product.image || '/images/logo.png'}
-              alt={product.name}
-              fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-            />
+            {(() => {
+              const imageSrc = product.thumbnail || (product.images && product.images[0]) || product.image;
+              return imageSrc ? (
+                <Image
+                  src={imageSrc}
+                  alt={product.name}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-cream-100 text-charcoal-300" aria-hidden="true">
+                  <ImageIcon className="w-10 h-10" />
+                </div>
+              );
+            })()}
           </motion.div>
 
           {/* Badges Góc Trái Trên */}

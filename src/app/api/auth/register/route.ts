@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         role: 'user',
         status: 'active',
         points: 0,
-        babyGender: 'be-gai',
+        babyGender: 'girl',
       },
       select: {
         id: true,

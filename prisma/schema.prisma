@@ -179,6 +179,25 @@ model SiteContent {
   @@map("site_content")
 }
 
+/// Thư viện ảnh dùng chung: mọi ảnh hiển thị trên website đều có bản ghi tại đây.
+/// Ảnh được lưu trên Cloudinary, database giữ metadata và URL phân phối.
+model MediaAsset {
+  id           String   @id @default(cuid())
+  url          String   @unique
+  publicId     String?  @unique
+  folder       String   @default("tpetie/site")
+  altText      String?
+  width        Int?
+  height       Int?
+  bytes        Int?
+  format       String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([createdAt])
+  @@map("media_assets")
+}
+
 model ProductImage {
   id String @id @default(cuid())
   productId String
@@ -223,6 +242,7 @@ model Order {
   district String
   ward String?
   orderNote String? @db.Text
+  source String? // Kênh khách biết đến cửa hàng, do khách chọn khi thanh toán
   subtotal BigInt
   shippingFee BigInt @default(0)
   discountAmount BigInt @default(0)
@@ -258,6 +278,21 @@ model OrderItem {
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
   @@index([orderId])
   @@map("order_items")
+}
+
+/// Tiến trình xuất dữ liệu chạy nền: người dùng kích hoạt rồi nhận thông báo khi file sẵn sàng.
+model ExportJob {
+  id            String    @id @default(cuid())
+  status        String    @default("pending") // "pending" | "processing" | "completed" | "failed"
+  requestedById String?
+  fileName      String?
+  fileUrl       String?
+  orderCount    Int       @default(0)
+  error         String?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+  @@index([createdAt])
+  @@map("export_jobs")
 }
 
 model RateLimitCounter {

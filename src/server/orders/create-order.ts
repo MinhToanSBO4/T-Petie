@@ -6,7 +6,7 @@ import { quoteOrder, type QuoteItem } from './quote-order';
 
 export type CheckoutInput = {
   fullName: string; phone: string; address: string; city: string; district: string; ward?: string;
-  note?: string; couponCode?: string; items: QuoteItem[];
+  note?: string; couponCode?: string; source?: string; items: QuoteItem[];
 };
 
 export async function createOrder(input: CheckoutInput, userId: string | undefined, idempotencyKey: string | null) {
@@ -48,6 +48,7 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
         district: input.district,
         ward: input.ward || null,
         orderNote: input.note || null,
+        source: input.source || null,
         subtotal: BigInt(quote.subtotal), shippingFee: BigInt(quote.shippingFee),
         discountAmount: BigInt(quote.discount), totalAmount: BigInt(quote.total),
         couponCode: quote.couponCode,

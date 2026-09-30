@@ -7,6 +7,7 @@ import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { createTemporaryPassword } from '@/server/security/password-reset';
+import { isSameOrigin } from '@/server/security/origin';
 
 interface RouteContext {
   params: {
@@ -208,6 +209,9 @@ export async function DELETE(req: Request, { params }: RouteContext) {
         { error: '403 Forbidden: Bạn không có quyền thực hiện thao tác này.' },
         { status: 403 }
       );
+    }
+    if (!isSameOrigin(req)) {
+      return NextResponse.json({ error: '403 Forbidden: Nguồn yêu cầu không hợp lệ.' }, { status: 403 });
     }
 
     const { id: targetUserId } = params;

@@ -1,14 +1,17 @@
 import type { PublicTestimonial } from '@/types/testimonial';
+import type { TestimonialsSectionContent } from '@/lib/content/site-content';
 
-export function TestimonialsSection({ testimonials }: { testimonials: PublicTestimonial[] }) {
+export function TestimonialsSection({ testimonials, section }: {
+  testimonials: PublicTestimonial[]; section?: TestimonialsSectionContent | null;
+}) {
   if (testimonials.length === 0) return null;
 
   return <section aria-labelledby="customer-feedback-title" className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
     <div className="mb-6 text-center">
-      <p className="text-xs font-bold uppercase tracking-wider text-honey-700">Lời chia sẻ của khách hàng</p>
-      <h2 id="customer-feedback-title" className="mt-2 text-xl sm:text-3xl font-bold font-heading text-charcoal-900">
-        Mẹ nói gì về T&apos;Petie?
-      </h2>
+      {section?.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-700">{section.eyebrow}</p>}
+      {section?.title && <h2 id="customer-feedback-title" className="mt-2 text-xl sm:text-3xl font-bold font-heading text-charcoal-900">
+        {section.title}
+      </h2>}
     </div>
     <ul className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-4 md:grid md:grid-cols-3 md:overflow-visible" aria-label="Feedback khách hàng">
       {testimonials.map((item) => <li key={item.id} className="min-w-[85%] sm:min-w-[48%] md:min-w-0 snap-center">

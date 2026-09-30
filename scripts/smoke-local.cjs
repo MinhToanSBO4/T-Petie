@@ -8,7 +8,7 @@ function cookies(response) {
 }
 
 async function main() {
-  for (const path of ['/', '/bo-suu-tap', '/sale', '/api/products', '/api/collections', '/dang-nhap']) {
+  for (const path of ['/', '/collections', '/sale', '/api/products', '/api/collections', '/login']) {
     const response = await fetch(new URL(path, base));
     if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
     if (path === '/api/products') {
@@ -33,7 +33,7 @@ async function main() {
     const { csrfToken } = await csrfResponse.json();
     const body = new URLSearchParams({
       csrfToken, email: account.username, password: account.password,
-      callbackUrl: new URL(account.role === 'admin' ? '/admin' : '/admin/san-pham', base).toString(), json: 'true',
+      callbackUrl: new URL(account.role === 'admin' ? '/admin' : '/admin/products', base).toString(), json: 'true',
     });
     const loginResponse = await fetch(new URL('/api/auth/callback/credentials', base), {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookies(csrfResponse) }, body, redirect: 'manual',
@@ -43,10 +43,10 @@ async function main() {
     const session = await sessionResponse.json();
     if (session?.user?.role !== account.role) throw new Error(`${account.role} login smoke test failed (HTTP ${loginResponse.status})`);
     if (account.role === 'admin') {
-      const staffPage = await fetch(new URL('/admin/nhan-vien', base), { headers: { cookie: sessionCookies } });
+      const staffPage = await fetch(new URL('/admin/staff', base), { headers: { cookie: sessionCookies } });
       if (!staffPage.ok) throw new Error(`Admin staff page: HTTP ${staffPage.status}`);
     } else {
-      const staffPage = await fetch(new URL('/admin/nhan-vien', base), { headers: { cookie: sessionCookies }, redirect: 'manual' });
+      const staffPage = await fetch(new URL('/admin/staff', base), { headers: { cookie: sessionCookies }, redirect: 'manual' });
       const usersApi = await fetch(new URL('/api/admin/users', base), { headers: { cookie: sessionCookies } });
       const staffHtml = await staffPage.text();
       if (staffHtml.includes('Thêm nhân viên') || usersApi.status !== 403) {

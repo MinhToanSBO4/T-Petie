@@ -5,8 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import type { Collection } from '@/types/collection';
+import type { HomeHero } from '@/lib/content/site-content';
 
-export function HeroCarousel({ collections }: { collections: Collection[] }) {
+export function HeroCarousel({ collections, hero }: { collections: Collection[]; hero?: HomeHero | null }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const activeIndex = collections.length ? currentIndex % collections.length : 0;
 
@@ -29,7 +30,7 @@ export function HeroCarousel({ collections }: { collections: Collection[] }) {
         {collections.map((collection, index) => (
           <Link
             key={collection.id}
-            href={`/bo-suu-tap/${collection.id}`}
+            href={`/collections/${collection.id}`}
             data-track={`click_hero_banner_${collection.id}`}
             className={`absolute inset-0 transition-transform duration-700 ease-in-out flex items-center justify-center ${
               index === activeIndex ? 'translate-x-0' : index < activeIndex ? '-translate-x-full' : 'translate-x-full'
@@ -85,7 +86,7 @@ export function HeroCarousel({ collections }: { collections: Collection[] }) {
         <div className="flex items-center space-x-2 text-xs sm:text-sm text-charcoal-700 text-center sm:text-left transition-opacity duration-300">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-honey-500 text-white text-[11px] font-bold shrink-0 shadow-sm">
             <Sparkles className="w-3 h-3 mr-1" />
-            {collections[activeIndex]?.badge || 'Bộ sưu tập'}
+            {collections[activeIndex]?.badge || hero?.defaultBadge}
           </span>
           <span>
             <strong>{collections[activeIndex]?.title}</strong>
@@ -93,21 +94,21 @@ export function HeroCarousel({ collections }: { collections: Collection[] }) {
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-center">
-          <Link
-            href="/be-gai"
+          {hero?.shopLabel && hero.shopHref && <Link
+            href={hero.shopHref}
             data-track="hero-cta-shop-girls"
             className="flex-1 sm:flex-none px-5 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center space-x-1.5"
           >
-            <span>Mua Sắm Ngay</span>
+            <span>{hero.shopLabel}</span>
             <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link
-            href="/bo-suu-tap"
+          </Link>}
+          {hero?.lookbookLabel && hero.lookbookHref && <Link
+            href={hero.lookbookHref}
             data-track="hero-cta-view-lookbook"
             className="flex-1 sm:flex-none px-5 py-2.5 rounded-full bg-white hover:bg-cream-100 text-charcoal-900 border border-cream-300 text-xs sm:text-sm font-bold transition-all active:scale-95 text-center"
           >
-            <span>Xem Lookbook</span>
-          </Link>
+            <span>{hero.lookbookLabel}</span>
+          </Link>}
         </div>
       </div>
     </div>

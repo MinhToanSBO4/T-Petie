@@ -70,7 +70,7 @@ export async function PATCH(req: Request) {
       (babyProfile.name !== undefined && (typeof babyProfile.name !== 'string' || babyProfile.name.length > 100)) ||
       (babyProfile.birthDate !== undefined && babyProfile.birthDate !== '' &&
         (typeof babyProfile.birthDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(babyProfile.birthDate) || Number.isNaN(Date.parse(babyProfile.birthDate)))) ||
-      (babyProfile.gender !== undefined && babyProfile.gender !== 'be-gai') ||
+      (babyProfile.gender !== undefined && babyProfile.gender !== 'girl') ||
       (babyProfile.recommendedSize !== undefined && (typeof babyProfile.recommendedSize !== 'string' || babyProfile.recommendedSize.length > 100)) ||
       (babyProfile.weight !== undefined && (!Number.isFinite(Number(babyProfile.weight)) || Number(babyProfile.weight) <= 0 || Number(babyProfile.weight) > 100)) ||
       (babyProfile.height !== undefined && (!Number.isFinite(Number(babyProfile.height)) || Number(babyProfile.height) <= 0 || Number(babyProfile.height) > 250)))) {

@@ -11,6 +11,8 @@ import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { MiniCart } from '@/components/cart/MiniCart';
 import { FloatingMessenger } from '@/components/layout/FloatingMessenger';
 import { NavigationProgress } from '@/components/layout/NavigationProgress';
+import { getSiteContent } from '@/server/content/site-content';
+import { getCommerceSettings } from '@/server/orders/commerce-settings';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -32,7 +34,7 @@ export const viewport: Viewport = {
   themeColor: '#FFF8EE',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -41,6 +43,9 @@ export default function RootLayout({
     ? process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID : undefined;
   const ga4Id = /^G-[A-Z0-9]+$/.test(process.env.NEXT_PUBLIC_GA4_ID || '')
     ? process.env.NEXT_PUBLIC_GA4_ID : undefined;
+  // Nhận diện thương hiệu và cấu hình bán hàng lấy từ database, không còn số liệu viết cứng.
+  const [siteContent, commerceSettings] = await Promise.all([getSiteContent(), getCommerceSettings()]);
+  const brandAssets = siteContent.brand_assets;
 
   return (
     <html lang="vi">
@@ -95,13 +100,13 @@ export default function RootLayout({
               <CartProvider>
                 <Suspense fallback={null}><NavigationProgress /></Suspense>
                 {/* Header Sticky */}
-                <Header />
+                <Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />
 
                 {/* Main Content Area */}
                 <main className="flex-1 pb-16 md:pb-0">{children}</main>
 
                 {/* Mini Cart Slide-in Drawer */}
-                <MiniCart />
+                <MiniCart freeShippingThreshold={commerceSettings?.freeShippingThreshold ?? null} />
 
                 {/* Mobile Bottom Navigation */}
                 <MobileBottomNav />
@@ -110,7 +115,7 @@ export default function RootLayout({
                 <FloatingMessenger />
 
                 {/* Footer */}
-                <Footer />
+                <Footer logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} />
               </CartProvider>
             </ToastProvider>
           </AuthProvider>

@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/server/auth/options';
+import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { revalidateTag } from 'next/cache';
 
@@ -16,6 +17,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
+  if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   let body: { status?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
   if (typeof body.status !== 'string') return NextResponse.json({ error: 'Thiếu trạng thái' }, { status: 400 });

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import type { AdminTestimonial } from '@/types/admin-content';
 
@@ -57,8 +56,7 @@ export function TestimonialManager({ initialTestimonials }: { initialTestimonial
   };
 
   return <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-    <header><Link href="/admin" className="text-sm font-semibold text-honey-700">← Quản trị</Link>
-      <h1 className="mt-2 text-3xl font-bold font-heading">Feedback khách hàng</h1>
+    <header><h1 className="mt-2 text-3xl font-bold font-heading">Feedback khách hàng</h1>
       <p className="mt-1 text-sm text-charcoal-600">Lưu lời nhận xét thật từ khách. Có thể giữ ở bản nháp trước khi công bố ở cuối trang chủ.</p>
     </header>
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
