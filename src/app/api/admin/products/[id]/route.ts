@@ -1,7 +1,6 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { authOptions } from '@/server/auth/options';
+import { getStaffSession } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { parseProductPatch, parseVariantInput, parseVariantPatch } from '@/lib/content/product-input';
@@ -17,10 +16,7 @@ const isCloudinaryUrl = (value: unknown) =>
  * Ảnh chỉ được thêm/xóa/sắp xếp khi yêu cầu này chạy, nên thao tác trên giao diện có thể hủy bỏ.
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.status !== 'active' || !['admin', 'staff'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  }
+  if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   const raw = await request.text();
   if (raw.length > 200_000) return NextResponse.json({ error: 'Dữ liệu quá lớn' }, { status: 413 });

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +11,7 @@ const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml
  * thay vì để lộ trực tiếp đường dẫn lưu trữ.
  */
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  }
+  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const job = await prisma.exportJob.findUnique({ where: { id: params.id } });
   if (!job || job.status !== 'completed' || !job.fileUrl) {
     return NextResponse.json({ error: 'File chưa sẵn sàng' }, { status: 404 });

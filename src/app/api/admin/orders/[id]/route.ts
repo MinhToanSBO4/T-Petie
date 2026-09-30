@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { revalidateTag } from 'next/cache';
@@ -13,10 +12,7 @@ const transitions: Record<string, string[]> = {
 };
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  }
+  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   let body: { status?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }

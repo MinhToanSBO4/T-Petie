@@ -1,7 +1,6 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { authOptions } from '@/server/auth/options';
+import { getStaffSession, requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 import { prisma } from '@/server/db/client';
@@ -9,10 +8,7 @@ import { prisma } from '@/server/db/client';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.status !== 'active' || !['admin', 'staff'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  }
+  if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
   const search = parseSearch(searchParams);
@@ -43,10 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
-    return NextResponse.json({ error: 'Chỉ quản trị viên được tạo sản phẩm' }, { status: 403 });
-  }
+  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Chỉ quản trị viên được tạo sản phẩm' }, { status: 403 });
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
@@ -66,7 +59,7 @@ export async function POST(request: Request) {
     const product = await prisma.product.create({ data: {
       name: name.trim(), sku: sku.trim(), slug: slug.trim(), basePrice: BigInt(Number(price)),
       categoryId: 'girls', categoryName: 'Thời trang bé gái',
-      variants: { create: [{ sku: `${sku}-${size}`, size: size.trim(), stock: Number(stock), price: BigInt(Number(price)) }] },
+      variants: { create: [{ sku: `${sku.trim()}-${size.trim()}`, size: size.trim(), stock: Number(stock), price: BigInt(Number(price)) }] },
       ...(typeof imageUrl === 'string' && imageUrl ? { images: { create: [{ url: imageUrl, isPrimary: true, altText: name.trim() }] } } : {}),
     } });
     revalidateTag('products');

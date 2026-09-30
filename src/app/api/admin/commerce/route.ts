@@ -1,20 +1,14 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import { parseCommerceSettings } from '@/lib/orders/commerce-input';
 import { COMMERCE_TAG } from '@/server/orders/commerce-settings';
 
 export const dynamic = 'force-dynamic';
 
-async function isAdmin() {
-  const session = await getServerSession(authOptions);
-  return session?.user?.role === 'admin' && session.user.status === 'active';
-}
-
 export async function GET() {
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const settings = await prisma.commerceSetting.findUnique({ where: { id: 'default' } });
   return NextResponse.json({ settings: settings && {
     shippingFee: Number(settings.shippingFee), freeShippingThreshold: Number(settings.freeShippingThreshold),
@@ -24,7 +18,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
   try {

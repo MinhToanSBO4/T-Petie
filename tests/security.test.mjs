@@ -28,3 +28,20 @@ test('seed has no published password', () => {
   const source = read('../prisma/seed.ts');
   assert.doesNotMatch(source, /AdminPassword123|UserPassword123/);
 });
+
+test('every admin API route uses the shared role guards instead of ad-hoc checks', async () => {
+  const { readdirSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const root = new URL('../src/app/api/admin/', import.meta.url);
+  const walk = (dir) => readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    return statSync(path).isDirectory() ? walk(path) : name === 'route.ts' ? [path] : [];
+  });
+  const routes = walk(root.pathname.replace(/^\/(?=[A-Za-z]:)/, ''));
+  assert.ok(routes.length >= 20, 'admin routes found');
+  for (const route of routes) {
+    const source = readFileSync(route, 'utf8');
+    assert.match(source, /(requireAdminApi|getStaffSession)\(\)/, `${route} must call a shared guard`);
+    assert.doesNotMatch(source, /getServerSession/, `${route} must not re-implement the role check`);
+  }
+});

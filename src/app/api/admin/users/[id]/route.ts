@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { createTemporaryPassword } from '@/server/security/password-reset';
@@ -20,9 +19,9 @@ interface RouteContext {
  */
 export async function GET(req: Request, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await requireAdminApi();
 
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!session) {
       return NextResponse.json(
         { error: '403 Forbidden: Bạn không có quyền truy cập thông tin này.' },
         { status: 403 }
@@ -91,9 +90,9 @@ export async function PATCH(req: Request, { params }: RouteContext) {
   try {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
-    const session = await getServerSession(authOptions);
+    const session = await requireAdminApi();
 
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!session) {
       return NextResponse.json(
         { error: '403 Forbidden: Bạn không có quyền thực hiện thao tác này.' },
         { status: 403 }
@@ -101,7 +100,10 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     }
 
     const { id: targetUserId } = params;
-    const body = await req.json();
+    const raw = await req.text();
+    if (raw.length > 4000) return NextResponse.json({ error: 'Dữ liệu quá lớn' }, { status: 413 });
+    let body: Record<string, unknown>;
+    try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
     const { role, status, name, phone, address, city, password, resetPassword } = body;
 
     // Không cho phép Admin tự khóa hoặc tự hạ quyền chính mình
@@ -149,7 +151,8 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       if (!temporaryPassword && (targetUser.role !== 'staff' || typeof password !== 'string' || password.length < 12 || password.length > 128)) {
         return NextResponse.json({ error: 'Mật khẩu nhân viên cần 12–128 ký tự' }, { status: 400 });
       }
-      updateData.password = await bcrypt.hash(temporaryPassword || password, 12);
+      // Nhánh trên đã bảo đảm password là chuỗi 12–128 ký tự khi không dùng mật khẩu tạm.
+      updateData.password = await bcrypt.hash(temporaryPassword || (password as string), 12);
     }
     if (name !== undefined) {
       if (typeof name !== 'string' || name.length > 100) return NextResponse.json({ error: 'Tên không hợp lệ' }, { status: 400 });
@@ -202,9 +205,9 @@ export async function PUT(req: Request, context: RouteContext) {
  */
 export async function DELETE(req: Request, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await requireAdminApi();
 
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!session) {
       return NextResponse.json(
         { error: '403 Forbidden: Bạn không có quyền thực hiện thao tác này.' },
         { status: 403 }

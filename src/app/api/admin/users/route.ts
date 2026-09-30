@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth/options';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
@@ -10,10 +9,7 @@ import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
 // GET: Lấy danh sách người dùng trong hệ thống, có tìm kiếm và phân trang (Chỉ Admin)
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-
-    // Kiểm tra quyền Admin
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!(await requireAdminApi())) {
       return NextResponse.json(
         { error: '403 Forbidden: Chỉ Quản Trị Viên (Admin) mới có quyền truy cập.' },
         { status: 403 }
@@ -101,9 +97,7 @@ export async function POST(req: Request) {
   try {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
-    const session = await getServerSession(authOptions);
-
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!(await requireAdminApi())) {
       return NextResponse.json(
         { error: '403 Forbidden: Chỉ Quản Trị Viên (Admin) mới có quyền tạo người dùng.' },
         { status: 403 }
