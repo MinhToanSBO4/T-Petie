@@ -375,7 +375,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             </div>
             <div className="flex items-center space-x-2">
               <RefreshCw className="w-4 h-4 text-honey-500 shrink-0" />
-              <span>Hỗ trợ đổi size trong vòng 7 ngày nếu bé mặc không vừa.</span>
+              <span>Hỗ trợ đổi size trong vòng 3 ngày kể từ ngày nhận hàng nếu bé mặc không vừa.</span>
             </div>
             <div className="flex items-center space-x-2">
               <Truck className="w-4 h-4 text-blush-500 shrink-0" />
