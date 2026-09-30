@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   try {
     const input = parseReviewInput(JSON.parse(raw));
     // Đánh giá phải gắn với sản phẩm đang bán.
-    const product = await prisma.product.findUnique({ where: { id: input.productId }, select: { id: true } });
+    const product = await prisma.product.findFirst({ where: { id: input.productId, isActive: true }, select: { id: true } });
     if (!product) return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
     const existing = await prisma.productReview.count({ where: { productId: input.productId, userId: session.user.id } });
     if (existing > 0) return NextResponse.json({ error: 'Bạn đã đánh giá sản phẩm này rồi' }, { status: 409 });

@@ -9,12 +9,12 @@ import { prisma } from '@/server/db/client';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email || session.user.status !== 'active') {
+    if (!session?.user?.id || session.user.status !== 'active') {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       select: {
         id: true,
         name: true,
@@ -54,7 +54,7 @@ export async function PATCH(req: Request) {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email || session.user.status !== 'active') {
+    if (!session?.user?.id || session.user.status !== 'active') {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
@@ -66,6 +66,7 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Thông tin hồ sơ không hợp lệ' }, { status: 400 });
       }
     }
+    if (name !== undefined && !name.trim()) return NextResponse.json({ error: 'Tên không được để trống' }, { status: 400 });
     if (babyProfile !== undefined && (!babyProfile || typeof babyProfile !== 'object' || Array.isArray(babyProfile) ||
       (babyProfile.name !== undefined && (typeof babyProfile.name !== 'string' || babyProfile.name.length > 100)) ||
       (babyProfile.birthDate !== undefined && babyProfile.birthDate !== '' &&
@@ -95,7 +96,7 @@ export async function PATCH(req: Request) {
     }
 
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       data: updateData,
       select: {
         id: true,
