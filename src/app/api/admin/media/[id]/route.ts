@@ -34,6 +34,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
   const asset = await prisma.mediaAsset.findUnique({ where: { id: params.id } });
   if (!asset) return NextResponse.json({ error: 'Không tìm thấy ảnh' }, { status: 404 });
+  // Xóa ảnh đang được dùng sẽ làm vỡ ảnh trên website, nên chặn lại và báo đang dùng ở đâu.
+  const [productUses, collectionUses, contentUses] = await Promise.all([
+    prisma.productImage.count({ where: { url: asset.url } }),
+    prisma.collection.count({ where: { OR: [{ bannerUrl: asset.url }, { lookbookUrls: { has: asset.url } }] } }),
+    prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM "site_content" WHERE strpos("data"::text, ${asset.url}) > 0`,
+  ]);
+  const usedIn = [productUses && `${productUses} sản phẩm`, collectionUses && `${collectionUses} bộ sưu tập`,
+    contentUses[0]?.count && 'nội dung trang chủ'].filter(Boolean);
+  if (usedIn.length) {
+    return NextResponse.json({ error: `Ảnh đang được dùng ở ${usedIn.join(', ')}. Hãy gỡ ảnh khỏi các nơi đó trước khi xóa.` }, { status: 409 });
+  }
   if (asset.publicId && !(await deleteCloudinaryImage(asset.publicId))) {
     return NextResponse.json({ error: 'Không xóa được ảnh trên Cloudinary' }, { status: 502 });
   }
