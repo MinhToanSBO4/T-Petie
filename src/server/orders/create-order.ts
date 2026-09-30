@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import { quoteOrder, type QuoteItem } from './quote-order';
+import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 
 export type CheckoutInput = {
   fullName: string; phone: string; address: string; city: string; district: string; ward?: string;
@@ -66,5 +67,7 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
     });
   });
   revalidateTag('products');
+  // Đơn mới làm thay đổi doanh thu, số đơn chờ và tồn kho trên trang Tổng quan.
+  revalidateTag(DASHBOARD_TAG);
   return { orderId: order.orderCode, totalAmount: quote.total };
 }

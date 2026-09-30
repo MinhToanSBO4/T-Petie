@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdminApi } from '@/server/auth/staff-session';
+import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { revalidateTag } from 'next/cache';
@@ -36,6 +37,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     });
     if (body.status === 'CANCELLED') revalidateTag('products');
+    revalidateTag(DASHBOARD_TAG);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể cập nhật đơn' }, { status: 409 });

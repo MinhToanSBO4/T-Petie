@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { getStaffSession } from '@/server/auth/staff-session';
+import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
 import { parseProductPatch, parseVariantInput, parseVariantPatch } from '@/lib/content/product-input';
@@ -84,6 +85,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     revalidateTag('products');
     revalidateTag('collections');
+    // Tồn kho thay đổi thì danh sách "sắp hết hàng" ở trang tổng quan cũng phải cập nhật.
+    revalidateTag(DASHBOARD_TAG);
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof Error && /không hợp lệ|Không có thay đổi|Không tìm thấy|đã tồn tại/.test(error.message)) {
