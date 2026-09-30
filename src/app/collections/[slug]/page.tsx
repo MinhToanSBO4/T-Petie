@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -13,6 +14,15 @@ interface PageProps {
 }
 
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const collection = (await getCollections()).find((item) => item.id === params.slug);
+  if (!collection) return {};
+  const description = (collection.subtitle || collection.story).replace(/\s+/g, ' ').trim().slice(0, 160) || undefined;
+  const title = `${collection.title} | Bộ sưu tập T'Petie`;
+  return { title, description,
+    openGraph: { title, description, type: 'website', images: collection.bannerImage ? [collection.bannerImage] : undefined } };
+}
 
 export default async function CollectionDetailPage({ params }: PageProps) {
   const [collections, allProducts] = await Promise.all([getCollections(), getProducts()]);
