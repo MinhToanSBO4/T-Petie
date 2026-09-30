@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 import { OrderStatusControl } from '@/components/admin/OrderStatusControl';
+import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
+import { ORDER_STATUS_LABELS, orderStatusLabel } from '@/lib/orders/status';
 
 type OrderItem = { name: string; size: string; quantity: number; total: number };
 type Order = {
@@ -10,11 +12,6 @@ type Order = {
   city: string; district: string; totalAmount: number; orderStatus: string;
   source: string | null; couponCode: string | null; note: string | null;
   createdAt: string; items: OrderItem[];
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', PROCESSING: 'Đang chuẩn bị',
-  SHIPPING: 'Đang giao', COMPLETED: 'Hoàn tất', CANCELLED: 'Đã hủy',
 };
 
 const formatPrice = (value: number) => `${value.toLocaleString('vi-VN')}₫`;
@@ -36,7 +33,7 @@ export function OrderManager() {
     <header className="flex flex-wrap items-center justify-between gap-2">
       <div>
         <h2 className="text-lg font-bold">Đơn {selected.orderCode}</h2>
-        <p className="text-xs text-charcoal-500">{formatDate(selected.createdAt)} · {STATUS_LABELS[selected.orderStatus] || selected.orderStatus}</p>
+        <p className="text-xs text-charcoal-500">{formatDate(selected.createdAt)} · {orderStatusLabel(selected.orderStatus)}</p>
       </div>
       <button type="button" onClick={() => { setSelected(null); setReloadKey((key) => key + 1); }}
         className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
@@ -75,7 +72,8 @@ export function OrderManager() {
 
     <section className="rounded-2xl border border-cream-200 bg-white p-5">
       <h3 className="mb-3 font-bold">Cập nhật trạng thái</h3>
-      <OrderStatusControl code={selected.orderCode} status={selected.orderStatus} />
+      <OrderStatusControl code={selected.orderCode} status={selected.orderStatus}
+        onChanged={(orderStatus) => setSelected({ ...selected, orderStatus })} />
     </section>
   </div>;
 
@@ -93,16 +91,13 @@ export function OrderManager() {
         {row.items.length} món · {row.items.slice(0, 2).map((item) => item.name).join(', ')}{row.items.length > 2 ? '…' : ''}
       </span> },
     { key: 'total', header: 'Tổng tiền', render: (row) => formatPrice(row.totalAmount) },
-    { key: 'status', header: 'Trạng thái', render: (row) => <span className="rounded-full bg-cream-200 px-3 py-1 text-xs font-bold text-charcoal-700">
-        {STATUS_LABELS[row.orderStatus] || row.orderStatus}</span> },
+    { key: 'status', header: 'Trạng thái', render: (row) => <OrderStatusBadge status={row.orderStatus} /> },
   ];
 
   return <div className="space-y-4">
     <DataTable columns={columns} fetchPage={fetchOrders} reloadKey={reloadKey}
       searchPlaceholder="Tìm theo mã đơn, tên khách hoặc số điện thoại"
-      filters={[['PENDING', 'Chờ xử lý'], ['CONFIRMED', 'Đã xác nhận'], ['PROCESSING', 'Đang chuẩn bị'],
-        ['SHIPPING', 'Đang giao'], ['COMPLETED', 'Hoàn tất'], ['CANCELLED', 'Đã hủy']]
-        .map(([value, label]) => ({ value, label }))}
+      filters={Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => ({ value, label }))}
       emptyText="Chưa có đơn hàng nào."
       onRowClick={(row) => setSelected(row)} />
     <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết đơn và cập nhật trạng thái.</p>
