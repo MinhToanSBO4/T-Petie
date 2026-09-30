@@ -87,9 +87,10 @@ export function CustomerManager() {
     { key: 'city', header: 'Tỉnh/thành', render: (row) => row.city || '—' },
     { key: 'points', header: 'Điểm', render: (row) => row.points },
     { key: 'joined', header: 'Tham gia', render: (row) => <span className="text-xs text-charcoal-600">{formatDate(row.createdAt)}</span> },
-    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${
       row.status === 'active' ? 'bg-sage-100 text-sage-800' : 'bg-blush-100 text-blush-700'}`}>
       {row.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</span> },
+    { key: 'action', header: '', render: (row) => <button type="button" onClick={(event) => { event.stopPropagation(); setSelected(row); }} className="min-h-9 whitespace-nowrap rounded-lg border border-cream-300 px-3 text-xs font-bold">Chỉnh sửa</button> },
   ];
 
   return <div className="space-y-4">
