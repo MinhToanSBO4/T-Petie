@@ -131,7 +131,7 @@ export function FeedbackViewer({ items, startIndex, onClose, onView, endAction }
 
   const image = <img key={item.id} src={cloudinaryImage(item.imageUrl, { width: 1080 })} draggable={false}
     width={item.width ?? undefined} height={item.height ?? undefined}
-    alt={item.caption ? `Feedback: ${item.caption}` : `Ảnh chụp tin nhắn feedback ${index + 1}`}
+    alt={item.caption ? `Feedback: ${item.caption}` : `Feedback ${index + 1}`}
     onLoad={(event) => {
       const { naturalWidth, naturalHeight } = event.currentTarget;
       if (!item.width && naturalWidth) setRatios((current) => ({ ...current, [item.id]: naturalHeight / naturalWidth }));

@@ -25,7 +25,7 @@ export function TestimonialsSection({ feedback, feedbackTotal, reviews, section 
       </h2>
       {feedbackTotal > 0 && <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-charcoal-600">
         <MessageCircleHeart className="size-4 text-blush-600" aria-hidden />
-        <span><strong className="text-charcoal-900">{feedbackTotal}</strong> lời khen thật từ tin nhắn của các mẹ</span>
+        <span><strong className="text-charcoal-900">{feedbackTotal}</strong> feedback từ các mẹ</span>
         <Link href="/feedback" className="font-bold text-honey-700 hover:underline">Xem album →</Link>
       </p>}
     </div>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react';
-import { cloudinaryLoader } from '@/lib/media/cloudinary-url';
+import { cloudinaryStoryLoader } from '@/lib/media/cloudinary-url';
 import { prefersReducedMotion } from '@/hooks/useDialog';
 import { FeedbackViewer } from '@/components/feedback/FeedbackViewer';
 import type { PublicFeedback } from '@/types/testimonial';
@@ -70,7 +70,7 @@ export function FeedbackStoryRail({ items, total }: { items: PublicFeedback[]; t
             className={`group ${card} rounded-[22px] p-[3px] transition-transform duration-200 motion-safe:hover:-translate-y-1 ${
               isSeen ? 'bg-cream-300' : 'bg-gradient-to-tr from-honey-400 via-blush-500 to-honey-600'}`}>
             <span className="relative block aspect-[9/16] overflow-hidden rounded-[19px] border-2 border-white bg-cream-100">
-              <Image loader={cloudinaryLoader} src={item.imageUrl} alt="" fill sizes="(min-width: 640px) 176px, 38vw"
+              <Image loader={cloudinaryStoryLoader} src={item.imageUrl} alt="" fill sizes="(min-width: 640px) 176px, 38vw"
                 className="object-cover object-top transition-transform duration-500 motion-safe:group-hover:scale-105" />
               {(item.caption || item.product) && <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-2.5 pt-12 text-left text-white">
                 {item.caption && <span className="line-clamp-2 text-xs font-bold leading-snug drop-shadow">{item.caption}</span>}

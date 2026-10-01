@@ -10,7 +10,7 @@ export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Feedback khách hàng | T'Petie",
-  description: "Album tin nhắn các mẹ gửi T'Petie sau khi nhận đồ cho bé.",
+  description: "Feedback các mẹ gửi T'Petie sau khi nhận đồ cho bé.",
 };
 
 /** Album toàn bộ feedback ảnh chụp tin nhắn đã công bố. */
@@ -26,11 +26,11 @@ export default async function FeedbackPage() {
       </h1>
       {feedback.length > 0 && <p className="mt-3 flex items-center justify-center gap-2 text-sm text-charcoal-700">
         <MessageCircleHeart className="size-4 text-blush-600" aria-hidden />
-        <span><strong className="text-charcoal-900">{feedback.length}</strong> tin nhắn khen từ các mẹ đã mua</span>
+        <span><strong className="text-charcoal-900">{feedback.length}</strong> feedback từ các mẹ đã mua</span>
       </p>}
       <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-charcoal-500">
         <ShieldCheck className="size-3.5 text-sage-700" aria-hidden />
-        Ảnh chụp tin nhắn khách gửi shop, chỉ đăng khi khách đồng ý.
+        Chỉ đăng khi khách đồng ý.
       </p>
     </header>
 

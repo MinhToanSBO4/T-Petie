@@ -67,13 +67,13 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
     <DataTable columns={columns} fetchPage={fetchTestimonials} reloadKey={reloadKey} pageSize={12}
       searchPlaceholder="Tìm theo chú thích hoặc sản phẩm"
       filters={[{ value: 'published', label: 'Đang công bố' }, { value: 'draft', label: 'Bản nháp' }]}
-      emptyText="Chưa có feedback nào. Bấm “Thêm feedback” để tải ảnh chụp tin nhắn của khách."
+      emptyText="Chưa có feedback nào. Bấm “Thêm feedback” để tải ảnh feedback của khách."
       onRowClick={(row) => setView({ mode: 'edit', testimonial: row })}
       toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
         className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">
         <ImagePlus className="size-4" aria-hidden />Thêm feedback</button>} />
     <p className="text-xs text-charcoal-500">
-      Feedback là ảnh chụp màn hình tin nhắn khách khen shop. Trang chủ hiện 12 ảnh đầu dạng story, trang /feedback hiện toàn bộ
+      Feedback là ảnh khách khen shop (ảnh chụp màn hình, ảnh khách gửi...). Trang chủ hiện 12 ảnh đầu dạng story, trang /feedback hiện toàn bộ
       dạng album. Chỉ ảnh đã xác nhận khách đồng ý và bật công bố mới hiển thị.
     </p>
   </div>;
@@ -204,7 +204,7 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
     <header className="flex flex-wrap items-center justify-between gap-2">
       <div>
         <h2 className="text-lg font-bold">Thêm feedback</h2>
-        <p className="text-xs text-charcoal-500">Tải tối đa {FEEDBACK_BATCH_MAX} ảnh chụp màn hình tin nhắn mỗi lần. Ảnh nặng được nén tự động.</p>
+        <p className="text-xs text-charcoal-500">Tải tối đa {FEEDBACK_BATCH_MAX} ảnh feedback mỗi lần. Ảnh nặng được nén tự động.</p>
       </div>
       <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
