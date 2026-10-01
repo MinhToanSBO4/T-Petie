@@ -16,7 +16,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['SHIPPING', 'CANCELLED'],
-  SHIPPING: ['COMPLETED'],
+  // Hủy khi đang giao = giao không thành công / khách không nhận, hàng quay về kho.
+  SHIPPING: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
   CANCELLED: [],
 };
@@ -24,6 +25,40 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
 export function canTransition(from: string, to: string): boolean {
   return (ORDER_TRANSITIONS[from as OrderStatus] || []).includes(to as OrderStatus);
 }
+
+/** Bước kế tiếp trên quy trình chính (không tính hủy) và tên hành động trên nút của quản trị viên. */
+export const ADMIN_NEXT_STEP: Partial<Record<OrderStatus, { to: OrderStatus; label: string }>> = {
+  PENDING: { to: 'CONFIRMED', label: 'Xác nhận đơn' },
+  CONFIRMED: { to: 'PROCESSING', label: 'Bắt đầu đóng gói' },
+  PROCESSING: { to: 'SHIPPING', label: 'Giao cho shipper' },
+  SHIPPING: { to: 'COMPLETED', label: 'Đã giao thành công' },
+};
+
+/**
+ * Bấm nhầm bước tiến thì được hoàn tác ngay sau đó (nút trên thông báo hiện 8 giây; máy chủ cho phép
+ * trong 30 giây để bù độ trễ mạng). Không hoàn tác Hủy (đã hoàn kho) và Hoàn tất (đã mở quyền đánh giá).
+ */
+export const UNDO_WINDOW_MS = 30_000;
+export const UNDOABLE_STATUSES: readonly OrderStatus[] = ['CONFIRMED', 'PROCESSING', 'SHIPPING'];
+export const PREVIOUS_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
+  CONFIRMED: 'PENDING', PROCESSING: 'CONFIRMED', SHIPPING: 'PROCESSING',
+};
+
+/**
+ * Đơn đang giao mà khách không bấm "Đã nhận được hàng" sẽ tự hoàn tất sau số ngày này
+ * (tính từ lúc giao cho shipper), để đơn đã tới tay khách không nằm mãi ở "Đang giao".
+ */
+export const AUTO_COMPLETE_DAYS = 7;
+
+/** Lý do hủy chọn sẵn; lý do "Khác" do quản trị viên tự nhập. */
+export const CANCEL_REASONS = {
+  beforeShipping: ['Khách yêu cầu hủy', 'Không liên lạc được với khách', 'Hết hàng / hết size', 'Đơn trùng hoặc đặt nhầm', 'Nghi ngờ đơn ảo'],
+  shipping: ['Khách không nhận hàng', 'Giao không thành công, hàng hoàn về shop', 'Hàng hư hỏng khi vận chuyển'],
+} as const;
+export const CANCEL_REASON_MAX = 200;
+export const CUSTOMER_CANCEL_NOTE = 'Khách tự hủy đơn';
+
+export type StatusActor = 'admin' | 'customer' | 'system';
 
 /**
  * Thao tác khách tự làm trên đơn của mình (như Shopee): hủy khi shop chưa xác nhận,

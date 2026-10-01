@@ -46,7 +46,7 @@ const FORMATS = { money: '#,##0', date: 'dd/mm/yyyy', datetime: 'dd/mm/yyyy hh:m
 const ROLE_LABELS: Record<string, string> = { admin: 'Quản trị viên', staff: 'Nhân viên' };
 const ACCOUNT_STATUS: Record<string, string> = { active: 'Đang hoạt động', blocked: 'Đã khóa' };
 // Hệ thống hiện chỉ ghi PENDING (COD chưa thu tiền); giá trị khác, nếu có sau này, được giữ nguyên.
-const PAYMENT_STATUS: Record<string, string> = { PENDING: 'Chưa thanh toán' };
+const PAYMENT_STATUS: Record<string, string> = { PENDING: 'Chưa thanh toán', PAID: 'Đã thanh toán' };
 
 function addSheet<T>(workbook: ExcelJS.Workbook, name: string, columns: Column<T>[], rows: T[]) {
   // Cố định dòng tiêu đề và bật bộ lọc để người dùng lọc/sắp xếp ngay trong Excel.

@@ -8,6 +8,7 @@ import { TrendChart } from '@/components/admin/dashboard/TrendChart';
 import { RefreshButton } from '@/components/admin/dashboard/RefreshButton';
 import { BarList, EmptyState, Panel, StatTile, StatusBreakdown } from '@/components/admin/dashboard/DashboardParts';
 import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
+import { autoCompleteShippedOrders } from '@/server/orders/order-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,8 @@ const percentText = (value: number) => `${value.toLocaleString('vi-VN', { maximu
 export default async function AdminPage({ searchParams }: { searchParams: { range?: string } }) {
   await requireAdminPage('/admin');
   const range = parseRange(searchParams.range);
+  // Hoàn tất các đơn giao quá hạn trước khi đọc số liệu (tự giới hạn tần suất).
+  await autoCompleteShippedOrders();
   const data = await getDashboardData(range);
   const { current, previous } = data;
   const averageOrder = (totals: typeof current) => totals.completed ? totals.revenue / totals.completed : 0;

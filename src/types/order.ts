@@ -26,6 +26,8 @@ export type CustomerOrderSummary = {
 export type CustomerOrderDetail = CustomerOrderSummary & {
   subtotal: number; shippingFee: number; discount: number; couponCode: string | null; paymentMethod: string;
   recipient: { name: string; phone: string; address: string }; note: string | null; timeline: TimelineStep[];
+  /** Lý do hủy (đơn đã hủy) và ngày tự hoàn tất (đơn đang giao). */
+  cancelReason: string | null; autoCompleteAt: string | null;
 };
 
 export type CustomerOrderList = {

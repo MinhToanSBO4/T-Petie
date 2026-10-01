@@ -88,7 +88,9 @@ test('order timeline marks passed, current and upcoming steps with event times',
 test('order status changes follow the fulfilment flow and customers only cancel or confirm receipt', () => {
   assert.equal(canTransition('PENDING', 'CONFIRMED'), true);
   assert.equal(canTransition('SHIPPING', 'COMPLETED'), true);
-  assert.equal(canTransition('SHIPPING', 'CANCELLED'), false);
+  // Giao không thành công: quản trị viên hủy đơn đang giao; khách không làm được vì bị giới hạn `from`.
+  assert.equal(canTransition('SHIPPING', 'CANCELLED'), true);
+  assert.equal(CUSTOMER_ORDER_ACTIONS.cancel.from, 'PENDING');
   assert.equal(canTransition('COMPLETED', 'CANCELLED'), false);
   assert.equal(canTransition('PENDING', 'COMPLETED'), false);
   assert.equal(canTransition('UNKNOWN', 'COMPLETED'), false);

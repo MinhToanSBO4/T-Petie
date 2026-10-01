@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, MapPin, MessageCircle, Phone, Receipt, Star } from 'lucide-react';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { CustomerStatusBadge } from '@/components/orders/CustomerStatusBadge';
 import { OrderActions } from '@/components/orders/OrderActions';
 import { OrderItemRow } from '@/components/orders/OrderCard';
@@ -14,6 +13,7 @@ import { getSiteContent } from '@/server/content/site-content';
 import { customerStatus } from '@/lib/orders/status';
 import { telHref } from '@/lib/content/site-content';
 import { formatDateVN, formatPriceCompact } from '@/lib/utils/formatters';
+import { RefreshWhenStale } from '@/components/orders/RefreshWhenStale';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: "Chi tiết đơn mua | T'Petie", robots: { index: false, follow: false } };
@@ -38,7 +38,8 @@ export default async function OrderDetailPage({ params }: { params: { code: stri
   const contact = content.contact_info;
 
   return <div className="mx-auto max-w-5xl space-y-5 px-4 pb-12 pt-2 sm:px-6">
-    <Breadcrumb items={[{ label: 'Tài khoản', href: '/dashboard' }, { label: 'Đơn mua', href: '/orders' }, { label: order.code }]} />
+    {/* Trạng thái đơn đổi từ phía shop: không để trình duyệt hiện bản cũ quá 30 giây. */}
+    <RefreshWhenStale renderId={crypto.randomUUID()} />
     <Link href="/orders" className="inline-flex items-center gap-1.5 rounded-full border border-cream-300 bg-white px-3 py-1.5 text-xs font-bold text-charcoal-700 hover:text-honey-700">
       <ArrowLeft className="size-4" aria-hidden />Đơn mua
     </Link>
@@ -53,6 +54,10 @@ export default async function OrderDetailPage({ params }: { params: { code: stri
         <CustomerStatusBadge status={order.status} />
       </div>
       {status.description && <p className="mt-3 text-sm text-charcoal-700">{status.description}</p>}
+      {order.cancelReason && <p className="mt-2 text-sm text-charcoal-700">Lý do: <strong>{order.cancelReason}</strong></p>}
+      {order.autoCompleteAt && <p className="mt-2 text-xs text-charcoal-500">
+        Nếu mẹ chưa bấm xác nhận, đơn sẽ tự hoàn tất vào {formatDateVN(order.autoCompleteAt)}. Có vấn đề khi nhận hàng, mẹ nhắn shop trước ngày này nhé.
+      </p>}
       {order.pendingReviews > 0 && order.reviewDeadline && <p className="mt-3 flex items-center gap-2 rounded-2xl bg-blush-50 px-4 py-3 text-sm text-blush-900">
         <Star className="size-4 shrink-0" fill="currentColor" aria-hidden />
         Còn {order.pendingReviews} sản phẩm chờ đánh giá — mẹ đánh giá trước {formatDateVN(order.reviewDeadline)} nhé.

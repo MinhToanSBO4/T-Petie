@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 
 export type Column<T> = {
   key: string;
-  header: string;
+  header: React.ReactNode;
   className?: string;
   render: (row: T) => React.ReactNode;
 };
@@ -27,6 +27,10 @@ const snapshots = new Map<string, Snapshot>();
 const pageStore = new Map<string, Map<string, CachedPage>>();
 /** Request đang chờ theo cùng tham số: bấm nhanh, dựng lại hay StrictMode đều dùng chung một lần gọi. */
 const inflight = new Map<string, Promise<TablePage<unknown>>>();
+/** Xóa dữ liệu đã lưu của các bảng có khóa bắt đầu bằng `prefix` (ví dụ mọi tab của trang đơn hàng sau khi đổi trạng thái). */
+export function clearTableCache(prefix: string) {
+  for (const key of Array.from(pageStore.keys())) if (key.startsWith(prefix)) pageStore.delete(key);
+}
 const pageCache = (table: string) => {
   if (!pageStore.has(table)) pageStore.set(table, new Map());
   return pageStore.get(table)!;
@@ -37,7 +41,8 @@ const pageCache = (table: string) => {
  * Mỗi trang chỉ tải đúng số dòng cần hiển thị.
  */
 export function DataTable<T extends { id: string }>({
-  columns, fetchPage, toolbar, searchPlaceholder, emptyText, onRowClick, filters, pageSize = 10, reloadKey = 0, stateKey,
+  columns, fetchPage, toolbar, searchPlaceholder, emptyText, onRowClick, filters, pageSize = 10, reloadKey = 0, stateKey, onData,
+  alwaysRevalidate = false,
 }: {
   columns: Column<T>[];
   fetchPage: (query: TableQuery) => Promise<TablePage<T>>;
@@ -50,6 +55,10 @@ export function DataTable<T extends { id: string }>({
   reloadKey?: number;
   /** Mặc định là đường dẫn trang; chỉ cần đặt khi một trang có nhiều bảng. */
   stateKey?: string;
+  /** Nhận các dòng đang hiển thị mỗi khi dữ liệu đổi (ví dụ để chọn tất cả trên trang). */
+  onData?: (rows: T[]) => void;
+  /** Hiện ngay trang đã lưu nhưng vẫn tải bản mới ngầm mỗi lần mở (dữ liệu có thể đổi từ phía khác). */
+  alwaysRevalidate?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -80,13 +89,15 @@ export function DataTable<T extends { id: string }>({
 
   const load = useCallback(async (force: boolean) => {
     const cached = pageCache(key).get(cacheId(page));
+    // Dữ liệu hay thay đổi từ phía khác (như trạng thái đơn): vẫn hiện ngay bản đã lưu nhưng luôn tải lại ngầm.
+    const background = Boolean(cached && !force && alwaysRevalidate);
     if (cached && !force) {
       latestRequest.current += 1; // bỏ qua mọi phản hồi cũ còn đang chờ
       setData(cached.data as TablePage<T>); setLoadedAt(cached.loadedAt); setLoading(false); setError('');
-      return;
+      if (!background) return;
     }
     const request = ++latestRequest.current;
-    setLoading(true); setError('');
+    if (!background) { setLoading(true); setError(''); }
     const inflightId = `${key}|${cacheId(page)}`;
     let pending = inflight.get(inflightId);
     if (!pending) {
@@ -101,18 +112,18 @@ export function DataTable<T extends { id: string }>({
       pageCache(key).set(cacheId(page), entry);
       setData(result); setLoadedAt(entry.loadedAt);
     } catch (loadError) {
-      if (request === latestRequest.current) setError(loadError instanceof Error ? loadError.message : 'Không tải được dữ liệu');
+      // Tải ngầm lỗi thì giữ nguyên dữ liệu đang hiện, không làm phiền người dùng.
+      if (request === latestRequest.current && !background) setError(loadError instanceof Error ? loadError.message : 'Không tải được dữ liệu');
     } finally { if (request === latestRequest.current) setLoading(false); }
     // cacheId phụ thuộc đúng các giá trị trong danh sách bên dưới.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, page, pageSize, debouncedQuery, filter]);
+  }, [key, page, pageSize, debouncedQuery, filter, alwaysRevalidate]);
 
   /** Nút "Làm mới": bỏ các trang đã lưu của bảng này rồi tải lại trang đang xem. */
   const refresh = useCallback(() => {
     pageCache(key).clear();
     void load(true);
   }, [key, load]);
-
   useEffect(() => {
     if (reloadKey !== handledReload.current) {
       handledReload.current = reloadKey;
@@ -124,6 +135,9 @@ export function DataTable<T extends { id: string }>({
     void load(false);
   }, [load, reloadKey, refresh, router]);
   useEffect(() => { snapshots.set(key, { page, query: debouncedQuery, filter, reloadKey }); }, [key, page, debouncedQuery, filter, reloadKey]);
+  const onDataRef = useRef(onData);
+  onDataRef.current = onData;
+  useEffect(() => { onDataRef.current?.(data?.items ?? []); }, [data]);
 
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;

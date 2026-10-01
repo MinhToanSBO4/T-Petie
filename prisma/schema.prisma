@@ -311,6 +311,10 @@ model OrderStatusEvent {
   id String @id @default(cuid())
   orderId String
   status String
+  /// Ai chuyển trạng thái: admin, customer (khách tự hủy/xác nhận đã nhận) hoặc system (tự hoàn tất).
+  actor String?
+  /// Ghi chú hiển thị trong lịch sử đơn, ví dụ lý do hủy.
+  note String?
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])

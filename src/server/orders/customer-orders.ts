@@ -1,14 +1,22 @@
 import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db/client';
+import { autoCompleteShippedOrders } from '@/server/orders/order-status';
 import { MAX_PAGE } from '@/lib/pagination';
 import { buildOrderTimeline, countOrderTabs, tabStatuses, type CustomerOrderTab } from '@/lib/orders/customer-orders';
 import { cartSizeLabel } from '@/lib/orders/variant-match';
+import { AUTO_COMPLETE_DAYS } from '@/lib/orders/status';
 import { canEditReview, editDeadline, REVIEW_WINDOW_DAYS, reviewDeadline, reviewEligibility } from '@/lib/reviews/rules';
 import type { CustomerOrderDetail, CustomerOrderItem, CustomerOrderList, CustomerOrderSummary, ReviewTarget } from '@/types/order';
 
 export const ORDERS_PER_PAGE = 10;
 const DAY_MS = 86_400_000;
+
+/** Ngày đơn đang giao sẽ tự hoàn tất nếu khách chưa bấm "Đã nhận được hàng". */
+function autoCompleteAt(events: { status: string; createdAt: Date }[]) {
+  const shipped = events.findLast((event) => event.status === 'SHIPPING');
+  return shipped ? new Date(shipped.createdAt.getTime() + AUTO_COMPLETE_DAYS * DAY_MS).toISOString() : null;
+}
 
 const firstImage = { orderBy: { sortOrder: 'asc' as const }, take: 1, select: { url: true } };
 
@@ -71,6 +79,7 @@ function toSummary(order: OrderRow, now: Date): CustomerOrderSummary {
 
 /** Đơn mua của khách theo tab, kèm số đơn từng tab cho thanh tab. Các truy vấn chạy song song. */
 export async function listCustomerOrders(userId: string, tab: CustomerOrderTab, requestedPage: number): Promise<CustomerOrderList> {
+  await autoCompleteShippedOrders();
   const now = new Date();
   const page = Math.min(MAX_PAGE, Math.max(1, Math.floor(requestedPage) || 1));
   const where = tabWhere(userId, tab, now);
@@ -89,9 +98,10 @@ export async function listCustomerOrders(userId: string, tab: CustomerOrderTab, 
 /** Chi tiết một đơn của chính khách; đơn của người khác trả về null như không tồn tại. */
 export async function getCustomerOrder(userId: string, orderCode: string): Promise<CustomerOrderDetail | null> {
   if (!/^TP-[A-Z0-9-]{6,50}$/.test(orderCode)) return null;
+  await autoCompleteShippedOrders();
   const order = await prisma.order.findFirst({
     where: { orderCode, userId },
-    include: { ...orderInclude, statusEvents: { orderBy: { createdAt: 'asc' }, select: { status: true, createdAt: true } } },
+    include: { ...orderInclude, statusEvents: { orderBy: { createdAt: 'asc' }, select: { status: true, note: true, createdAt: true } } },
   });
   if (!order) return null;
   const now = new Date();
@@ -102,6 +112,9 @@ export async function getCustomerOrder(userId: string, orderCode: string): Promi
     recipient: { name: order.customerName, phone: order.customerPhone,
       address: [order.shippingAddress, order.ward, order.district, order.city].filter(Boolean).join(', ') },
     note: order.orderNote, timeline: buildOrderTimeline(order.orderStatus, order.statusEvents, order.createdAt),
+    cancelReason: order.orderStatus === 'CANCELLED'
+      ? order.statusEvents.findLast((event) => event.status === 'CANCELLED')?.note ?? null : null,
+    autoCompleteAt: order.orderStatus === 'SHIPPING' ? autoCompleteAt(order.statusEvents) : null,
   };
 }
 

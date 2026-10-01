@@ -3,7 +3,7 @@ import { getActiveSession } from '@/server/auth/session';
 import { changeOrderStatus, CONCURRENT_UPDATE, ORDER_NOT_FOUND, OrderStatusError } from '@/server/orders/order-status';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { isSameOrigin } from '@/server/security/origin';
-import { CUSTOMER_ORDER_ACTIONS, type CustomerOrderAction } from '@/lib/orders/status';
+import { CUSTOMER_CANCEL_NOTE, CUSTOMER_ORDER_ACTIONS, type CustomerOrderAction } from '@/lib/orders/status';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const action = body.action as CustomerOrderAction;
   const { from, to } = CUSTOMER_ORDER_ACTIONS[action];
   try {
-    await changeOrderStatus(params.id, to, { ownerId: session.user.id, from });
+    await changeOrderStatus(params.id, to, { ownerId: session.user.id, from, actor: 'customer',
+      note: action === 'cancel' ? CUSTOMER_CANCEL_NOTE : undefined });
     return NextResponse.json({ success: true, status: to });
   } catch (error) {
     if (error instanceof OrderStatusError) {

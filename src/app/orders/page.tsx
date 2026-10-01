@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Package } from 'lucide-react';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { CartShortcut } from '@/components/orders/CartShortcut';
 import { OrderCard } from '@/components/orders/OrderCard';
 import { OrderTabs } from '@/components/orders/OrderTabs';
@@ -10,6 +9,7 @@ import { SignInPrompt } from '@/components/orders/SignInPrompt';
 import { getActiveSession } from '@/server/auth/session';
 import { listCustomerOrders } from '@/server/orders/customer-orders';
 import { CUSTOMER_ORDER_TABS, parseOrderTab, type CustomerOrderTab } from '@/lib/orders/customer-orders';
+import { RefreshWhenStale } from '@/components/orders/RefreshWhenStale';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: "Đơn mua | T'Petie", robots: { index: false, follow: false } };
@@ -38,7 +38,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: { tab
   const pageHref = (page: number) => `/orders?${new URLSearchParams({ ...(tab === 'all' ? {} : { tab }), page: String(page) })}`;
 
   return <div className="mx-auto max-w-5xl space-y-5 px-4 pb-12 pt-2 sm:px-6">
-    <Breadcrumb items={[{ label: 'Tài khoản', href: '/dashboard' }, { label: 'Đơn mua' }]} />
+    {/* Trạng thái đơn đổi từ phía shop: không để trình duyệt hiện bản cũ quá 30 giây. */}
+    <RefreshWhenStale renderId={crypto.randomUUID()} />
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex items-center gap-3">
         <span className="grid size-12 place-items-center rounded-2xl bg-sage-100 text-sage-700"><Package className="size-6" aria-hidden /></span>

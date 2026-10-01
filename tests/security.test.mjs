@@ -68,7 +68,7 @@ test('reviews are only accepted for a completed purchase that belongs to the sig
 
 test('customers can only cancel or confirm receipt of their own orders', () => {
   const route = read('../src/app/api/orders/[id]/status/route.ts');
-  assert.match(route, /changeOrderStatus\(params\.id, to, \{ ownerId: session\.user\.id, from \}\)/);
+  assert.match(route, /changeOrderStatus\(params\.id, to, \{ ownerId: session\.user\.id, from,/);
   assert.match(route, /Object\.hasOwn\(CUSTOMER_ORDER_ACTIONS/);
   const detail = read('../src/server/orders/customer-orders.ts');
   assert.match(detail, /where: \{ orderCode, userId \}/, 'order details are scoped to the owner');
