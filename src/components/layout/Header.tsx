@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingBag,
   Search,
@@ -18,6 +18,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
+import { UserAvatar } from '@/components/layout/UserAvatar';
 
 export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   logoUrl?: string; logoAlt?: string; collectionNav?: SubNavItem[];
@@ -25,14 +26,12 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   const pathname = usePathname();
   const { totalItems, openMiniCart, cartBounceTrigger } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
-  const [hidden, setHidden] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredNavIndex, setHoveredNavIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections'
     ? { ...item, children: collectionNav } : item);
-  const { scrollY } = useScroll();
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -46,18 +45,6 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Ẩn khi cuộn xuống, hiện khi cuộn lên
-  useMotionValueEvent(scrollY, 'change', (latest) => {
-    const previous = scrollY.getPrevious() ?? 0;
-    if (latest > previous && latest > 120) {
-      setHidden(true);
-      setIsUserMenuOpen(false);
-      setHoveredNavIndex(null);
-    } else {
-      setHidden(false);
-    }
-  });
 
   const handleMouseEnter = (index: number) => {
     if (hoverTimeoutRef.current) {
@@ -76,13 +63,8 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   return (
     <>
       {/* Header Chính */}
-      <motion.header
-        variants={{
-          visible: { y: 0 },
-          hidden: { y: '-100%' },
-        }}
-        animate={hidden ? 'hidden' : 'visible'}
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      {/* Header luôn đứng yên ở đầu màn hình khi cuộn, không ẩn/hiện theo hướng cuộn. */}
+      <header
         className="sticky top-0 z-50 bg-white border-b border-cream-200 shadow-sm"
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -216,15 +198,9 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-cream-100 hover:bg-honey-100 border border-cream-300 transition-all text-xs font-bold text-charcoal-800"
                 >
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-gradient-to-tr from-amber-400 to-rose-300 text-white flex items-center justify-center text-[10px] font-bold shadow-sm">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      (user.name || 'Q').charAt(0).toUpperCase()
-                    )}
-                  </div>
+                  <UserAvatar src={user.avatar} name={user.name} className="w-6 h-6 shadow-sm ring-1 ring-white" />
                   <span className="hidden md:inline max-w-[140px] truncate">
-                    👤 {user.name || "Mẹ T'Petie"}
+                    {user.name || "Mẹ T'Petie"}
                   </span>
                   <ChevronDown className="w-3 h-3 text-charcoal-400" />
                 </button>
@@ -313,7 +289,7 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
             </motion.button>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Modal Tìm Kiếm Nhanh */}
       {isSearchOpen && (

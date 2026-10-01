@@ -32,6 +32,7 @@ import {
 import { CustomerStatusBadge } from '@/components/orders/CustomerStatusBadge';
 import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
+import { UserAvatar } from '@/components/layout/UserAvatar';
 
 export default function UserDashboardPage() {
   return (
@@ -141,13 +142,8 @@ function DashboardContent() {
       <div className="bg-gradient-to-r from-cream-100 via-blush-50 to-honey-100 rounded-3xl p-6 sm:p-8 border border-cream-200 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
           <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-honey-200 flex items-center justify-center text-2xl font-bold font-heading text-honey-800">
-              {user?.avatar ? (
-                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-              ) : (
-                user?.name.charAt(0) || 'M'
-              )}
-            </div>
+            <UserAvatar src={user?.avatar} name={user?.name}
+              className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-white shadow-md" />
             <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-sage-500 border-2 border-white flex items-center justify-center text-[10px] text-white">
               ✓
             </span>
