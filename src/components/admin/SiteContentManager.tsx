@@ -372,7 +372,7 @@ export function SiteContentManager({ initialContent, collections, products, best
       <SectionShell title="Trang Về Chúng Tôi" hint="Ảnh nền đầu trang và khối mời gọi cuối trang."
         editing={editing === 'about_page'} onToggle={() => toggle('about_page')}
         preview={<div className="space-y-2">{previewImage(draft.about_page.heroImageUrl, draft.about_page.heroImageAlt)}
-          <p className="text-xs text-charcoal-600">Tiêu đề ẩn SEO: {draft.about_page.heroTitle || '—'}</p>
+          <p className="text-xs text-charcoal-600">Tiêu đề: {draft.about_page.heroTitle || "—"}</p>
           <div className="rounded-lg bg-gradient-to-r from-cream-200 to-blush-100 p-3 text-center">
             <p className="text-sm font-bold">{draft.about_page.ctaTitle || '—'}</p>
             <p className="text-xs">{draft.about_page.ctaDescription || '—'}</p>
