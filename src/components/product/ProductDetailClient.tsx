@@ -24,7 +24,6 @@ import { Product, ProductSizeOption } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { StarRating } from '@/components/reviews/StarRating';
@@ -112,7 +111,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-8">
-      {/* Top Bar: Nút Quay Lại & Breadcrumb */}
+      {/* Nút quay lại */}
       <div className="flex items-center justify-between">
         <button
           onClick={handleBack}
@@ -123,13 +122,6 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
           <span>Quay lại</span>
         </button>
 
-        <Breadcrumb
-          items={[
-            { label: 'Bé Gái', href: '/girls' },
-            { label: product.subcategoryName || 'Sản phẩm', href: `/girls/${product.subcategory || ''}` },
-            { label: product.name },
-          ]}
-        />
       </div>
 
       {/* Main Product Section: Gallery + Purchase Actions */}

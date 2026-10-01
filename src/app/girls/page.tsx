@@ -1,4 +1,3 @@
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { GirlsCatalog } from '@/components/catalog/GirlsCatalog';
 import { CategoryHero } from '@/components/collection/CategoryHero';
 import { CATEGORY_PAGE_LABELS } from '@/lib/content/site-content';
@@ -10,7 +9,6 @@ export default async function GirlsPage() {
   const category = await getCategoryPage('girls');
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-      <Breadcrumb items={[{ label: CATEGORY_PAGE_LABELS.girls.breadcrumb, href: CATEGORY_PAGE_LABELS.girls.href }]} />
       <CategoryHero page={category} />
       <GirlsCatalog />
     </div>

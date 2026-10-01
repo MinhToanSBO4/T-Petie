@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import {
   Trash2,
   Plus,
@@ -115,11 +114,6 @@ export default function CartPage() {
 
 
 
-      <Breadcrumb
-        items={[
-          { label: 'Giỏ Hàng', href: '/cart' },
-        ]}
-      />
 
       {/* ===== GIỎ HÀNG ===== */}
       <div className="space-y-6">

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MessageCircleHeart, ShieldCheck } from 'lucide-react';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { FeedbackAlbum } from '@/components/feedback/FeedbackAlbum';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { getSiteContent } from '@/server/content/site-content';
@@ -18,7 +17,6 @@ export default async function FeedbackPage() {
   const [feedback, content] = await Promise.all([getPublishedFeedback(), getSiteContent()]);
   const section = content.testimonials_section;
   return <div className="mx-auto max-w-6xl px-4 pb-12 pt-2 sm:px-6 sm:pb-16">
-    <Breadcrumb items={[{ label: 'Feedback khách hàng' }]} />
     <header className="mx-auto mb-8 mt-3 max-w-2xl text-center">
       {section?.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-700">{section.eyebrow}</p>}
       <h1 className="mt-2 font-heading text-2xl font-extrabold text-charcoal-900 sm:text-4xl">

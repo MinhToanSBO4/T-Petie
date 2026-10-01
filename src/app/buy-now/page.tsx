@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { trackBeginCheckout } from '@/client/analytics/tracker';
@@ -76,11 +75,6 @@ export default function BuyNowPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-6">
-      <Breadcrumb
-        items={[
-          { label: 'Mua Ngay', href: '/buy-now' },
-        ]}
-      />
 
       {/* Tiêu đề */}
       <div className="flex items-center justify-between">

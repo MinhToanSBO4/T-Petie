@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { getProducts } from '@/server/catalog/queries';
 import { getSiteContent } from '@/server/content/site-content';
@@ -11,7 +10,6 @@ export default async function SalePage() {
   const banner = content.sale_page;
   const saleProducts = products.filter((product) => product.isSale);
   return <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-8">
-    <Breadcrumb items={[{ label: 'Ưu đãi', href: '/sale' }]} />
     {banner?.bannerUrl && <div className="relative aspect-[3168/1344] rounded-3xl overflow-hidden bg-cream-100">
       <Image src={banner.bannerUrl} alt={banner.bannerAlt || banner.title} fill
         sizes="100vw" className="object-contain" priority />
