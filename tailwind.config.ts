@@ -67,6 +67,9 @@ const config: Config = {
       animation: {
         'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        // Hiệu ứng vào trang: `backwards` để hết hiệu ứng là bỏ hẳn transform. Transform còn lại trên khung bao
+        // khiến mọi phần tử `fixed` bên trong (ngăn kéo, hộp thoại) bị neo vào khung đó thay vì màn hình.
+        'page-in': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards',
         'shimmer': 'shimmer 1.8s infinite',
         'indeterminate-progress': 'indeterminate 1.5s infinite linear',
         // Cùng nhịp với menu tài khoản ở giao diện khách (framer-motion: y 8px, scale .97, 0.16s easeOut).
