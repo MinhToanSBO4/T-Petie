@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/dev-sync.cjs",
     "dev": "next dev",
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
