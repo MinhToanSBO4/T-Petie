@@ -55,6 +55,7 @@ async function main() {
   const suffix = Date.now().toString(36);
   const accountIds = [];
   let reviewId;
+  let orderId;
   try {
     const admin = await makeAccount('admin', suffix, accountIds);
     const staff = await makeAccount('staff', suffix, accountIds);
@@ -78,17 +79,30 @@ async function main() {
     assert(contentEditor.text.includes('Hero trang chủ'), 'Home sections are not rendered in the editor.');
     assert(contentEditor.text.includes('Sửa'), 'Edit buttons missing in the editor.');
 
-    // 4. Luồng đánh giá sản phẩm: khách gửi → admin duyệt → chọn hiển thị trang chủ.
-    const product = await prisma.product.findFirst({ where: { isActive: true }, select: { id: true, name: true } });
-    assert(product, 'No active product to review.');
+    // 4. Luồng đánh giá sản phẩm: khách đã nhận hàng gửi → admin duyệt → chọn hiển thị trang chủ.
+    const variant = await prisma.productVariant.findFirst({ where: { isActive: true, product: { isActive: true } },
+      include: { product: { select: { id: true, name: true } } } });
+    assert(variant, 'No active product to review.');
+    const product = variant.product;
+    const order = await prisma.order.create({ data: {
+      orderCode: `TP-FLOW-${suffix.toUpperCase()}`, userId: customer.id, customerName: 'Flow user', customerPhone: '0900000000',
+      shippingAddress: 'Kiểm tra', city: 'Hà Nội', district: 'Ba Đình', subtotal: variant.price, totalAmount: variant.price,
+      orderStatus: 'COMPLETED', completedAt: new Date(),
+      items: { create: { productId: product.id, variantId: variant.id, productName: product.name, sku: variant.sku,
+        size: variant.size, quantity: 1, unitPrice: variant.price, totalPrice: variant.price } },
+    }, include: { items: true } });
+    orderId = order.id;
+    const notBought = await request('/api/reviews', 'POST', staff.cookie,
+      { orderItemId: order.items[0].id, rating: 5, content: 'Không phải đơn của mình.' });
+    assert(notBought.status === 404, 'A review for someone else\'s purchase was accepted.');
     const submitted = await request('/api/reviews', 'POST', customer.cookie,
-      { productId: product.id, rating: 5, content: `Đánh giá kiểm tra ${suffix}: vải mềm, bé mặc rất thoải mái.` });
+      { orderItemId: order.items[0].id, rating: 5, content: `Đánh giá kiểm tra ${suffix}: vải mềm, bé mặc rất thoải mái.` });
     assert(submitted.status === 201, `Review submit failed: ${submitted.status} ${submitted.text.slice(0, 120)}`);
     reviewId = JSON.parse(submitted.text).id;
 
     const duplicate = await request('/api/reviews', 'POST', customer.cookie,
-      { productId: product.id, rating: 4, content: 'Đánh giá trùng, hệ thống phải chặn lại.' });
-    assert(duplicate.status === 409, 'Duplicate review from the same customer was accepted.');
+      { orderItemId: order.items[0].id, rating: 4, content: 'Đánh giá trùng, hệ thống phải chặn lại.' });
+    assert(duplicate.status === 409, 'Duplicate review for the same purchased item was accepted.');
 
     const publicList = await request(`/api/reviews?productId=${product.id}`);
     assert(!publicList.text.includes(suffix), 'Unapproved review was shown publicly.');
@@ -106,9 +120,23 @@ async function main() {
     const staffCannotModerate = await request('/api/admin/reviews', 'PATCH', staff.cookie, { id: reviewId, isApproved: false });
     assert(staffCannotModerate.status === 403, 'Staff was allowed to moderate reviews.');
 
-    console.log('Flow checks passed: admin chrome, role routing, visual content editor, review approve/feature pipeline.');
+    console.log('Flow checks passed: admin chrome, role routing, visual content editor, verified review approve/feature pipeline.');
   } finally {
-    if (reviewId) await prisma.productReview.deleteMany({ where: { id: reviewId } });
+    if (reviewId) {
+      const review = await prisma.productReview.findUnique({ where: { id: reviewId }, select: { productId: true } });
+      await prisma.productReview.deleteMany({ where: { id: reviewId } });
+      // Điểm sao đã tính từ đánh giá thử: tính lại sau khi xóa.
+      if (review) {
+        const left = await prisma.productReview.aggregate({ where: { productId: review.productId, isApproved: true },
+          _avg: { rating: true }, _count: { _all: true } });
+        await prisma.product.update({ where: { id: review.productId }, data: {
+          rating: left._count._all ? Math.round(left._avg.rating * 10) / 10 : null, reviewCount: left._count._all } });
+      }
+    }
+    if (orderId) {
+      await prisma.orderItem.deleteMany({ where: { orderId } });
+      await prisma.order.deleteMany({ where: { id: orderId } });
+    }
     if (accountIds.length) await prisma.user.deleteMany({ where: { id: { in: accountIds } } });
     await prisma.$disconnect();
   }

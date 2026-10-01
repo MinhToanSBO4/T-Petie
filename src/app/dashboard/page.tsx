@@ -23,8 +23,15 @@ import {
   Clock,
   ArrowRight,
   ShieldCheck,
-  Tag
+  Tag,
+  Hourglass,
+  PackageOpen,
+  Truck,
+  Star
 } from 'lucide-react';
+import { CustomerStatusBadge } from '@/components/orders/CustomerStatusBadge';
+import { formatDateVN } from '@/lib/utils/formatters';
+import type { CustomerOrderList } from '@/types/order';
 
 export default function UserDashboardPage() {
   return (
@@ -111,22 +118,19 @@ function DashboardContent() {
     showToast(result.success ? 'Đã cập nhật hồ sơ bé yêu. ✨' : result.error || 'Không lưu được hồ sơ bé.', result.success ? 'success' : 'info');
   };
 
-  type OrderView = { id: string; date: string; status: string; total: number;
-    items: { name: string; size: string; qty: number; price: number; img: string }[] };
-  const [orders, setOrders] = useState<OrderView[]>([]);
+  // Đơn mua: lấy số đơn theo tab và vài đơn gần nhất; danh sách đầy đủ nằm ở trang /orders.
+  const [orderData, setOrderData] = useState<Pick<CustomerOrderList, 'orders' | 'counts'> | null>(null);
   useEffect(() => {
     if (!user) return;
-    fetch('/api/orders', { cache: 'no-store' }).then((response) => response.json())
-      .then((data) => setOrders(Array.isArray(data.orders) ? data.orders : [])).catch(() => setOrders([]));
+    fetch('/api/orders', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null)
+      .then((data) => setOrderData(data?.counts ? data : null)).catch(() => setOrderData(null));
   }, [user?.id]);
-  const statusView: Record<string, { label: string; color: string }> = {
-    PENDING: { label: 'Chờ xác nhận', color: 'bg-honey-100 text-honey-700 border-honey-200' },
-    CONFIRMED: { label: 'Đã xác nhận', color: 'bg-sage-100 text-sage-700 border-sage-200' },
-    PROCESSING: { label: 'Đang chuẩn bị', color: 'bg-honey-100 text-honey-700 border-honey-200' },
-    SHIPPING: { label: 'Đang vận chuyển', color: 'bg-honey-100 text-honey-700 border-honey-200' },
-    COMPLETED: { label: 'Hoàn tất', color: 'bg-sage-100 text-sage-700 border-sage-200' },
-    CANCELLED: { label: 'Đã hủy', color: 'bg-blush-100 text-blush-700 border-blush-200' },
-  };
+  const orderShortcuts = [
+    { tab: 'pending', label: 'Chờ xác nhận', icon: Hourglass },
+    { tab: 'preparing', label: 'Đang chuẩn bị', icon: PackageOpen },
+    { tab: 'shipping', label: 'Đang giao', icon: Truck },
+    { tab: 'to-review', label: 'Chờ đánh giá', icon: Star },
+  ] as const;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
@@ -185,7 +189,7 @@ function DashboardContent() {
           {[
             { id: 'profile', label: 'Thông tin cá nhân & Địa chỉ', icon: UserIcon, desc: 'Tên, SĐT, Địa chỉ nhận đồ' },
             { id: 'baby', label: 'Hồ sơ bé & Gợi ý size', icon: Baby, desc: 'Cân nặng, chiều cao, size chuẩn' },
-            { id: 'orders', label: 'Lịch sử đơn hàng', icon: Package, desc: `${orders.length} đơn hàng đã đặt` },
+            { id: 'orders', label: 'Đơn mua', icon: Package, desc: `${orderData?.counts.all ?? 0} đơn đã đặt` },
             { id: 'rewards', label: 'Điểm thưởng & Ưu đãi', icon: Award, desc: `${user?.points ?? 0} điểm hiện có` },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -396,61 +400,52 @@ function DashboardContent() {
             </div>
           )}
 
-          {/* TAB 3: ĐƠN HÀNG CỦA TÔI */}
+          {/* TAB 3: ĐƠN MUA — lối tắt theo trạng thái như mục "Đơn mua" của Shopee */}
           {activeTab === 'orders' && (
             <div className="space-y-6">
-              <div className="border-b border-cream-200 pb-4 flex items-center justify-between">
+              <div className="border-b border-cream-200 pb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold font-heading text-charcoal-900">
-                    Lịch Sử Đơn Hàng Của Mẹ
-                  </h2>
-                  <p className="text-xs text-charcoal-500 mt-0.5">
-                    Theo dõi tình trạng đơn hàng và xem lại các sản phẩm đã đặt mua.
-                  </p>
+                  <h2 className="text-lg sm:text-xl font-bold font-heading text-charcoal-900">Đơn Mua Của Mẹ</h2>
+                  <p className="text-xs text-charcoal-500 mt-0.5">Theo dõi đơn đã đặt, xác nhận đã nhận hàng và đánh giá sản phẩm.</p>
                 </div>
-                <span className="text-xs font-bold bg-cream-100 text-charcoal-700 px-3 py-1 rounded-full border border-cream-200">
-                  {orders.length} Đơn hàng
-                </span>
+                <Link href="/orders" className="inline-flex items-center gap-1 px-4 py-2 rounded-full bg-sage-700 hover:bg-sage-800 text-white text-xs font-bold transition-all active:scale-95">
+                  Xem tất cả đơn mua <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
 
-              <div className="space-y-4">
-                {orders.map((order) => (
-                  <div key={order.id} className="p-5 rounded-2xl border border-cream-200 hover:border-honey-300 transition-all space-y-4 bg-cream-50/40">
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-cream-200 text-xs">
-                      <div>
-                        <span className="font-bold text-charcoal-900">Mã đơn: #{order.id}</span>
-                        <span className="text-charcoal-400 ml-2">({new Date(order.date).toLocaleDateString('vi-VN')})</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] border ${statusView[order.status]?.color || ''}`}>
-                        {statusView[order.status]?.label || order.status}
-                      </span>
-                    </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {orderShortcuts.map((shortcut) => {
+                  const Icon = shortcut.icon;
+                  const count = orderData?.counts[shortcut.tab] ?? 0;
+                  return (
+                    <Link key={shortcut.tab} href={`/orders?tab=${shortcut.tab}`}
+                      className="relative flex flex-col items-center gap-2 rounded-2xl border border-cream-200 bg-cream-50/60 p-4 text-center hover:border-honey-300 hover:bg-honey-50 transition-all">
+                      <Icon className="w-6 h-6 text-sage-700" />
+                      <span className="text-xs font-bold text-charcoal-800">{shortcut.label}</span>
+                      {count > 0 && <span className={`absolute right-3 top-3 min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center ${
+                        shortcut.tab === 'to-review' ? 'bg-blush-500' : 'bg-honey-500'}`}>{count}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
 
-                    <div className="space-y-2.5">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center space-x-3">
-                          <img src={item.img} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-cream-200 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-bold text-charcoal-900 truncate">{item.name}</h4>
-                            <p className="text-[11px] text-charcoal-400">Phân loại: {item.size} • Số lượng: x{item.qty}</p>
-                          </div>
-                          <span className="text-xs font-bold text-honey-600 font-heading">
-                            {item.price.toLocaleString('vi-VN')}đ
-                          </span>
-                        </div>
-                      ))}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-charcoal-900">Đơn gần đây</h3>
+                {orderData && orderData.orders.length === 0 && (
+                  <p className="text-xs text-charcoal-500">Mẹ chưa có đơn hàng nào. <Link href="/girls" className="font-bold text-honey-700 hover:underline">Mua sắm ngay</Link></p>
+                )}
+                {orderData?.orders.slice(0, 3).map((order) => (
+                  <Link key={order.code} href={`/orders/${order.code}`}
+                    className="flex items-center gap-3 rounded-2xl border border-cream-200 p-3 hover:border-honey-300 transition-all">
+                    {order.items[0]?.thumbnail
+                      ? <img src={order.items[0].thumbnail} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-200 shrink-0" />
+                      : <span className="w-12 h-12 rounded-xl bg-cream-100 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-charcoal-900 truncate">Đơn {order.code}</p>
+                      <p className="text-[11px] text-charcoal-500 truncate">{formatDateVN(order.createdAt)} · {order.itemCount} sản phẩm · {order.total.toLocaleString('vi-VN')}đ</p>
                     </div>
-
-                    <div className="pt-3 border-t border-cream-200 flex items-center justify-between">
-                      <div className="text-xs text-charcoal-600">
-                        Tổng thanh toán: <strong className="text-sm font-bold text-honey-600 font-heading">{(order.total).toLocaleString('vi-VN')}đ</strong>
-                      </div>
-                      <Link href={`/order-lookup?code=${encodeURIComponent(order.id)}`}
-                        className="px-4 py-1.5 rounded-full bg-white hover:bg-cream-100 border border-cream-300 text-xs font-bold text-charcoal-700 transition-all active:scale-95">
-                        Tra cứu hành trình
-                      </Link>
-                    </div>
-                  </div>
+                    <CustomerStatusBadge status={order.status} />
+                  </Link>
                 ))}
               </div>
             </div>

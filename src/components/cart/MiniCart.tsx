@@ -6,10 +6,18 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 
 export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: number | null }) {
   const { items, isMiniCartOpen, closeMiniCart, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
+  const { isAuthenticated, user } = useAuth();
+  // Lối sang đơn đã đặt ngay trong giỏ, để khách không tìm đơn đã mua trong giỏ hàng.
+  const ordersLink = isAuthenticated && user?.role === 'user' && (
+    <Link href="/orders" onClick={closeMiniCart} className="block text-center text-[11px] font-semibold text-sage-700 hover:underline">
+      Tìm đơn đã đặt? Xem Đơn mua →
+    </Link>
+  );
 
   // Ngưỡng miễn phí vận chuyển lấy từ cấu hình trong database; ẩn thanh tiến độ khi chưa tải được.
   const progressPercent = freeShippingThreshold ? Math.min(100, (totalPrice / freeShippingThreshold) * 100) : 0;
@@ -41,9 +49,12 @@ export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: num
             <div className="p-4 border-b border-cream-200 flex items-center justify-between bg-cream-50">
               <div className="flex items-center space-x-2">
                 <ShoppingBag className="w-5 h-5 text-honey-600" />
-                <h3 className="font-heading font-bold text-base text-charcoal-900">
-                  Giỏ Hàng Của Mẹ ({totalItems})
-                </h3>
+                <div>
+                  <h3 className="font-heading font-bold text-base text-charcoal-900">
+                    Giỏ Hàng Của Mẹ ({totalItems})
+                  </h3>
+                  <p className="text-[11px] text-charcoal-500">Món đang chọn · chưa đặt hàng</p>
+                </div>
               </div>
               <button
                 onClick={closeMiniCart}
@@ -89,6 +100,7 @@ export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: num
                   >
                     Dạo Xem Sản Phẩm
                   </button>
+                  {ordersLink && <div className="mt-4">{ordersLink}</div>}
                 </div>
               ) : (
                 items.map((item) => (
@@ -165,6 +177,7 @@ export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: num
                   >
                     <span>Xem Giỏ Hàng</span>
                   </Link>
+                {ordersLink}
               </div>
             )}
           </motion.div>

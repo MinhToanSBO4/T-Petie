@@ -73,8 +73,18 @@ export function Footer({ logoUrl, logoAlt, contact }: { logoUrl?: string; logoAl
           </h4>
           <ul className="space-y-2 text-xs text-charcoal-600">
             <li>
+              <Link href="/orders" className="hover:text-honey-600 transition-colors block">
+                Đơn mua của tôi
+              </Link>
+            </li>
+            <li>
               <Link href="/order-lookup" className="hover:text-honey-600 transition-colors block">
                 Tra cứu đơn hàng
+              </Link>
+            </li>
+            <li>
+              <Link href="/feedback" className="hover:text-honey-600 transition-colors block">
+                Feedback khách hàng
               </Link>
             </li>
             <li>

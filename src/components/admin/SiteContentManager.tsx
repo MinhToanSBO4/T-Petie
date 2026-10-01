@@ -7,11 +7,12 @@ import { MediaPicker } from '@/components/admin/MediaPicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
 import { FeatureCarousel } from '@/components/home/FeatureCarousel';
-import { TestimonialsSection, type TestimonialCard } from '@/components/home/TestimonialsSection';
+import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, type HomeBlockId } from '@/lib/content/site-content';
 import type { Collection } from '@/types/collection';
 import type { Product } from '@/types/product';
+import type { FeaturedReview, PublicFeedback } from '@/types/testimonial';
 
 type HomeFeatureRow = { id: string; src: string; icon: string; title: string; description: string; objectPosition: string };
 type SizeGuideRow = { size: string; age: string; weight: string; height: string };
@@ -40,7 +41,7 @@ const HOME_SECTION_TITLES: Partial<Record<ContentKey, string>> = {
   home_hero: 'Sửa hero trang chủ',
   home_sections: 'Sửa tiêu đề các khối',
   home_features: 'Sửa ảnh chủ đề',
-  testimonials_section: 'Sửa khối đánh giá khách hàng',
+  testimonials_section: 'Sửa khối feedback khách hàng',
 };
 
 const emptyLink = (): LinkDraft => ({ title: '', linkLabel: '', linkHref: '', productIds: [], imageUrl: '', imageAlt: '' });
@@ -183,7 +184,7 @@ const previewImage = (url: string, label: string) => url
 
 const HOME_BLOCK_LABELS: Record<HomeBlockId, string> = {
   hero: 'Hero trang chủ', bestSellers: 'Sản phẩm bán chạy', sale: 'Sản phẩm ưu đãi',
-  collections: 'Bộ sưu tập nổi bật', features: 'Ảnh chủ đề', testimonials: 'Đánh giá khách hàng',
+  collections: 'Bộ sưu tập nổi bật', features: 'Ảnh chủ đề', testimonials: 'Feedback khách hàng',
 };
 
 /** Danh sách kéo-thả dùng HTML Drag and Drop, chỉ đổi thứ tự chứ không làm mất khối. */
@@ -207,13 +208,15 @@ function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: 
   </section>;
 }
 
-export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, testimonials }: {
+export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal, reviews }: {
   initialContent: Record<string, unknown>;
   collections: Collection[];
   products: ProductOption[];
   bestSellers: Product[];
   saleProducts: Product[];
-  testimonials: TestimonialCard[];
+  feedback: PublicFeedback[];
+  feedbackTotal: number;
+  reviews: FeaturedReview[];
 }) {
   const [draft, setDraft] = useState<ContentDraft>(() => toDraft(initialContent));
   const router = useRouter();
@@ -341,8 +344,8 @@ export function SiteContentManager({ initialContent, collections, products, best
         <div className="px-1"><FeatureCarousel section={draft.home_features} /></div>
       </EditableSection>}
 
-      {testimonials.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Đánh giá khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
-        <TestimonialsSection testimonials={testimonials} section={draft.testimonials_section} />
+      {(feedback.length > 0 || reviews.length > 0) && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Feedback khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
+        <TestimonialsSection feedback={feedback} feedbackTotal={feedbackTotal} reviews={reviews} section={draft.testimonials_section} />
       </EditableSection>}
     </div>
 
@@ -578,8 +581,8 @@ export function SiteContentManager({ initialContent, collections, products, best
 
         {editing === 'testimonials_section' && <div className="space-y-4">
           <p className="rounded-xl bg-cream-100 p-3 text-xs text-charcoal-600">
-            Nội dung đánh giá lấy từ khách hàng đã gửi và được duyệt ở mục &ldquo;Đánh giá sản phẩm&rdquo;.
-            Tại đây chỉ chỉnh tiêu đề khối hiển thị ở trang chủ.
+            Ảnh feedback quản lý ở mục &ldquo;Feedback&rdquo;; đánh giá của khách đã mua chọn hiện trang chủ ở mục
+            &ldquo;Đánh giá sản phẩm&rdquo;. Tại đây chỉ chỉnh tiêu đề khối (dùng chung cho trang album /feedback).
           </p>
           <MediaPicker label="Ảnh minh họa đánh giá" value={draft.testimonials_section.imageUrl} altText={draft.testimonials_section.imageAlt} onError={setError}
             onChange={(imageUrl) => update('testimonials_section', { ...draft.testimonials_section, imageUrl })} />

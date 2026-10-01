@@ -1,14 +1,6 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
-import { cache } from 'react';
-import { getServerSession } from 'next-auth';
-import { authOptions } from './options';
-
-/**
- * Mỗi lần đọc phiên, callback jwt truy vấn lại database để cập nhật vai trò/trạng thái.
- * Layout và trang quản trị đều cần phiên, nên gộp về một lần đọc cho mỗi request.
- */
-const currentSession = cache(() => getServerSession(authOptions));
+import { currentSession } from './session';
 
 export async function getStaffSession() {
   const session = await currentSession();

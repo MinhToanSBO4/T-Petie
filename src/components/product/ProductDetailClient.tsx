@@ -27,6 +27,8 @@ import { useToast } from '@/context/ToastContext';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 import { ProductReviews } from '@/components/product/ProductReviews';
+import { StarRating } from '@/components/reviews/StarRating';
+import { cartSizeLabel } from '@/lib/orders/variant-match';
 import { ProductCard } from '@/components/product/ProductCard';
 import { trackViewItem, trackEvent } from '@/client/analytics/tracker';
 
@@ -84,7 +86,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
       showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
       return;
     }
-    const formattedSize = `${selectedSize.size} (${selectedSize.weightRange})`;
+    const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
     const buyNowItem = {
       productId: product.id,
       productName: product.name,
@@ -241,6 +243,14 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             <h1 className="text-xl sm:text-3xl font-extrabold font-heading text-charcoal-900 leading-snug">
               {product.name}
             </h1>
+            {/* Điểm đánh giá của khách đã mua (chỉ tính đánh giá đã duyệt), bấm để xuống phần đánh giá. */}
+            {product.reviewCount > 0 && (
+              <a href="#reviews" className="mt-2 inline-flex items-center gap-2 text-xs sm:text-sm text-charcoal-700 hover:text-honey-700">
+                <span className="font-bold text-honey-700">{product.rating.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                <StarRating value={product.rating} size="w-4 h-4" />
+                <span className="underline-offset-2 hover:underline">{product.reviewCount} đánh giá</span>
+              </a>
+            )}
           </div>
 
           {/* Khối Giá Tiền Theo Size */}

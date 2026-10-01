@@ -63,6 +63,8 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
           unitPrice: BigInt(item.unitPrice),
           totalPrice: BigInt(item.totalPrice),
         })) },
+        // Mốc đầu tiên của dòng thời gian đơn hàng mà khách xem ở mục Đơn mua.
+        statusEvents: { create: { status: 'PENDING' } },
       },
     });
   });

@@ -47,7 +47,6 @@ async function waitForHomepage(marker, expected = true) {
 async function main() {
   const suffix = Date.now().toString(36);
   const slug = `content-check-${suffix}`;
-  const quote = `Content management verification ${suffix}: service was excellent and the clothes fit beautifully.`;
   let collectionId; let testimonialId; let cookie; let staffCookie; let sectionsBefore; const accountIds = [];
   try {
     const anonymous = await request('/api/admin/collections');
@@ -84,18 +83,30 @@ async function main() {
     assert(publicCollections.data.collections.some((item) => item.id === slug && !item.showInMenu), 'Updated menu setting missing from public API.');
     assert(await waitForHomepage(collection.title, false), 'Hidden collection still appeared on homepage.');
 
-    const draft = { customerName: 'Content check', quote, location: '', rating: 5, sortOrder: 998,
-      consentConfirmed: false, isPublished: false };
+    // Feedback dạng ảnh chụp màn hình: ảnh phải nằm trong thư viện, công bố cần khách đồng ý.
+    const asset = await prisma.mediaAsset.findFirst({ orderBy: { createdAt: 'desc' } });
+    assert(asset, 'A media library image is needed to create screenshot feedback.');
+    const caption = `Content check ${suffix}`;
+    const draft = { items: [{ imageUrl: asset.url, caption }], sortOrder: 0, consentConfirmed: false, isPublished: false };
     const invalid = await request('/api/admin/testimonials', 'POST', cookie, { ...draft, isPublished: true });
-    assert(invalid.status === 400, 'A testimonial without consent was published.');
+    assert(invalid.status === 400, 'A feedback without consent was published.');
+    const outside = await request('/api/admin/testimonials', 'POST', cookie,
+      { ...draft, items: [{ imageUrl: `https://res.cloudinary.com/demo/image/upload/${suffix}.png` }] });
+    assert(outside.status === 400, 'Feedback accepted an image outside the media library.');
     const testimonial = await request('/api/admin/testimonials', 'POST', staffCookie, draft);
-    assert(testimonial.status === 201, `Testimonial create failed: ${testimonial.status} ${testimonial.data.error || ''}`);
-    testimonialId = testimonial.data.id;
-    assert(await waitForHomepage(quote, false), 'Unpublished testimonial appeared on homepage.');
+    assert(testimonial.status === 201 && testimonial.data.count === 1,
+      `Feedback create failed: ${testimonial.status} ${testimonial.data.error || ''}`);
+    testimonialId = (await prisma.customerTestimonial.findFirst({ where: { caption }, select: { id: true } }))?.id;
+    assert(testimonialId, 'Created feedback not stored.');
+    assert(await waitForHomepage(testimonialId, false), 'Unpublished feedback appeared on homepage.');
     const published = await request(`/api/admin/testimonials/${testimonialId}`, 'PATCH', staffCookie,
-      { ...draft, consentConfirmed: true, isPublished: true });
-    assert(published.status === 200, `Testimonial publish failed: ${published.status} ${published.data.error || ''}`);
-    assert(await waitForHomepage(quote), 'Published testimonial missing from homepage.');
+      { imageUrl: asset.url, caption, productId: '', sortOrder: 0, consentConfirmed: true, isPublished: true });
+    assert(published.status === 200, `Feedback publish failed: ${published.status} ${published.data.error || ''}`);
+    assert(await waitForHomepage(testimonialId), 'Published feedback missing from homepage story rail.');
+    const album = await fetch(new URL('/feedback', base), { cache: 'no-store' }).then((response) => response.text());
+    assert(album.includes(testimonialId), 'Published feedback missing from the /feedback album.');
+    const inUse = await request(`/api/admin/media/${asset.id}`, 'DELETE', cookie);
+    assert(inUse.status === 409 && /feedback/.test(inUse.data.error || ''), 'An image used by feedback could be deleted.');
 
     // Cấu hình nội dung website: admin sửa tiêu đề khối trang chủ và thấy thay đổi trên trang chủ.
     const siteContent = await request('/api/admin/site-content', 'GET', cookie);
@@ -115,7 +126,7 @@ async function main() {
     assert(restored.status === 200, 'Failed to restore home section content.');
     sectionsBefore = undefined;
 
-    console.log('Collection menu configuration, testimonial publishing and site content configuration verified through authenticated APIs and homepage.');
+    console.log('Collection menu configuration, screenshot feedback publishing (story rail + album) and site content configuration verified through authenticated APIs and pages.');
   } finally {
     if (sectionsBefore && cookie) {
       await request('/api/admin/site-content/home_sections', 'PUT', cookie, sectionsBefore).catch(() => {});

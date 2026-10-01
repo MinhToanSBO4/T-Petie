@@ -85,6 +85,7 @@ model Product {
   variants ProductVariant[]
   reviews ProductReview[]
   orderItems OrderItem[]
+  testimonials CustomerTestimonial[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -157,34 +158,55 @@ model Collection {
   @@map("collections")
 }
 
-/// Đánh giá sản phẩm do khách hàng gửi. Quản trị viên duyệt và chọn đánh giá hiển thị ở trang chủ.
+/// Đánh giá sản phẩm của khách đã mua: mỗi món trong đơn đã hoàn tất được đánh giá một lần và sửa tối đa một lần.
+/// Quản trị viên duyệt trước khi hiển thị và chọn đánh giá nổi bật cho trang chủ.
 model ProductReview {
   id           String   @id @default(cuid())
   productId    String
   userId       String?
+  /// Món đã mua được đánh giá; null chỉ với đánh giá cũ trước khi có xác minh mua hàng.
+  orderItemId  String?  @unique
   customerName String
+  /// Khách chọn ẩn tên: trang công khai chỉ hiện tên đã che.
+  isAnonymous  Boolean  @default(false)
   rating       Int
+  /// Có thể để trống khi khách chỉ chấm sao.
   content      String   @db.Text
+  /// Kích cỡ khách đã mua, hiển thị như "Phân loại" trên đánh giá.
+  variantLabel String?
+  /// Cảm nhận về kích cỡ: "small" | "fit" | "large".
+  sizeFit      String?
+  imageUrls    String[] @default([])
+  editCount    Int      @default(0)
   isApproved   Boolean  @default(false)
   isFeatured   Boolean  @default(false)
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   @@index([productId, isApproved])
   @@index([isFeatured, isApproved])
+  @@index([userId])
   @@map("product_reviews")
 }
 
+/// Feedback khách hàng dạng ảnh chụp màn hình tin nhắn khen shop.
+/// Chỉ bản đã xác nhận khách đồng ý và bật công bố mới hiển thị công khai.
 model CustomerTestimonial {
   id String @id @default(cuid())
-  customerName String
-  quote String @db.Text
-  rating Int
-  location String?
+  /// Ảnh trong thư viện media (Cloudinary).
+  imageUrl String
+  imageWidth Int?
+  imageHeight Int?
+  /// Chú thích ngắn tùy chọn, ví dụ "Mẹ bé Na · Hà Nội"; đồng thời là mô tả ảnh cho trình đọc màn hình.
+  caption String?
+  /// Sản phẩm được khen trong feedback, hiện nút xem sản phẩm khi xem feedback.
+  productId String?
   sortOrder Int @default(0)
   consentConfirmed Boolean @default(false)
   isPublished Boolean @default(false)
   createdById String?
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([isPublished, sortOrder])
@@ -271,14 +293,28 @@ model Order {
   paymentMethod String @default("COD")
   paymentStatus String @default("PENDING")
   orderStatus String @default("PENDING")
+  /// Thời điểm đơn chuyển sang Hoàn tất; mốc tính hạn đánh giá sản phẩm.
+  completedAt DateTime?
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   coupon Coupon? @relation(fields: [couponCode], references: [code], onDelete: SetNull)
   items OrderItem[]
+  statusEvents OrderStatusEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([userId, createdAt])
   @@index([orderStatus, createdAt])
   @@map("orders")
+}
+
+/// Lịch sử chuyển trạng thái đơn, dùng cho dòng thời gian "hành trình đơn hàng" của khách.
+model OrderStatusEvent {
+  id String @id @default(cuid())
+  orderId String
+  status String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+  @@map("order_status_events")
 }
 
 model OrderItem {
@@ -295,7 +331,9 @@ model OrderItem {
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  review ProductReview?
   @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 

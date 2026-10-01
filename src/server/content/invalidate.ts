@@ -14,6 +14,7 @@ export function invalidateCollections(slug?: string) {
 export function invalidateTestimonials() {
   revalidateTag('testimonials');
   revalidatePath('/');
+  revalidatePath('/feedback');
 }
 
 /** Xóa cache cấu hình nội dung và làm mới mọi trang hiển thị nó. */

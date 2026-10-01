@@ -112,3 +112,14 @@
 @media (prefers-reduced-motion: reduce) {
   .chart-grow { animation: none; }
 }
+
+/* Thanh tiến trình của trình xem feedback kiểu story: thời lượng và tạm dừng do component điều khiển. */
+@keyframes feedback-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.feedback-progress {
+  animation-name: feedback-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

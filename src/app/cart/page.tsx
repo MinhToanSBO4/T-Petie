@@ -11,8 +11,10 @@ import {
   ArrowRight,
   CheckSquare,
   Square,
+  Package,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { trackBeginCheckout } from '@/client/analytics/tracker';
@@ -29,6 +31,8 @@ const itemKey = (productId: string, selectedSize: string) =>
 export default function CartPage() {
   const router = useRouter();
   const { items, updateQuantity, removeFromCart, clearCart, totalItems } = useCart();
+  const { isAuthenticated, user } = useAuth();
+  const showOrdersLink = isAuthenticated && user?.role === 'user';
   const { showToast } = useToast();
 
   // ── Checkbox state: mặc định tất cả được chọn ─────────────────
@@ -119,18 +123,34 @@ export default function CartPage() {
 
       {/* ===== GIỎ HÀNG ===== */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-charcoal-900">
-            Giỏ Hàng Của Mẹ ({totalItems} món)
-          </h1>
-          {items.length > 0 && (
-            <button
-              onClick={clearCart}
-              className="text-xs text-charcoal-400 hover:text-red-500 font-medium"
-            >
-              Xóa tất cả
-            </button>
-          )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-charcoal-900">
+              Giỏ Hàng Của Mẹ ({totalItems} món)
+            </h1>
+            {/* Nói rõ giỏ là món chưa đặt, để không nhầm với đơn đã mua. */}
+            <p className="text-xs text-charcoal-500 mt-1">Món mẹ đang chọn, chưa đặt hàng. Đơn đã đặt nằm ở mục Đơn mua.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {showOrdersLink && (
+              <Link
+                href="/orders"
+                data-track="cart-view-orders"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-sage-200 bg-sage-50 text-xs font-bold text-sage-800 hover:bg-sage-100 transition-colors"
+              >
+                <Package className="w-3.5 h-3.5" />
+                Đơn mua của tôi
+              </Link>
+            )}
+            {items.length > 0 && (
+              <button
+                onClick={clearCart}
+                className="text-xs text-charcoal-400 hover:text-red-500 font-medium"
+              >
+                Xóa tất cả
+              </button>
+            )}
+          </div>
         </div>
 
         {items.length === 0 ? (
@@ -148,6 +168,11 @@ export default function CartPage() {
             >
               Khám Phá Sản Phẩm Ngay
             </Link>
+            {showOrdersLink && (
+              <p className="text-xs text-charcoal-600">
+                Mẹ tìm đơn đã đặt? <Link href="/orders" className="font-bold text-sage-700 hover:underline">Xem Đơn mua</Link>
+              </p>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

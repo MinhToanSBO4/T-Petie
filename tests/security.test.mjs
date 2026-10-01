@@ -53,3 +53,23 @@ test('export API never sends the storage URL of customer data to the browser', (
   }
   assert.doesNotMatch(read('../src/server/orders/export-orders.ts').match(/EXPORT_JOB_FIELDS = \{[^}]*\}/)[0], /fileUrl/);
 });
+
+test('reviews are only accepted for a completed purchase that belongs to the signed-in customer', () => {
+  const route = read('../src/app/api/reviews/route.ts');
+  assert.match(route, /createVerifiedReview\(/);
+  assert.doesNotMatch(route, /productReview\.create/, 'the review route must go through the purchase check');
+  const service = read('../src/server/reviews/submit-review.ts');
+  assert.match(service, /where: \{ id: orderItemId, order: \{ userId \} \}/, 'the purchased item must be in the customer\'s own order');
+  assert.match(service, /reviewEligibility\(/, 'completion and review window are checked on the server');
+  assert.match(service, /detectImageType\(/, 'uploaded photos are checked by content, not by declared type');
+  const edit = read('../src/app/api/reviews/[id]/route.ts');
+  assert.match(edit, /updateOwnReview\(\{ userId: session\.user\.id/);
+});
+
+test('customers can only cancel or confirm receipt of their own orders', () => {
+  const route = read('../src/app/api/orders/[id]/status/route.ts');
+  assert.match(route, /changeOrderStatus\(params\.id, to, \{ ownerId: session\.user\.id, from \}\)/);
+  assert.match(route, /Object\.hasOwn\(CUSTOMER_ORDER_ACTIONS/);
+  const detail = read('../src/server/orders/customer-orders.ts');
+  assert.match(detail, /where: \{ orderCode, userId \}/, 'order details are scoped to the owner');
+});

@@ -5,7 +5,9 @@ export type AdminCollection = {
   showInMenu: boolean; showOnHome: boolean; productCount: number;
 };
 
+/** Feedback dạng ảnh chụp màn hình trong trang quản trị. */
 export type AdminTestimonial = {
-  id: string; customerName: string; quote: string; rating: number; location: string | null;
-  sortOrder: number; consentConfirmed: boolean; isPublished: boolean;
+  id: string; imageUrl: string; imageWidth: number | null; imageHeight: number | null;
+  caption: string | null; productId: string | null; productName: string | null;
+  sortOrder: number; consentConfirmed: boolean; isPublished: boolean; createdAt: string;
 };

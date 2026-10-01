@@ -67,6 +67,17 @@ export async function deleteCloudinaryImage(publicId: string): Promise<boolean> 
   return result.result === 'ok' || result.result === 'not found';
 }
 
+/**
+ * Public id của ảnh do chính tài khoản Cloudinary này phân phối (bỏ phiên bản và phần mở rộng),
+ * dùng để xóa ảnh không còn được tham chiếu. URL lạ hoặc có biến đổi trả về null.
+ */
+export function cloudinaryPublicId(url: string): string | null {
+  const config = cloudinaryConfig();
+  const match = /^https:\/\/res\.cloudinary\.com\/([^/]+)\/image\/upload\/(?:v\d+\/)?([^,]+?)\.[a-z0-9]+$/i.exec(url);
+  if (!config || !match || match[1] !== config.cloud) return null;
+  return match[2];
+}
+
 /** Tải một tệp bất kỳ (ví dụ báo cáo Excel) lên Cloudinary dưới dạng raw. */
 export async function uploadRawFileToCloudinary(buffer: Buffer, filename: string, mimeType: string): Promise<{ url: string; publicId: string } | null> {
   const config = cloudinaryConfig();

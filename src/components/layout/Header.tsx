@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   ShieldCheck,
+  Package,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -245,6 +246,18 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
                         >
                           <ShieldCheck className="w-4 h-4 text-honey-600" />
                           <span>Trang quản trị</span>
+                        </Link>
+                      )}
+                      {/* Đơn mua (đơn đã đặt) tách khỏi Giỏ hàng (món chưa đặt) như mục "Đơn mua" của Shopee. */}
+                      {user.role === 'user' && (
+                        <Link
+                          href="/orders"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          data-track="menu-orders"
+                          className="flex items-center space-x-2 px-3.5 py-2 hover:bg-cream-100 font-semibold text-charcoal-900"
+                        >
+                          <Package className="w-4 h-4 text-sage-700" />
+                          <span>Đơn mua</span>
                         </Link>
                       )}
                       <Link

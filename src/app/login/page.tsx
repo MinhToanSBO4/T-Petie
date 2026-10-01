@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { safeCallbackPath } from '@/lib/auth-identity';
 import {
   Lock,
   Mail,
@@ -21,7 +22,8 @@ import {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl');
+  // Chỉ quay lại trang trong website (ví dụ Đơn mua), không chuyển khách sang địa chỉ ngoài.
+  const callbackUrl = safeCallbackPath(searchParams.get('callbackUrl'));
 
   const { login, isLoading } = useAuth();
   const { showToast } = useToast();
