@@ -41,7 +41,7 @@ test('every admin API route uses the shared role guards instead of ad-hoc checks
   assert.ok(routes.length >= 20, 'admin routes found');
   for (const route of routes) {
     const source = readFileSync(route, 'utf8');
-    assert.match(source, /(requireAdminApi|getStaffSession)\(\)/, `${route} must call a shared guard`);
+    assert.match(source, /(requireAdminApi|requireStaffApi|getStaffSession)\(\)/, `${route} must call a shared guard`);
     assert.doesNotMatch(source, /getServerSession/, `${route} must not re-implement the role check`);
   }
 });

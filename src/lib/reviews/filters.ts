@@ -18,6 +18,8 @@ export type ReviewSummary = {
 export type PublicReview = {
   id: string; name: string; rating: number; content: string; variantLabel: string | null; sizeFit: string | null;
   images: string[]; createdAt: string; verified: boolean; edited: boolean;
+  /** Phản hồi của shop (nếu có). */
+  reply: { content: string; at: string } | null;
 };
 
 /** Nhận xét về kích cỡ khi đủ ít nhất 3 câu trả lời, ví dụ "8/10 mẹ thấy vừa vặn". */

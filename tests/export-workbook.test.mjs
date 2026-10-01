@@ -34,8 +34,8 @@ const data = {
     weightRange: '10-12kg', ageRange: null, price: 250000n, stock: 3, productActive: true, variantActive: false, soldQuantity: 1 }],
   coupons: [{ code: 'TPETIE20', type: 'PERCENT', value: 20, minSubtotal: 0n, usedCount: 1, usageLimit: null,
     startsAt: null, expiresAt: null, requiresLogin: false, active: true }],
-  reviews: [{ productName: 'Váy hoa', customerName: 'Chị Hà', rating: 5, content: 'Đẹp', isApproved: true,
-    isFeatured: false, createdAt: new Date('2026-09-01T00:00:00Z') }],
+  reviews: [{ productName: 'Váy hoa', customerName: 'Chị Hà', rating: 5, content: 'Đẹp', isHidden: false, reply: null,
+    createdAt: new Date('2026-09-01T00:00:00Z') }],
 };
 
 async function roundTrip() {

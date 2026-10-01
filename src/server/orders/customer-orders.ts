@@ -24,7 +24,7 @@ const itemInclude = {
   product: { select: { slug: true, sku: true, isActive: true, categoryName: true, images: firstImage } },
   variant: { select: { size: true, weightRange: true, price: true, stock: true, isActive: true } },
   review: { select: { id: true, rating: true, content: true, sizeFit: true, isAnonymous: true, imageUrls: true,
-    isApproved: true, editCount: true, createdAt: true } },
+    isHidden: true, reply: true, editCount: true, createdAt: true } },
 } satisfies Prisma.OrderItemInclude;
 
 const orderInclude = { items: { include: itemInclude, orderBy: { id: 'asc' as const } } } satisfies Prisma.OrderInclude;
@@ -54,7 +54,7 @@ function toItem(item: ItemRow, order: Pick<OrderRow, 'orderStatus' | 'completedA
     size: item.size, quantity: item.quantity, unitPrice: Number(item.unitPrice), totalPrice: Number(item.totalPrice),
     review: review && {
       id: review.id, rating: review.rating, content: review.content, sizeFit: review.sizeFit,
-      isAnonymous: review.isAnonymous, imageUrls: review.imageUrls, status: review.isApproved ? 'approved' : 'pending',
+      isAnonymous: review.isAnonymous, imageUrls: review.imageUrls, status: review.isHidden ? 'hidden' : 'visible', reply: review.reply,
       editable: canEditReview({ createdAt: review.createdAt, editCount: review.editCount, now }),
       editDeadline: editDeadline(review.createdAt).toISOString(),
     },

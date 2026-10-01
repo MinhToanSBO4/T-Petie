@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Trash2, Upload } from 'lucide-react';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { ReviewModerationPanel } from '@/components/admin/ReviewModerationPanel';
 
 type VariantRow = { id: string; size: string; stock: number; price: number; weightRange: string; ageRange: string };
 type ProductRow = { id: string; slug: string; sku: string; name: string; active: boolean; price: number;
@@ -339,5 +340,13 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
         </button>
       </div>
     </div>
+
+    <section className="space-y-4 rounded-2xl border border-cream-200 bg-white p-6" aria-labelledby="product-reviews-title">
+      <div className="border-b border-cream-100 pb-3">
+        <h3 id="product-reviews-title" className="text-xl font-bold text-charcoal-900">Đánh giá của khách</h3>
+        <p className="mt-1 text-sm text-charcoal-600">Trả lời, ẩn hoặc xóa đánh giá được lưu ngay, không cần bấm “Lưu thay đổi”.</p>
+      </div>
+      <ReviewModerationPanel productId={product.id} />
+    </section>
   </div>;
 }

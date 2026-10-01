@@ -12,7 +12,7 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, type HomeBlockId } from '@/lib/content/site-content';
 import type { Collection } from '@/types/collection';
 import type { Product } from '@/types/product';
-import type { FeaturedReview, PublicFeedback } from '@/types/testimonial';
+import type { PublicFeedback } from '@/types/testimonial';
 
 type HomeFeatureRow = { id: string; src: string; icon: string; title: string; description: string; objectPosition: string };
 type SizeGuideRow = { size: string; age: string; weight: string; height: string };
@@ -208,7 +208,7 @@ function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: 
   </section>;
 }
 
-export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal, reviews }: {
+export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal }: {
   initialContent: Record<string, unknown>;
   collections: Collection[];
   products: ProductOption[];
@@ -216,7 +216,6 @@ export function SiteContentManager({ initialContent, collections, products, best
   saleProducts: Product[];
   feedback: PublicFeedback[];
   feedbackTotal: number;
-  reviews: FeaturedReview[];
 }) {
   const [draft, setDraft] = useState<ContentDraft>(() => toDraft(initialContent));
   const router = useRouter();
@@ -344,8 +343,8 @@ export function SiteContentManager({ initialContent, collections, products, best
         <div className="px-1"><FeatureCarousel section={draft.home_features} /></div>
       </EditableSection>}
 
-      {(feedback.length > 0 || reviews.length > 0) && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Feedback khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
-        <TestimonialsSection feedback={feedback} feedbackTotal={feedbackTotal} reviews={reviews} section={draft.testimonials_section} />
+      {feedback.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Feedback khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
+        <TestimonialsSection feedback={feedback} feedbackTotal={feedbackTotal} section={draft.testimonials_section} />
       </EditableSection>}
     </div>
 

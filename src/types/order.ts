@@ -3,7 +3,9 @@ import type { CustomerOrderCounts, CustomerOrderTab, TimelineStep } from '@/lib/
 /** Đánh giá khách đã gửi cho một món trong đơn. */
 export type CustomerItemReview = {
   id: string; rating: number; content: string; sizeFit: string | null; isAnonymous: boolean;
-  imageUrls: string[]; status: 'pending' | 'approved'; editable: boolean; editDeadline: string;
+  imageUrls: string[]; status: 'visible' | 'hidden'; editable: boolean; editDeadline: string;
+  /** Câu trả lời của shop (nếu có). */
+  reply: string | null;
 };
 
 /** waiting: đơn chưa giao xong · open: được đánh giá · expired: quá hạn · reviewed: đã đánh giá. */

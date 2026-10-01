@@ -50,7 +50,7 @@ async function uploadImages(files: File[]): Promise<string[]> {
 
 /**
  * Khách gửi đánh giá cho một món trong đơn của chính mình. Chỉ nhận khi đơn đã hoàn tất, còn trong hạn
- * và món đó chưa được đánh giá. Đánh giá chờ quản trị viên duyệt trước khi hiển thị.
+ * và món đó chưa được đánh giá. Đánh giá hiển thị ngay; shop có thể ẩn nếu không phù hợp.
  */
 export async function createVerifiedReview({ userId, customerName, orderItemId, fields, files }: {
   userId: string; customerName: string; orderItemId: string; fields: ReviewFields; files: File[];
@@ -68,13 +68,14 @@ export async function createVerifiedReview({ userId, customerName, orderItemId, 
     throw new ReviewError(REVIEW_BLOCK_MESSAGES[eligibility.reason], eligibility.reason === 'reviewed' ? 409 : 403);
   }
   const imageUrls = files.length ? await uploadImages(files) : [];
+  let reviewId: string;
   try {
     const review = await prisma.productReview.create({ data: {
       productId: item.productId, userId, orderItemId: item.id, customerName: customerName.trim() || 'Khách hàng',
       isAnonymous: fields.isAnonymous, rating: fields.rating, content: fields.content,
       variantLabel: item.size, sizeFit: fields.sizeFit, imageUrls,
     } });
-    return review.id;
+    reviewId = review.id;
   } catch (error) {
     await removeReviewImages(imageUrls);
     // Hai lần gửi cùng lúc: chỉ mục duy nhất theo món hàng chặn bản thứ hai.
@@ -83,11 +84,14 @@ export async function createVerifiedReview({ userId, customerName, orderItemId, 
     }
     throw error;
   }
+  // Đánh giá hiển thị ngay nên điểm sao của sản phẩm cập nhật luôn.
+  await refreshProductRating(item.productId);
+  return reviewId;
 }
 
 /**
  * Khách sửa đánh giá của mình một lần trong 30 ngày. Có thể giữ lại một phần ảnh cũ và thêm ảnh mới.
- * Đánh giá sau khi sửa quay về chờ duyệt để nội dung mới cũng được kiểm tra.
+ * Bản sửa hiển thị ngay (đánh giá đang bị shop ẩn thì vẫn ẩn).
  */
 export async function updateOwnReview({ userId, reviewId, fields, keepImageUrls, files }: {
   userId: string; reviewId: string; fields: ReviewFields; keepImageUrls: string[]; files: File[];
@@ -104,13 +108,14 @@ export async function updateOwnReview({ userId, reviewId, fields, keepImageUrls,
   const updated = await prisma.productReview.updateMany({
     where: { id: review.id, editCount: review.editCount },
     data: { rating: fields.rating, content: fields.content, sizeFit: fields.sizeFit, isAnonymous: fields.isAnonymous,
-      imageUrls: [...kept, ...added], editCount: { increment: 1 }, isApproved: false, isFeatured: false },
+      imageUrls: [...kept, ...added], editCount: { increment: 1 } },
   });
   if (updated.count !== 1) {
     await removeReviewImages(added);
     throw new ReviewError('Đánh giá vừa được sửa ở nơi khác', 409);
   }
   await removeReviewImages(review.imageUrls.filter((url) => !kept.includes(url)));
-  // Bản đã duyệt bị rút về chờ duyệt nên điểm trung bình phải tính lại.
-  if (review.isApproved) await refreshProductRating(review.productId);
+
+  // Số sao có thể đã đổi nên điểm trung bình phải tính lại.
+  await refreshProductRating(review.productId);
 }

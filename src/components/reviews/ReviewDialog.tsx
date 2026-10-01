@@ -110,8 +110,8 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
         { method: editing ? 'PATCH' : 'POST', headers, body });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Không gửi được đánh giá');
-      onSaved(editing ? 'Đã lưu đánh giá. Bản sửa sẽ hiển thị sau khi shop duyệt.'
-        : 'Cảm ơn mẹ đã đánh giá! Đánh giá sẽ hiển thị sau khi shop duyệt. 🌸');
+      onSaved(editing ? 'Đã lưu đánh giá.'
+        : 'Cảm ơn mẹ đã đánh giá! 🌸');
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra');
       setBusy(false);
@@ -214,7 +214,7 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
 
           <p className="flex items-start gap-2 rounded-xl bg-cream-50 p-3 text-xs text-charcoal-600">
             <Info className="mt-0.5 size-4 shrink-0 text-honey-600" aria-hidden />
-            Đánh giá hiển thị sau khi shop duyệt. {editing ? 'Đây là lần sửa duy nhất của đánh giá này.'
+            Đánh giá hiển thị ngay trên trang sản phẩm. {editing ? 'Đây là lần sửa duy nhất của đánh giá này.'
               : `Mẹ có thể sửa đánh giá 1 lần trong ${REVIEW_EDIT_WINDOW_DAYS} ngày.`}
           </p>
           {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}

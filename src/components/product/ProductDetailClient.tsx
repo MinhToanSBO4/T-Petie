@@ -243,7 +243,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             <h1 className="text-xl sm:text-3xl font-extrabold font-heading text-charcoal-900 leading-snug">
               {product.name}
             </h1>
-            {/* Điểm đánh giá của khách đã mua (chỉ tính đánh giá đã duyệt), bấm để xuống phần đánh giá. */}
+            {/* Điểm đánh giá của khách đã mua (chỉ tính đánh giá đang hiển thị), bấm để xuống phần đánh giá. */}
             {product.reviewCount > 0 && (
               <a href="#reviews" className="mt-2 inline-flex items-center gap-2 text-xs sm:text-sm text-charcoal-700 hover:text-honey-700">
                 <span className="font-bold text-honey-700">{product.rating.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>

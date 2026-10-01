@@ -3,7 +3,7 @@
  * - /orders yêu cầu đăng nhập; khách chỉ thấy đơn của mình, lọc đúng theo tab.
  * - Khách hủy đơn chờ xác nhận (tồn kho được hoàn), xác nhận "Đã nhận được hàng" khi đơn đang giao.
  * - Chỉ món thuộc đơn đã hoàn tất của chính khách mới đánh giá được; mỗi món một lần; sửa đúng một lần.
- * - Admin duyệt → điểm sao sản phẩm cập nhật và đánh giá hiện trong API công khai.
+ * - Đánh giá hiển thị ngay: điểm sao sản phẩm cập nhật và đánh giá hiện trong API công khai.
  * Dữ liệu thử (tài khoản, đơn, đánh giá, ảnh) được dọn trong finally.
  */
 const { loadEnvConfig } = require('@next/env');
@@ -187,16 +187,12 @@ async function main() {
     const duplicate = await request('/api/reviews', 'POST', buyer.cookie, { orderItemId: itemId, rating: 5 });
     assert(duplicate.status === 409, 'The same purchased item was reviewed twice.');
     const stored = await prisma.productReview.findUnique({ where: { id: reviewId } });
-    assert(stored.orderItemId === itemId && stored.variantLabel === variant.size && !stored.isApproved, 'Review is not linked to the purchase or skipped moderation.');
+    assert(stored.orderItemId === itemId && stored.variantLabel === variant.size && !stored.isHidden, 'Review is not linked to the purchase or was not published.');
     if (hasCloudinary) assert(stored.imageUrls.length === 1 && stored.imageUrls[0].includes('/tpetie/reviews/'), 'Review photo was not stored.');
 
-    // 7. Chưa duyệt thì chưa công khai; duyệt xong có điểm sao và tên đã che.
-    const hidden = await request(`/api/reviews?productId=${product.id}`);
-    assert(!hidden.text.includes(marker), 'Pending review was public.');
-    const approve = await request('/api/admin/reviews', 'PATCH', admin.cookie, { id: reviewId, isApproved: true });
-    assert(approve.status === 200, `Approval failed: ${approve.status}`);
+    // 7. Hiển thị ngay, có điểm sao và tên đã che.
     const rated = await prisma.product.findUnique({ where: { id: product.id }, select: { rating: true, reviewCount: true } });
-    assert(rated.reviewCount === productBefore.reviewCount + 1 && rated.rating, 'Product rating was not refreshed after approval.');
+    assert(rated.reviewCount === productBefore.reviewCount + 1 && rated.rating, 'Product rating was not refreshed after the review was submitted.');
     let publicList;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       publicList = await request(`/api/reviews?productId=${product.id}`);
@@ -204,18 +200,18 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 800));
     }
     const shown = publicList.data.reviews?.find((review) => review.id === reviewId);
-    assert(shown && shown.verified && shown.name.includes('*****') && shown.sizeFit === 'fit', 'Approved review is missing, unverified or not masked.');
-    assert(publicList.data.summary.total >= 1, 'Review summary did not count the approved review.');
+    assert(shown && shown.verified && shown.name.includes('*****') && shown.sizeFit === 'fit', 'Published review is missing, unverified or not masked.');
+    assert(publicList.data.summary.total >= 1, 'Review summary did not count the published review.');
     const mediaFilter = await request(`/api/reviews?productId=${product.id}&filter=media`);
     if (hasCloudinary) assert(mediaFilter.data.reviews.some((review) => review.id === reviewId), 'Photo filter missed the review with a photo.');
 
-    // 8. Sửa một lần (quay về chờ duyệt, điểm sao tính lại), lần hai bị chặn.
+    // 8. Sửa một lần (vẫn hiển thị, điểm sao tính lại), lần hai bị chặn.
     const edited = await request(`/api/reviews/${reviewId}`, 'PATCH', buyer.cookie, { rating: 5, content: `${marker} (đã sửa)`, keepImages: stored.imageUrls });
     assert(edited.status === 200, `Edit failed: ${edited.status} ${edited.data.error || ''}`);
     const afterEdit = await prisma.productReview.findUnique({ where: { id: reviewId } });
-    assert(afterEdit.editCount === 1 && !afterEdit.isApproved && afterEdit.imageUrls.length === stored.imageUrls.length, 'Edit did not reset moderation or lost photos.');
-    const unrated = await prisma.product.findUnique({ where: { id: product.id }, select: { reviewCount: true } });
-    assert(unrated.reviewCount === productBefore.reviewCount, 'Rating still counted a review waiting for moderation.');
+    assert(afterEdit.editCount === 1 && !afterEdit.isHidden && afterEdit.imageUrls.length === stored.imageUrls.length, 'Edit hid the review or lost photos.');
+    const rerated = await prisma.product.findUnique({ where: { id: product.id }, select: { reviewCount: true } });
+    assert(rerated.reviewCount === productBefore.reviewCount + 1, 'Rating stopped counting the edited review.');
     const secondEdit = await request(`/api/reviews/${reviewId}`, 'PATCH', buyer.cookie, { rating: 1 });
     assert(secondEdit.status === 409, 'A review was edited twice.');
     const strangerEdit = await request(`/api/reviews/${reviewId}`, 'PATCH', stranger.cookie, { rating: 1 });

@@ -178,14 +178,19 @@ model ProductReview {
   sizeFit      String?
   imageUrls    String[] @default([])
   editCount    Int      @default(0)
-  isApproved   Boolean  @default(false)
+  /// Đánh giá hiển thị ngay khi khách gửi; quản trị viên/nhân viên có thể ẩn đánh giá không phù hợp.
+  isHidden     Boolean  @default(false)
   isFeatured   Boolean  @default(false)
+  /// Phản hồi của shop, hiện ngay dưới đánh giá trên trang sản phẩm.
+  reply        String?  @db.Text
+  repliedAt    DateTime?
+  repliedById  String?
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  @@index([productId, isApproved])
-  @@index([isFeatured, isApproved])
+  @@index([productId, isHidden])
+  @@index([isFeatured, isHidden])
   @@index([userId])
   @@map("product_reviews")
 }

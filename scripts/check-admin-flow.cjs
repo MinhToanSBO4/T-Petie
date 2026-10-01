@@ -27,19 +27,23 @@ async function request(path, method = 'GET', cookie = '', body) {
   const response = await fetch(new URL(path, base), { method,
     headers: { cookie, origin: base.origin, ...(body ? { 'content-type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
-  return { status: response.status, text: await response.text() };
+  const text = await response.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* trang HTML */ }
+  return { status: response.status, text, data };
 }
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
-/** Trang chủ là ISR nên lần tải đầu sau khi duyệt có thể còn bản cũ; thử lại vài lần. */
-async function waitForHomepage(marker) {
+/** Danh sách đánh giá công khai được cache ngắn: thử lại vài lần cho tới khi đúng điều kiện. */
+async function waitForPublicReviews(productId, condition) {
+  let list;
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const home = await request('/', 'GET');
-    if (home.text.includes(marker)) return true;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    list = await request(`/api/reviews?productId=${productId}`);
+    if (condition(list)) return list;
+    await new Promise((resolve) => setTimeout(resolve, 800));
   }
-  return false;
+  return list;
 }
 
 async function makeAccount(role, suffix, ids) {
@@ -79,7 +83,7 @@ async function main() {
     assert(contentEditor.text.includes('Hero trang chủ'), 'Home sections are not rendered in the editor.');
     assert(contentEditor.text.includes('Sửa'), 'Edit buttons missing in the editor.');
 
-    // 4. Luồng đánh giá sản phẩm: khách đã nhận hàng gửi → admin duyệt → chọn hiển thị trang chủ.
+    // 4. Luồng đánh giá sản phẩm: khách đã nhận hàng gửi → hiển thị ngay ở trang sản phẩm → nhân viên ẩn/trả lời.
     const variant = await prisma.productVariant.findFirst({ where: { isActive: true, product: { isActive: true } },
       include: { product: { select: { id: true, name: true } } } });
     assert(variant, 'No active product to review.');
@@ -104,30 +108,39 @@ async function main() {
       { orderItemId: order.items[0].id, rating: 4, content: 'Đánh giá trùng, hệ thống phải chặn lại.' });
     assert(duplicate.status === 409, 'Duplicate review for the same purchased item was accepted.');
 
-    const publicList = await request(`/api/reviews?productId=${product.id}`);
-    assert(!publicList.text.includes(suffix), 'Unapproved review was shown publicly.');
+    const publicList = await waitForPublicReviews(product.id, (list) => list.text.includes(suffix));
+    assert(publicList.text.includes(suffix), 'A new review was not published immediately.');
 
-    const approved = await request('/api/admin/reviews', 'PATCH', admin.cookie, { id: reviewId, isApproved: true });
-    assert(approved.status === 200, `Review approval failed: ${approved.status}`);
-    const featured = await request('/api/admin/reviews', 'PATCH', admin.cookie, { id: reviewId, isFeatured: true });
-    assert(featured.status === 200, `Review feature failed: ${featured.status}`);
+    // Nhân viên được ẩn và trả lời đánh giá; khách thường thì không.
+    const customerCannotModerate = await request('/api/admin/reviews', 'PATCH', customer.cookie, { id: reviewId, isHidden: true });
+    assert(customerCannotModerate.status === 403, 'A customer was allowed to moderate reviews.');
+    const hidden = await request('/api/admin/reviews', 'PATCH', staff.cookie, { id: reviewId, isHidden: true });
+    assert(hidden.status === 200, `Staff could not hide a review: ${hidden.status}`);
+    const hiddenList = await waitForPublicReviews(product.id, (list) => !list.text.includes(suffix));
+    assert(!hiddenList.text.includes(suffix), 'A hidden review is still public.');
+    const shownAgain = await request('/api/admin/reviews', 'PATCH', staff.cookie, { id: reviewId, isHidden: false });
+    assert(shownAgain.status === 200, `Staff could not show the review again: ${shownAgain.status}`);
+    const replied = await request('/api/admin/reviews', 'PATCH', staff.cookie, { id: reviewId, reply: `Cảm ơn mẹ ${suffix}` });
+    assert(replied.status === 200, `Staff could not reply: ${replied.status}`);
+    const productReviews = await request(`/api/admin/reviews?productId=${product.id}`, 'GET', staff.cookie);
+    assert(productReviews.data?.items.some((item) => item.id === reviewId && item.reply === `Cảm ơn mẹ ${suffix}`),
+      'Product-scoped review list is missing the reply.');
 
-    const home = await waitForHomepage(suffix);
-    assert(home, 'Featured review did not appear on the homepage.');
-    const guestList = await request(`/api/reviews?productId=${product.id}`);
-    assert(guestList.text.includes(suffix), 'Approved review missing from the product page list.');
+    // Trang chủ không hiện đánh giá sản phẩm; đánh giá chỉ nằm ở trang sản phẩm.
+    const home = await request('/', 'GET');
+    assert(!home.text.includes(suffix), 'A product review was shown on the homepage.');
+    const guestList = await waitForPublicReviews(product.id, (list) => list.text.includes(`Cảm ơn mẹ ${suffix}`));
+    const guestReview = guestList.data?.reviews?.find((review) => review.id === reviewId);
+    assert(guestReview?.reply?.content === `Cảm ơn mẹ ${suffix}`, 'Shop reply missing from the product page list.');
 
-    const staffCannotModerate = await request('/api/admin/reviews', 'PATCH', staff.cookie, { id: reviewId, isApproved: false });
-    assert(staffCannotModerate.status === 403, 'Staff was allowed to moderate reviews.');
-
-    console.log('Flow checks passed: admin chrome, role routing, visual content editor, verified review approve/feature pipeline.');
+    console.log('Flow checks passed: admin chrome, role routing, visual content editor, review publish/hide/reply pipeline.');
   } finally {
     if (reviewId) {
       const review = await prisma.productReview.findUnique({ where: { id: reviewId }, select: { productId: true } });
       await prisma.productReview.deleteMany({ where: { id: reviewId } });
       // Điểm sao đã tính từ đánh giá thử: tính lại sau khi xóa.
       if (review) {
-        const left = await prisma.productReview.aggregate({ where: { productId: review.productId, isApproved: true },
+        const left = await prisma.productReview.aggregate({ where: { productId: review.productId, isHidden: false },
           _avg: { rating: true }, _count: { _all: true } });
         await prisma.product.update({ where: { id: review.productId }, data: {
           rating: left._count._all ? Math.round(left._avg.rating * 10) / 10 : null, reviewCount: left._count._all } });

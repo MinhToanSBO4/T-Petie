@@ -16,6 +16,11 @@ export async function requireAdminApi() {
   return session?.user?.status === 'active' && session.user.role === 'admin' ? session : null;
 }
 
+/** Bản dành cho API route mà cả admin và nhân viên được dùng: trả về phiên hợp lệ hoặc null. */
+export async function requireStaffApi() {
+  return getStaffSession();
+}
+
 /**
  * Dùng cho trang quản trị dành cho cả admin và nhân viên.
  * Người chưa đăng nhập về trang đăng nhập; khách đã đăng nhập về trang tài khoản của họ.

@@ -10,7 +10,7 @@ import { parseReviewFields } from '@/lib/content/review-input';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Khách sửa đánh giá của chính mình (một lần trong 30 ngày); bản sửa chờ duyệt lại. */
+/** Khách sửa đánh giá của chính mình (một lần trong 30 ngày); bản sửa hiển thị ngay. */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(params.id)) return NextResponse.json({ error: 'Không tìm thấy đánh giá' }, { status: 404 });
@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const { data, files, keepImageUrls } = await readReviewRequest(request);
     await updateOwnReview({ userId: session.user.id, reviewId: params.id, fields: parseReviewFields(data), keepImageUrls, files });
-    return NextResponse.json({ success: true, status: 'pending' });
+    return NextResponse.json({ success: true });
   } catch (error) {
     return reviewErrorResponse(error, 'Không lưu được đánh giá');
   }

@@ -1,4 +1,5 @@
 export const REVIEW_CONTENT_MAX = 1000;
+export const REVIEW_REPLY_MAX = 1000;
 export const REVIEW_MAX_IMAGES = 5;
 
 export const SIZE_FIT_OPTIONS = [

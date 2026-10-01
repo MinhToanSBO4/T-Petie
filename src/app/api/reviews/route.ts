@@ -12,7 +12,7 @@ import { parseReviewFilter } from '@/lib/reviews/filters';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Đánh giá đã duyệt của một sản phẩm (công khai): tổng quan + một trang theo bộ lọc. */
+/** Đánh giá đang hiển thị của một sản phẩm (công khai): tổng quan + một trang theo bộ lọc. */
 export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const productId = searchParams.get('productId') || '';
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const fields = parseReviewFields(data);
     const id = await createVerifiedReview({ userId: session.user.id, customerName: session.user.name || '',
       orderItemId: parseOrderItemId(data.orderItemId), fields, files });
-    return NextResponse.json({ id, status: 'pending' }, { status: 201 });
+    return NextResponse.json({ id, status: 'visible' }, { status: 201 });
   } catch (error) {
     return reviewErrorResponse(error, 'Không gửi được đánh giá');
   }

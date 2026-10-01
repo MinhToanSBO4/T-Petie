@@ -23,6 +23,7 @@ const STAFF_ITEMS: AdminNavItem[] = [
   { href: '/admin/products', label: 'Sản phẩm', icon: 'products' },
   { href: '/admin/collections', label: 'Bộ sưu tập', icon: 'collections' },
   { href: '/admin/content', label: 'Nội dung website', icon: 'content' },
+  { href: '/admin/reviews', label: 'Đánh giá sản phẩm', icon: 'reviews' },
   { href: '/admin/feedback', label: 'Feedback', icon: 'feedback' },
 ];
 

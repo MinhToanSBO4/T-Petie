@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { BadgeCheck, Camera, PenLine } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -24,7 +23,6 @@ type ReviewPage = { summary: ReviewSummary; reviews: PublicReview[]; page: numbe
  */
 export function ProductReviews({ productId, productName }: { productId: string; productName: string }) {
   const { isAuthenticated, user } = useAuth();
-  const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
   const [filter, setFilter] = useState<ReviewFilter>('all');
@@ -144,6 +142,10 @@ export function ProductReviews({ productId, productName }: { productId: string; 
               </button>
             </li>)}
           </ul>}
+          {review.reply && <div className="mt-2 rounded-2xl bg-cream-100 px-4 py-3">
+            <p className="text-xs font-bold text-charcoal-800">Phản hồi của T&apos;Petie</p>
+            <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-charcoal-700">{review.reply.content}</p>
+          </div>}
         </div>
       </li>)}
     </ul>}
@@ -160,12 +162,7 @@ export function ProductReviews({ productId, productName }: { productId: string; 
     </p>}
     {!data && loading && <div className="h-28 rounded-3xl shimmer" role="status" aria-label="Đang tải đánh giá" />}
 
-    <p className="text-xs text-charcoal-500">
-      Chỉ khách đã mua và nhận hàng mới đánh giá được; đánh giá được shop duyệt trước khi hiển thị.{' '}
-      {isAuthenticated
-        ? targets.length === 0 && <Link href="/orders?tab=to-review" className="font-bold text-honey-700 hover:underline">Xem sản phẩm chờ đánh giá</Link>
-        : <Link href={`/login?callbackUrl=${encodeURIComponent(`${pathname}#reviews`)}`} className="font-bold text-honey-700 hover:underline">Đăng nhập</Link>}
-    </p>
+    <p className="text-xs text-charcoal-500">Chỉ khách đã mua và nhận hàng mới đánh giá được.</p>
 
     {writing && <ReviewDialog customerName={user?.name || ''} onClose={() => setWriting(null)}
       target={{ orderItemId: writing.orderItemId, orderCode: writing.orderCode, productName: writing.productName || productName,

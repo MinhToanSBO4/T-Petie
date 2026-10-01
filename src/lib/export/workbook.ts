@@ -29,7 +29,7 @@ type VariantRow = { productName: string; productSku: string; collection: string 
 type CouponRow = { code: string; type: string; value: number; minSubtotal: Money; usedCount: number; usageLimit: number | null;
   startsAt: Date | null; expiresAt: Date | null; requiresLogin: boolean; active: boolean };
 type ReviewRow = { productName: string; customerName: string; rating: number; content: string;
-  isApproved: boolean; isFeatured: boolean; createdAt: Date };
+  isHidden: boolean; reply: string | null; createdAt: Date };
 
 export type ExportData = {
   orders: OrderRow[]; customers: CustomerRow[]; staff: StaffRow[];
@@ -184,8 +184,8 @@ export function buildExportWorkbook(data: ExportData, orderStatusLabels: Record<
     { header: 'Khách hàng', width: 22, value: (row) => row.customerName },
     { header: 'Số sao', width: 8, value: (row) => row.rating },
     { header: 'Nội dung', width: 60, value: (row) => row.content },
-    { header: 'Đã duyệt', width: 10, value: (row) => yesNo(row.isApproved) },
-    { header: 'Hiện trang chủ', width: 14, value: (row) => yesNo(row.isFeatured) },
+    { header: 'Đang hiển thị', width: 12, value: (row) => yesNo(!row.isHidden) },
+    { header: 'Shop trả lời', width: 40, value: (row) => row.reply || '' },
   ], data.reviews);
 
   return workbook;
