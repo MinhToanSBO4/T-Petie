@@ -99,6 +99,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
       <div className="sm:col-span-2">
         <MediaPicker label="Ảnh banner" value={draft.bannerUrl} altText={draft.title} onError={setError}
           onChange={(bannerUrl) => setDraft({ ...draft, bannerUrl })} />
+        <p className="mt-1 text-xs text-charcoal-500">Ảnh ngang, nên khoảng 2048 × 780 px. Banner hiển thị nguyên ảnh, không bị cắt, nên chữ thiết kế trong ảnh vẫn giữ nguyên.</p>
       </div>
       <label className="text-sm font-semibold">Phụ đề
         <input className={field} maxLength={200} value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} /></label>
@@ -115,11 +116,12 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
       <div className="sm:col-span-2">
         <MediaListPicker label="Ảnh lookbook" values={draft.lookbookUrls} onError={setError}
           onChange={(lookbookUrls) => setDraft({ ...draft, lookbookUrls })} />
+        <p className="mt-1 text-xs text-charcoal-500">Ảnh dọc (tỉ lệ 2:3) đẹp nhất. 3 ảnh đầu hiện ở trang Bộ sưu tập; ảnh đầu tiên là ảnh lớn trong trang chi tiết. Dùng nút lên/xuống để đổi thứ tự.</p>
       </div>
       <label className="text-sm font-semibold">Màu nền
         <input className={`${field} h-11 p-1`} type="color" value={draft.themeColor}
           onChange={(event) => setDraft({ ...draft, themeColor: event.target.value })} /></label>
-      <label className="text-sm font-semibold">Màu nhấn
+      <label className="text-sm font-semibold">Màu nhấn (số chương ở trang Bộ sưu tập; màu quá nhạt sẽ tự đổi sang màu đậm để dễ đọc)
         <input className={`${field} h-11 p-1`} type="color" value={draft.accentColor}
           onChange={(event) => setDraft({ ...draft, accentColor: event.target.value })} /></label>
     </div>
