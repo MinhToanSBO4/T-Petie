@@ -235,6 +235,11 @@ export type CatalogFacets = {
 
 const sizeNumber = (size: string) => Number(size.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
 
+/** Thứ tự size theo số ("Size 90" trước "Size 100", database chỉ so chuỗi); nhãn không có số như "Người lớn" xếp cuối. */
+export function compareSizeLabels(a: string, b: string) {
+  return sizeNumber(a) - sizeNumber(b) || a.localeCompare(b, 'vi');
+}
+
 /**
  * Lựa chọn của từng nhóm kèm số sản phẩm nếu chọn thêm lựa chọn đó (tính với các nhóm còn lại đang áp dụng).
  * Chỉ hiện lựa chọn có sản phẩm trong danh mục đang xem; lựa chọn tạm thời 0 kết quả vẫn hiện (giao diện làm mờ)
@@ -259,7 +264,7 @@ export function catalogFacets(products: Product[], filters: CatalogFilters): Cat
     if (!sizeHints.has(option.size)) sizeHints.set(option.size, [option.weightRange, option.ageRange].filter(Boolean).join(' · '));
   }
   for (const size of filters.sizes) if (!sizeHints.has(size)) sizeHints.set(size, '');
-  const sizeLabels = [...sizeHints.keys()].sort((a, b) => sizeNumber(a) - sizeNumber(b) || a.localeCompare(b, 'vi'));
+  const sizeLabels = [...sizeHints.keys()].sort(compareSizeLabels);
   const sizes = options(sizeLabels, filters.sizes, (size) => size,
     (product, size) => product.sizes.some((option) => option.size === size && (!filters.inStock || option.stock > 0)),
     within('sizes'), (size) => ({ label: size, hint: sizeHints.get(size) || undefined }));

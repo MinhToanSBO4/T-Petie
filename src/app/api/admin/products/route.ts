@@ -4,7 +4,7 @@ import { getStaffSession, requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import type { Prisma } from '@prisma/client';
 import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
-import { normalizeText } from '@/lib/catalog/filters';
+import { compareSizeLabels, normalizeText } from '@/lib/catalog/filters';
 import { prisma } from '@/server/db/client';
 import { LOW_STOCK_THRESHOLD } from '@/server/admin/dashboard';
 
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     discountPercent: row.discountPercent, collectionId: row.collectionId,
     isBestSeller: row.isBestSeller, isNewArrival: row.isNewArrival, isSale: row.isSale,
     images: row.images.map((image) => ({ id: image.id, url: image.url })),
-    variants: row.variants.map((variant) => ({ id: variant.id, size: variant.size, stock: variant.stock,
+    variants: [...row.variants].sort((a, b) => compareSizeLabels(a.size, b.size)).map((variant) => ({ id: variant.id, size: variant.size, stock: variant.stock,
       price: Number(variant.price), weightRange: variant.weightRange || '', ageRange: variant.ageRange || '' })),
   })), total, page, limit) }, { headers: { 'Cache-Control': 'no-store' } });
 }

@@ -250,7 +250,8 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             <span className="text-2xl sm:text-3xl font-extrabold text-honey-600 font-heading">
               {formatPriceCompact(selectedSize.price)}
             </span>
-            {product.originalPrice && (
+            {/* Giá gốc là một số cho cả sản phẩm, ứng với mức size rẻ nhất; size giá khác không gạch giá để khỏi hiện sai. */}
+            {product.originalPrice && selectedSize.price === product.basePrice && product.originalPrice > selectedSize.price && (
               <span className="text-sm sm:text-base text-charcoal-400 line-through">
                 {formatPriceCompact(product.originalPrice)}
               </span>
@@ -264,7 +265,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
           {product.promotion && (
             <div className="flex items-center space-x-2.5 p-3 rounded-2xl bg-blush-50 border border-blush-200 text-blush-900 text-xs font-medium shadow-2xs">
               <Gift className="w-4 h-4 text-blush-500 shrink-0" />
-              <span><strong className="font-bold text-blush-700">Ưu đãi:</strong> {product.promotion}</span>
+              <span className="whitespace-pre-line"><strong className="font-bold text-blush-700">Ưu đãi:</strong> {product.promotion}</span>
             </div>
           )}
 
@@ -371,10 +372,12 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
 
           {/* 3 Cam kết mua hàng */}
           <div className="p-4 rounded-2xl bg-cream-50 border border-cream-200 space-y-2 text-xs text-charcoal-700">
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-4 h-4 text-sage-600 shrink-0" />
-              <span>Chất liệu {product.material} — Cam kết mềm mại, an toàn tuyệt đối.</span>
-            </div>
+            {product.material && (
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-sage-600 shrink-0" />
+                <span>Chất liệu {product.material} — Cam kết mềm mại, an toàn tuyệt đối.</span>
+              </div>
+            )}
             <div className="flex items-center space-x-2">
               <RefreshCw className="w-4 h-4 text-honey-500 shrink-0" />
               <span>Hỗ trợ đổi size trong vòng 3 ngày kể từ ngày nhận hàng nếu bé mặc không vừa.</span>
@@ -392,7 +395,7 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
                 <Ruler className="w-4 h-4 text-honey-600 shrink-0" />
                 <span>Thông số chiều dài chi tiết:</span>
               </div>
-              <p className="leading-relaxed text-charcoal-700">{product.specifications}</p>
+              <p className="whitespace-pre-line leading-relaxed text-charcoal-700">{product.specifications}</p>
             </div>
           )}
 
@@ -402,26 +405,32 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>Lưu ý khi đặt / nhận đơn:</span>
               </div>
-              <p className="leading-relaxed text-amber-900">{product.orderNote}</p>
+              <p className="whitespace-pre-line leading-relaxed text-amber-900">{product.orderNote}</p>
             </div>
           )}
 
-          {/* Mô tả chi tiết & Hướng dẫn giặt */}
-          <div className="space-y-4 pt-4 border-t border-cream-200 text-xs sm:text-sm text-charcoal-700">
-            <div>
-              <h3 className="font-heading font-bold text-sm text-charcoal-900 mb-1.5">Mô Tả Sản Phẩm</h3>
-              <p className="leading-relaxed">{product.description}</p>
-            </div>
+          {/* Mô tả chi tiết & Hướng dẫn giặt: phần nào chưa có nội dung thì ẩn tiêu đề của phần đó. */}
+          {(product.description || product.careInstructions.length > 0) && (
+            <div className="space-y-4 pt-4 border-t border-cream-200 text-xs sm:text-sm text-charcoal-700">
+              {product.description && (
+                <div>
+                  <h3 className="font-heading font-bold text-sm text-charcoal-900 mb-1.5">Mô Tả Sản Phẩm</h3>
+                  <p className="whitespace-pre-line leading-relaxed">{product.description}</p>
+                </div>
+              )}
 
-            <div>
-              <h3 className="font-heading font-bold text-sm text-charcoal-900 mb-1.5">Hướng Dẫn Giặt &amp; Bảo Quản</h3>
-              <ul className="list-disc list-inside space-y-1 text-charcoal-600">
-                {product.careInstructions.map((c, i) => (
-                  <li key={i}>{c}</li>
-                ))}
-              </ul>
+              {product.careInstructions.length > 0 && (
+                <div>
+                  <h3 className="font-heading font-bold text-sm text-charcoal-900 mb-1.5">Hướng Dẫn Giặt &amp; Bảo Quản</h3>
+                  <ul className="list-disc list-inside space-y-1 text-charcoal-600">
+                    {product.careInstructions.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 

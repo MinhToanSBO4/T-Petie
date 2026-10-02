@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeFilterCount, catalogFacets, catalogParams, colorFamily, EMPTY_FILTERS, filterCatalog, normalizeText,
+  activeFilterCount, catalogFacets, catalogParams, colorFamily, compareSizeLabels, EMPTY_FILTERS, filterCatalog, normalizeText,
   parseCatalogParams, searchCatalog, sortCatalog,
 } from '../src/lib/catalog/filters.ts';
 
@@ -100,4 +100,10 @@ test('colour families follow the first colour named', () => {
   assert.equal(colorFamily('Đỏ Ruby & Xanh Cốm'), 'cam-do');
   assert.equal(colorFamily('Nâu Be Trầm Ấm'), 'nau-xam');
   assert.equal(colorFamily(undefined), null);
+});
+
+test('sizes sort by their number, not as text, and labels without a number go last', () => {
+  const labels = ['Size 150', 'Size 100', 'Người lớn', 'Size 90', 'Size 100 - Màu rêu', 'Size 120', 'Set S mẹ'];
+  assert.deepEqual([...labels].sort(compareSizeLabels),
+    ['Size 90', 'Size 100', 'Size 100 - Màu rêu', 'Size 120', 'Size 150', 'Người lớn', 'Set S mẹ']);
 });

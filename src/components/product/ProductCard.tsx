@@ -80,12 +80,14 @@ export function ProductCard({ product }: { product: Product }) {
             )}
           </div>
 
-          {/* Tag Chất Liệu Nổi Bật Dưới Chân Ảnh */}
-          <div className="absolute bottom-2 left-2 right-2 z-10">
-            <span className="inline-block text-[9px] sm:text-[10px] font-medium bg-white/90 backdrop-blur-md text-charcoal-700 px-2 py-0.5 rounded-full border border-cream-200 truncate max-w-full">
-              🌿 {product.materialFeatures[0] || product.material}
-            </span>
-          </div>
+          {/* Tag Chất Liệu Nổi Bật Dưới Chân Ảnh (sản phẩm chưa ghi chất liệu thì không hiện tag trống) */}
+          {(product.materialFeatures[0] || product.material) && (
+            <div className="absolute bottom-2 left-2 right-2 z-10">
+              <span className="inline-block text-[9px] sm:text-[10px] font-medium bg-white/90 backdrop-blur-md text-charcoal-700 px-2 py-0.5 rounded-full border border-cream-200 truncate max-w-full">
+                🌿 {product.materialFeatures[0] || product.material}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Thông Tin Sản Phẩm */}

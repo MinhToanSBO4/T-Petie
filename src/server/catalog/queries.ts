@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import type { Product } from '@/types/product';
 import type { Collection } from '@/types/collection';
+import { compareSizeLabels } from '@/lib/catalog/filters';
 
 const productInclude = { images: { orderBy: { sortOrder: 'asc' as const } }, variants: { orderBy: { size: 'asc' as const } }, collection: true };
 
@@ -21,7 +22,7 @@ function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ incl
     collectionName: row.collection?.title,
     material: row.material,
     materialFeatures: row.materialFeatures,
-    sizes: row.variants.filter((variant) => variant.isActive).map((variant) => ({
+    sizes: row.variants.filter((variant) => variant.isActive).sort((a, b) => compareSizeLabels(a.size, b.size)).map((variant) => ({
       size: variant.size, weightRange: variant.weightRange || '', ageRange: variant.ageRange || '',
       price: Number(variant.price), stock: variant.stock,
     })),
