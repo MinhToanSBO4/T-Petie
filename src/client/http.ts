@@ -4,7 +4,7 @@ export type JsonBody = { error?: string } & Record<string, any>;
 
 function bodyFrom(data: unknown, status: number, ok: boolean): JsonBody {
   if (data && typeof data === 'object') return data as JsonBody;
-  if (status === 413) return { error: 'Ảnh quá lớn. Chọn ảnh nhỏ hơn 4 MB.' };
+  if (status === 413) return { error: 'Dung lượng ảnh gửi lên quá lớn (tối đa khoảng 4 MB mỗi lần). Bớt ảnh hoặc chọn ảnh nhỏ hơn.' };
   if (status === 504) return { error: 'Máy chủ phản hồi quá lâu, vui lòng thử lại.' };
   return { error: ok ? 'Phản hồi không hợp lệ từ máy chủ' : `Máy chủ báo lỗi (${status}), vui lòng thử lại.` };
 }

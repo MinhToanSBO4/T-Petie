@@ -60,12 +60,13 @@ function ContactForm({ saved, onSaved }: {
   const [draft, setDraft] = useState(saved);
   const [currentPassword, setCurrentPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const emailChanged = draft.email.trim().toLowerCase() !== saved.email.toLowerCase();
   const dirty = emailChanged || draft.name.trim() !== saved.name || draft.phone.trim() !== saved.phone;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true);
+    setBusy(true); setError('');
     const id = toast.loading('Đang lưu thông tin…');
     try {
       const { profile } = await send('/api/admin/account', 'PATCH', { ...draft, ...(emailChanged ? { currentPassword } : {}) });
@@ -75,7 +76,10 @@ function ContactForm({ saved, onSaved }: {
       markAdminPagesStale();
       toast.success('Đã lưu thông tin', { id,
         description: emailChanged ? 'Từ giờ đăng nhập bằng email mới hoặc tên đăng nhập.' : undefined });
-    } catch (error) { toast.error(errorText(error, 'Không lưu được thông tin'), { id }); }
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không lưu được thông tin');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -95,6 +99,7 @@ function ContactForm({ saved, onSaved }: {
         <input className={field} type="password" required autoComplete="current-password" value={currentPassword}
           onChange={(event) => setCurrentPassword(event.target.value)} /></label>}
     </div>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !dirty} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang lưu…' : 'Lưu thay đổi'}
     </button>
@@ -106,13 +111,14 @@ function PasswordForm({ loginName }: { loginName: string }) {
   const [draft, setDraft] = useState(empty);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const longEnough = draft.next.length >= PASSWORD_MIN;
   const matches = draft.confirm.length > 0 && draft.confirm === draft.next;
   const type = visible ? 'text' : 'password';
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true);
+    setBusy(true); setError('');
     const id = toast.loading('Đang đổi mật khẩu…');
     try {
       await send('/api/admin/account/password', 'POST', { currentPassword: draft.current, newPassword: draft.next });
@@ -121,7 +127,10 @@ function PasswordForm({ loginName }: { loginName: string }) {
       if (!result?.ok) { window.location.href = '/login'; return; }
       setDraft(empty);
       toast.success('Đã đổi mật khẩu', { id, description: 'Các thiết bị khác đã được đăng xuất.' });
-    } catch (error) { toast.error(errorText(error, 'Không đổi được mật khẩu'), { id }); }
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không đổi được mật khẩu');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -152,6 +161,7 @@ function PasswordForm({ loginName }: { loginName: string }) {
       <li className={`flex items-center gap-1.5 ${matches ? 'text-sage-700' : draft.confirm ? 'text-red-700' : 'text-charcoal-500'}`}>
         <Check className={`size-3.5 ${matches ? '' : 'opacity-30'}`} aria-hidden />{draft.confirm && !matches ? 'Mật khẩu nhập lại chưa khớp' : 'Nhập lại khớp mật khẩu mới'}</li>
     </ul>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !draft.current || !longEnough || !matches} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang đổi…' : 'Đổi mật khẩu'}
     </button>

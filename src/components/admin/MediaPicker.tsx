@@ -18,19 +18,24 @@ type MediaPickerProps = {
   altText?: string;
   /** Ảnh hiển thị dạng nền lớn (banner) hay thu nhỏ (avatar). */
   aspect?: 'banner' | 'square';
+  /** Báo lỗi tải ảnh cho form cha (lỗi cũng hiện ngay dưới ô ảnh). */
+  onError?: (message: string) => void;
 };
 
 /**
  * Ô chọn ảnh: kéo-thả hoặc bấm để tải lên, hoặc chọn lại ảnh đã có trong thư viện.
  * Mọi ảnh đều đi qua thư viện media (database + Cloudinary), không nhập URL thủ công.
- * Tiến độ và lỗi tải ảnh hiện ở thông báo góc màn hình.
+ * Tiến độ tải ảnh hiện ở thông báo góc màn hình; lỗi hiện thêm ngay dưới ô ảnh để không mất khi thông báo tự ẩn.
  */
-export function MediaPicker({ value, onChange, label, altText, aspect = 'banner' }: MediaPickerProps) {
+export function MediaPicker({ value, onChange, label, altText, aspect = 'banner', onError }: MediaPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [assets, setAssets] = useState<MediaAssetRow[] | null>(null);
+  const [error, setError] = useState('');
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   // Bên gọi dựng onChange từ form ở lần render hiện tại. Ảnh tải mất vài giây: gọi onChange cũ sẽ ghi đè những gì
   // người dùng gõ trong lúc chờ (tiêu đề, mô tả…). Luôn gọi onChange của lần render mới nhất.
@@ -38,9 +43,11 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
   onChangeRef.current = onChange;
 
   const upload = useCallback(async (file: File) => {
-    setBusy(true);
-    try { await uploadMediaBatch([file], BANNER_PHOTO_OPTIONS, altText || label, (asset) => onChangeRef.current(asset.url)); }
-    finally { setBusy(false); }
+    setBusy(true); setError('');
+    try {
+      const result = await uploadMediaBatch([file], BANNER_PHOTO_OPTIONS, altText || label, (asset) => onChangeRef.current(asset.url));
+      if (result.error) { setError(result.error); onErrorRef.current?.(result.error); }
+    } finally { setBusy(false); }
   }, [altText, label]);
 
   useEffect(() => {
@@ -99,6 +106,7 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" className="hidden"
         onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
     </div>
+    {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
     {libraryOpen && <div className="max-h-64 overflow-y-auto rounded-xl border border-cream-200 bg-white p-2">
       {!assets && <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{Array.from({ length: 5 }, (_, index) =>
         <div key={index} className="h-20 rounded-lg shimmer" />)}</div>}
@@ -119,10 +127,11 @@ type MediaListPickerProps = {
   onChange: (urls: string[]) => void;
   label: string;
   max?: number;
+  onError?: (message: string) => void;
 };
 
 /** Danh sách ảnh (ví dụ lookbook): thêm, gỡ và sắp xếp thứ tự. */
-export function MediaListPicker({ values, onChange, label, max = 12 }: MediaListPickerProps) {
+export function MediaListPicker({ values, onChange, label, max = 12, onError }: MediaListPickerProps) {
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= values.length) return;
@@ -134,7 +143,7 @@ export function MediaListPicker({ values, onChange, label, max = 12 }: MediaList
     <span className="block text-sm font-semibold">{label} ({values.length}/{max})</span>
     {values.map((url, index) => <div key={`${url}-${index}`} className="flex items-start gap-2">
       <div className="flex-1">
-        <MediaPicker label={`Ảnh ${index + 1}`} value={url} aspect="square"
+        <MediaPicker label={`Ảnh ${index + 1}`} value={url} aspect="square" onError={onError}
           onChange={(next) => onChange(values.map((item, position) => position === index ? next : item).filter(Boolean))} />
       </div>
       <div className="flex flex-col gap-1 pt-6">
@@ -144,7 +153,7 @@ export function MediaListPicker({ values, onChange, label, max = 12 }: MediaList
           className="min-h-9 rounded-lg border border-cream-300 px-2 text-sm disabled:opacity-40">↓</button>
       </div>
     </div>)}
-    {values.length < max && <MediaPicker label="Thêm ảnh" value="" aspect="square"
+    {values.length < max && <MediaPicker label="Thêm ảnh" value="" aspect="square" onError={onError}
       onChange={(url) => { if (url) onChange([...values, url]); }} />}
   </div>;
 }

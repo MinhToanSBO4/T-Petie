@@ -135,7 +135,10 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
       if (!response.ok || !data.product) throw new Error(String(data.error || 'Không tạo được sản phẩm'));
       toast.success(`Đã tạo sản phẩm ${draft.name.trim()}`, { id });
       onCreated(data.product as ProductRow);
-    } catch (submitError) { toast.error(errorText(submitError, 'Không tạo được sản phẩm'), { id }); }
+    } catch (submitError) {
+      const text = errorText(submitError, 'Không tạo được sản phẩm');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -243,7 +246,7 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const busy = saving || uploading;
-  // Lỗi nhập liệu cần sửa trên form; kết quả lưu/tải ảnh hiện ở thông báo góc màn hình.
+  // Lỗi nhập liệu và lỗi lưu hiện trên form (thông báo góc màn hình tự ẩn); tiến độ tải ảnh hiện ở góc màn hình.
   const [error, setError] = useState('');
 
   // Nạp danh sách bộ sưu tập một lần để chọn cho sản phẩm.
@@ -282,7 +285,10 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
     if (skipped > 0) toast.warning(`Bỏ qua ${skipped} ảnh vì mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh`);
     if (files.length === 0) return;
     setUploading(true);
-    try { await uploadMediaBatch(files, PRODUCT_PHOTO_OPTIONS, draft.name, (asset) => setImages((current) => [...current, asset.url])); }
+    try {
+      await uploadMediaBatch(files, PRODUCT_PHOTO_OPTIONS, draft.name, (asset) => setImages((current) => [...current, asset.url]),
+        { description: 'Bấm "Lưu thay đổi" để ghi vào sản phẩm.' });
+    }
     finally { setUploading(false); }
   };
 
@@ -369,7 +375,10 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
       if (!response.ok) throw new Error(String(data.error || 'Không lưu được sản phẩm'));
       toast.success(`Đã lưu sản phẩm ${draft.name}`, { id });
       onBack();
-    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được sản phẩm'), { id }); }
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không lưu được sản phẩm');
+      setError(text); toast.error(text, { id });
+    }
     finally { setSaving(false); }
   };
 

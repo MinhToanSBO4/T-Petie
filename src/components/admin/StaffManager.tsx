@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { readJson } from '@/client/http';
 import { errorText, toast } from '@/client/toast';
-import { normalizePhone } from '@/lib/account/account-input';
+import { normalizePhone, PASSWORD_MIN } from '@/lib/account/account-input';
 
 type Staff = {
   id: string; name: string; username: string; email: string; phone?: string;
@@ -65,10 +65,11 @@ export function StaffManager() {
 function StaffCreateForm({ onDone }: { onDone: () => void }) {
   const [draft, setDraft] = useState({ name: '', username: '', email: '', password: '' });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true);
+    setBusy(true); setError('');
     const id = toast.loading('Đang tạo tài khoản…');
     try {
       const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
@@ -76,7 +77,10 @@ function StaffCreateForm({ onDone }: { onDone: () => void }) {
       if (!response.ok) throw new Error(data.error || 'Không tạo được tài khoản');
       toast.success(`Đã tạo tài khoản nhân viên ${draft.name}`, { id });
       onDone();
-    } catch (submitError) { toast.error(errorText(submitError, 'Không tạo được tài khoản'), { id }); }
+    } catch (submitError) {
+      const text = errorText(submitError, 'Không tạo được tài khoản');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -92,10 +96,11 @@ function StaffCreateForm({ onDone }: { onDone: () => void }) {
         <input className={`${field} mt-1`} required value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} /></label>
       <label className="text-sm font-semibold">Email
         <input className={`${field} mt-1`} type="email" required value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
-      <label className="text-sm font-semibold">Mật khẩu ban đầu (tối thiểu 12 ký tự)
-        <input className={`${field} mt-1`} type="text" required minLength={12} value={draft.password}
+      <label className="text-sm font-semibold">Mật khẩu ban đầu (tối thiểu {PASSWORD_MIN} ký tự)
+        <input className={`${field} mt-1`} type="text" required minLength={PASSWORD_MIN} value={draft.password}
           onChange={(event) => setDraft({ ...draft, password: event.target.value })} /></label>
     </div>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang tạo…' : 'Tạo tài khoản'}
     </button>
@@ -107,7 +112,7 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
   const [staff, setStaff] = useState(initial);
   const [draft, setDraft] = useState({ name: initial.name, email: initial.email, phone: initial.phone || '' });
   const [busy, setBusy] = useState(false);
-  // Lỗi nhập liệu cần sửa trên form; kết quả thao tác hiện ở thông báo góc màn hình.
+  // Lỗi nhập liệu và lỗi thao tác hiện trên form (thông báo góc màn hình tự ẩn); kết quả thành công hiện ở góc màn hình.
   const [error, setError] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const dirty = draft.name.trim() !== staff.name || draft.email.trim().toLowerCase() !== staff.email.toLowerCase()
@@ -124,7 +129,10 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
       setStaff((current) => ({ ...current, ...data.user, ...(typeof body.phone === 'string' ? { phone: body.phone } : {}) }));
       toast.success(okMessage, { id });
       if (data.temporaryPassword) setTemporaryPassword(data.temporaryPassword);
-    } catch (updateError) { toast.error(errorText(updateError, 'Thao tác thất bại'), { id }); }
+    } catch (updateError) {
+      const text = errorText(updateError, 'Thao tác thất bại');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 

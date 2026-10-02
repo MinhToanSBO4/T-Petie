@@ -34,9 +34,12 @@ let batchSequence = 0;
 /**
  * Tải lần lượt từng ảnh (một ảnh lỗi không làm hỏng cả loạt) với MỘT thông báo cho cả loạt: "Đang tải ảnh 2/5…" kèm
  * phần trăm chung, xong thì đổi thành kết quả. `onUploaded` chạy ngay sau mỗi ảnh để ảnh hiện dần trên form.
+ * `description`: dòng phụ của thông báo thành công (ví dụ nhắc bấm lưu). Trả về số ảnh đã tải và câu báo lỗi (rỗng nếu
+ * không lỗi) để nơi gọi hiện lỗi ngay trên form, vì thông báo góc màn hình tự ẩn sau vài giây.
  */
 export async function uploadMediaBatch(files: File[], options: CompressOptions, altText: string,
-  onUploaded: (asset: UploadedMedia) => void): Promise<void> {
+  onUploaded: (asset: UploadedMedia) => void,
+  { description: successDescription }: { description?: string } = {}): Promise<{ uploaded: number; error: string }> {
   const total = files.length;
   const step = (index: number) => total > 1 ? `Đang tải ảnh ${index + 1}/${total}…` : 'Đang tải ảnh…';
   // Id riêng: hai ô ảnh tải cùng lúc có cùng câu "Đang tải ảnh…" không bị gộp thành một thông báo.
@@ -60,13 +63,15 @@ export async function uploadMediaBatch(files: File[], options: CompressOptions, 
   }
 
   if (failures.length === 0) {
-    toast.success(total > 1 ? `Đã tải lên ${uploaded} ảnh` : 'Đã tải ảnh lên', { id });
-    return;
+    toast.success(total > 1 ? `Đã tải lên ${uploaded} ảnh` : 'Đã tải ảnh lên', { id, description: successDescription });
+    return { uploaded, error: '' };
   }
   // Nhiều ảnh cùng một lỗi (mất mạng…) chỉ ghi một lần; quá dài thì rút gọn.
   const reasons = [...new Set(failures)];
   const description = (reasons.length > 3 ? [...reasons.slice(0, 3), `và ${reasons.length - 3} lỗi khác`] : reasons).join('; ');
-  if (total === 1) toast.error(failures[0], { id });
-  else if (uploaded === 0) toast.error(`Không tải được ${total} ảnh`, { id, description });
-  else toast.error(`Đã tải lên ${uploaded}/${total} ảnh, ${failures.length} ảnh bị lỗi`, { id, description });
+  const title = total === 1 ? failures[0]
+    : uploaded === 0 ? `Không tải được ${total} ảnh` : `Đã tải lên ${uploaded}/${total} ảnh, ${failures.length} ảnh bị lỗi`;
+  if (total === 1) toast.error(title, { id });
+  else toast.error(title, { id, description });
+  return { uploaded, error: total === 1 ? title : `${title} — ${description}` };
 }

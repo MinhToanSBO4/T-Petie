@@ -69,10 +69,8 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
       toast.warning('Kích cỡ này đã hết hàng hoặc không đủ số lượng.');
       return;
     }
+    // Giỏ hàng nhanh tự mở là phản hồi đủ rõ; thêm toast sẽ đè lên chính giỏ hàng đó.
     addToCart(product, selectedSize, quantity);
-    toast.success(`Đã thêm ${quantity} x "${product.name} (${selectedSize.size})" vào giỏ hàng!`, {
-      action: { label: 'Xem giỏ hàng', href: '/cart' },
-    });
   };
 
   const handleBuyNow = () => {

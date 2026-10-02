@@ -48,6 +48,8 @@ export function ProductReviews({ productId, productName }: { productId: string; 
     finally { setLoading(false); }
   }, [productId]);
 
+  // Sang sản phẩm khác (cùng component): lần tải đầu của sản phẩm mới lỗi thì chỉ ẩn khối, không báo. Đặt trước effect tải.
+  useEffect(() => { loaded.current = false; }, [productId]);
   useEffect(() => { void load(filter, 1); }, [filter, load]);
 
   useEffect(() => {

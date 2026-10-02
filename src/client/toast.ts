@@ -64,6 +64,9 @@ export const toast = {
     if (byUser && current?.type === 'loading') {
       if (closedByUser.size > 100) closedByUser.clear();
       closedByUser.add(id);
+    } else if (!byUser) {
+      // Việc đã xong (đóng bằng code): id cố định dùng lại lần sau phải hiện bình thường.
+      closedByUser.delete(id);
     }
     commit(removeToast(toasts, id));
   },

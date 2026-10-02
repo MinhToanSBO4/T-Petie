@@ -70,8 +70,9 @@ function ToastCard({ item, paused }: { item: ToastItem; paused: boolean }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.95, transition: { duration: 0.15 } }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      // Chỉ chuột mới tạm dừng: chạm trên điện thoại giả lập mouseenter mà không có mouseleave, thông báo sẽ kẹt mãi.
+      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }}
+      onPointerLeave={(event) => { if (event.pointerType === 'mouse') setHovered(false); }}
       onFocus={() => setFocused(true)}
       onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}
       onKeyDown={(event) => { if (event.key === 'Escape') toast.dismiss(item.id, { byUser: true }); }}
@@ -110,8 +111,8 @@ function ToastCard({ item, paused }: { item: ToastItem; paused: boolean }) {
 }
 
 /**
- * Thông báo nổi ở góc màn hình: lỗi, đang xử lý, tiến độ tải ảnh/tạo file, kết quả thao tác. Máy tính: góc phải dưới,
- * phía trên nút chat Messenger ở trang khách. Điện thoại: ngay dưới header, không đè thanh điều hướng dưới và nút chat.
+ * Thông báo nổi ở góc phải trên: lỗi, đang xử lý, tiến độ tải ảnh/tạo file, kết quả thao tác. Nằm ngay dưới header
+ * (h-16) để không che logo, giỏ hàng, tài khoản; ở điện thoại trải ngang màn hình với lề 12px.
  */
 export function Toaster() {
   const items = useSyncExternalStore(subscribeToasts, getToasts, getServerToasts);
@@ -122,10 +123,10 @@ export function Toaster() {
 
   return (
     <section aria-label="Thông báo"
-      className={`pointer-events-none fixed inset-x-3 top-[4.5rem] z-[90] md:inset-x-auto md:top-auto md:w-96 ${
-        backOffice ? 'admin-theme md:bottom-6 md:right-6' : 'md:bottom-28 md:right-8'}`}>
-      {/* Mới nhất nằm sát mép: trên cùng ở điện thoại, dưới cùng ở máy tính. */}
-      <div aria-live="polite" aria-relevant="additions text" className="flex flex-col-reverse gap-2 md:flex-col">
+      className={`pointer-events-none fixed inset-x-3 top-[4.5rem] z-[90] md:inset-x-auto md:right-6 md:top-20 md:w-96 ${
+        backOffice ? 'admin-theme' : ''}`}>
+      {/* Mới nhất nằm trên cùng, sát mép trên; thông báo cũ trượt xuống dưới. */}
+      <div aria-live="polite" aria-relevant="additions text" className="flex max-h-[calc(100dvh-6rem)] flex-col-reverse gap-2 overflow-hidden">
         <AnimatePresence initial={false}>
           {items.map((item) => <ToastCard key={item.id} item={item} paused={hidden} />)}
         </AnimatePresence>

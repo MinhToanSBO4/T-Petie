@@ -98,8 +98,9 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
     const url = editing ? `/api/reviews/${review!.id}` : '/api/reviews';
     const method = editing ? 'PATCH' : 'POST';
     // Có ảnh: báo tiến độ tải lên ở góc màn hình (mạng điện thoại chậm có thể mất vài giây); lỗi vẫn hiện trong hộp thoại.
+    // Id riêng mỗi lần gửi: khách tự đóng thông báo lần trước thì lần gửi sau vẫn hiện tiến độ.
     const upload = photos.length > 0
-      ? toast.loading(`Đang tải ${photos.length} ảnh đánh giá…`, { id: 'review-upload', progress: 0 }) : null;
+      ? toast.loading(`Đang tải ${photos.length} ảnh đánh giá…`, { id: `review-upload-${Date.now()}`, progress: 0 }) : null;
     try {
       let result: { ok: boolean; data: JsonBody };
       if (upload) {

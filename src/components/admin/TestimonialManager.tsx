@@ -193,6 +193,9 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [settings, setSettings] = useState({ consent: false, publish: false });
   const [busy, setBusy] = useState(false);
+  // Lỗi tải ảnh / lưu hiện ngay trên form (thông báo góc màn hình tự ẩn sau vài giây).
+  const [uploadError, setUploadError] = useState('');
+  const [saveError, setSaveError] = useState('');
   const room = FEEDBACK_BATCH_MAX - drafts.length;
 
   const addUrls = (urls: string[]) => setDrafts((current) => [...current,
@@ -206,9 +209,9 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
     const accepted = files.slice(0, Math.max(0, room));
     if (files.length > accepted.length) toast.warning(`Mỗi lần thêm tối đa ${FEEDBACK_BATCH_MAX} ảnh; ${files.length - accepted.length} ảnh đã bỏ qua`);
     if (accepted.length === 0) return;
-    setUploading(true);
+    setUploading(true); setUploadError('');
     // Tải lần lượt từng ảnh: mỗi request nhỏ, có tiến độ, một ảnh lỗi không làm hỏng cả loạt.
-    try { await uploadMediaBatch(accepted, SCREENSHOT_OPTIONS, 'Feedback khách hàng', (asset) => addUrls([asset.url])); }
+    try { setUploadError((await uploadMediaBatch(accepted, SCREENSHOT_OPTIONS, 'Feedback khách hàng', (asset) => addUrls([asset.url]))).error); }
     finally { setUploading(false); }
   };
 
@@ -223,7 +226,7 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
   });
 
   const save = async () => {
-    setBusy(true);
+    setBusy(true); setSaveError('');
     const id = toast.loading(`Đang lưu ${drafts.length} feedback…`);
     try {
       const response = await fetch('/api/admin/testimonials', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -233,7 +236,10 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
       if (!response.ok) throw new Error(data.error || 'Không lưu được feedback');
       toast.success(settings.publish ? `Đã thêm và công bố ${data.count} feedback` : `Đã thêm ${data.count} feedback (bản nháp)`, { id });
       onDone();
-    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được feedback'), { id }); }
+    } catch (failure) {
+      const text = errorText(failure, 'Không lưu được feedback');
+      setSaveError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -268,6 +274,7 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
       {libraryOpen && <LibraryPicker room={room} exclude={drafts.map((draft) => draft.imageUrl)}
         onClose={() => setLibraryOpen(false)} onPick={(urls) => { addUrls(urls); setLibraryOpen(false); }} />}
     </div>}
+    {uploadError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{uploadError}</p>}
 
     {drafts.length > 0 && <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {drafts.map((draft, index) => <li key={draft.key} className="space-y-2 rounded-2xl border border-cream-200 p-3">
@@ -304,6 +311,7 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
         className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
         {busy ? 'Đang lưu…' : `Lưu ${drafts.length} feedback`}
       </button>
+      {saveError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
     </>}
   </div>;
 }
@@ -341,7 +349,7 @@ function FeedbackOrderEditor({ onDone }: { onDone: () => void }) {
 
   const save = async () => {
     if (!items) return;
-    setBusy(true);
+    setBusy(true); setError('');
     const id = toast.loading('Đang lưu thứ tự hiển thị…');
     try {
       const response = await fetch('/api/admin/testimonials/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -350,7 +358,10 @@ function FeedbackOrderEditor({ onDone }: { onDone: () => void }) {
       if (!response.ok) throw new Error(data.error || 'Không lưu được thứ tự');
       toast.success('Đã lưu thứ tự hiển thị feedback', { id });
       onDone();
-    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được thứ tự'), { id }); setBusy(false); }
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không lưu được thứ tự');
+      setError(text); toast.error(text, { id }); setBusy(false);
+    }
   };
 
   return <div className="space-y-5 rounded-2xl border border-cream-200 bg-white p-5">
@@ -420,7 +431,10 @@ function FeedbackEditor({ testimonial, products, onDone }: {
       if (!response.ok) throw new Error(data.error || 'Không lưu được feedback');
       toast.success('Đã lưu feedback', { id });
       onDone();
-    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được feedback'), { id }); }
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không lưu được feedback');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -434,7 +448,10 @@ function FeedbackEditor({ testimonial, products, onDone }: {
       if (!response.ok) throw new Error(data.error || 'Không xóa được feedback');
       toast.success('Đã xóa feedback', { id });
       onDone();
-    } catch (removeError) { toast.error(errorText(removeError, 'Không xóa được feedback'), { id }); setBusy(false); }
+    } catch (removeError) {
+      const text = errorText(removeError, 'Không xóa được feedback');
+      setError(text); toast.error(text, { id }); setBusy(false);
+    }
   };
 
   return <form onSubmit={save} className="space-y-5 rounded-2xl border border-cream-200 bg-white p-5">
