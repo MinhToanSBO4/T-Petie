@@ -44,11 +44,12 @@ test('only a few toasts stay on screen, and running tasks are never pushed out',
 });
 
 test('errors stay longer than confirmations and long messages get time to be read', () => {
-  assert.ok(toastDuration('error', 'Lỗi') >= 6_000);
+  assert.ok(toastDuration('error', 'Lỗi') >= 5_000);
+  assert.ok(toastDuration('success', 'Đã lưu') <= 3_000);
   assert.ok(toastDuration('success', 'Đã lưu') < toastDuration('error', 'Đã lưu'));
   const long = 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09. Mẹ kiểm tra lại giúp shop nhé.';
   assert.ok(toastDuration('info', long) > toastDuration('info', 'Đã sao chép'));
-  assert.equal(toastDuration('error', 'x'.repeat(1_000)), 12_000);
+  assert.equal(toastDuration('error', 'x'.repeat(1_000)), 7_000);
   assert.equal(toastDuration('loading', 'Đang tạo file…'), LOADING_TIMEOUT_MS);
 });
 

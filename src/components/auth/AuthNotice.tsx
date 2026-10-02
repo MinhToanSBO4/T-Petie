@@ -35,7 +35,7 @@ function show(kind: AuthNoticeKind) {
       toast.success('Đã liên kết Google với tài khoản của Mẹ', {
         description: 'Để giữ an toàn, mật khẩu cũ không còn dùng được. Từ nay Mẹ đăng nhập bằng Google, hoặc đặt mật khẩu mới trong Tài khoản.',
         action: { label: 'Đặt mật khẩu mới', href: '/dashboard?tab=security' },
-        duration: 12_000,
+        duration: 7_000,
       });
       break;
     default:
