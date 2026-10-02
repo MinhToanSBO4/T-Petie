@@ -10,6 +10,8 @@ import type { PublicFeedback } from '@/types/testimonial';
 
 /** Ảnh dài hơn tỉ lệ này (chụp cuộn nhiều tin nhắn) được cắt bớt trong lưới và mở đầy đủ khi chạm. */
 const TALL_RATIO = 2.1;
+/** Số ảnh mỗi lần hiện: trang không dựng và tải cùng lúc hàng trăm ảnh. */
+const BATCH = 24;
 
 /**
  * Album feedback dạng masonry: mỗi ảnh giữ đúng tỉ lệ (không cắt chữ trong tin nhắn) nên ảnh dài ngắn
@@ -17,9 +19,11 @@ const TALL_RATIO = 2.1;
  */
 export function FeedbackAlbum({ items }: { items: PublicFeedback[] }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [shown, setShown] = useState(BATCH);
+  const visible = items.slice(0, shown);
   return <>
     <ul className="columns-2 gap-3 sm:columns-3 sm:gap-4 lg:columns-4" aria-label="Album feedback khách hàng">
-      {items.map((item, index) => {
+      {visible.map((item, index) => {
         const tall = item.width && item.height ? item.height / item.width > TALL_RATIO : false;
         return <li key={item.id} className="mb-3 break-inside-avoid sm:mb-4">
           <figure className="overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-cream-200 transition-shadow hover:shadow-soft">
@@ -49,6 +53,13 @@ export function FeedbackAlbum({ items }: { items: PublicFeedback[] }) {
         </li>;
       })}
     </ul>
+    {shown < items.length && <div className="mt-6 flex flex-col items-center gap-1">
+      <button type="button" onClick={() => setShown((count) => count + BATCH)}
+        className="min-h-11 rounded-full border border-cream-300 bg-white px-6 text-sm font-bold text-charcoal-800 shadow-sm hover:border-honey-400">
+        Xem thêm {Math.min(BATCH, items.length - shown)} feedback
+      </button>
+      <p className="text-xs text-charcoal-500">Đang xem {shown}/{items.length}</p>
+    </div>}
     {open !== null && <FeedbackViewer items={items} startIndex={open} onClose={() => setOpen(null)} />}
   </>;
 }

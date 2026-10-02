@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProducts, getProductBySlug, getRelatedProducts } from '@/server/catalog/queries';
+import { toProductCard } from '@/types/product';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 
 export const revalidate = 60;
@@ -28,5 +29,5 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   const product = await getProductBySlug(params.slug);
   if (!product) notFound();
   const relatedProducts = await getRelatedProducts(product.id, product.collectionId || null, 4);
-  return <ProductDetailClient product={product} relatedProducts={relatedProducts} />;
+  return <ProductDetailClient product={product} relatedProducts={relatedProducts.map(toProductCard)} />;
 }

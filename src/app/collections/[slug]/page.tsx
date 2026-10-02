@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowDown, ArrowLeft } from 'lucide-react';
-import { getCollections, getProducts } from '@/server/catalog/queries';
-import { ProductGrid } from '@/components/product/ProductGrid';
+import { getCollections } from '@/server/catalog/queries';
+import { CatalogSection, type SearchParams } from '@/app/_catalog/catalog-section';
 import { LookbookGallery } from '@/components/collection/LookbookGallery';
 import { cloudinaryImage, cloudinarySrcSet } from '@/lib/media/cloudinary-url';
 
@@ -11,9 +11,9 @@ interface PageProps {
   params: {
     slug: string;
   };
+  searchParams: SearchParams;
 }
 
-export const revalidate = 60;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const collection = (await getCollections()).find((item) => item.id === params.slug);
@@ -28,15 +28,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * Trang một bộ sưu tập: banner nguyên tỉ lệ, câu chuyện, lookbook rồi mới tới các thiết kế,
  * để bộ sưu tập được kể như một câu chuyện thay vì chỉ là một danh sách sản phẩm.
  */
-export default async function CollectionDetailPage({ params }: PageProps) {
-  const [collections, allProducts] = await Promise.all([getCollections(), getProducts()]);
+export default async function CollectionDetailPage({ params, searchParams }: PageProps) {
+  const collections = await getCollections();
   const collection = collections.find((c) => c.id === params.slug);
   if (!collection) notFound();
 
-  const productsInCollection = allProducts.filter(
-    (p) => p.collectionId === collection.id || collection.featuredProductIds?.includes(p.id)
-  );
   const others = collections.filter((item) => item.id !== collection.id).slice(0, 3);
+  // Số thiết kế lấy từ danh sách mã sản phẩm của bộ sưu tập (đã cache); danh sách thẻ do CatalogSection tải theo trang.
+  const productsInCollection = collection.featuredProductIds;
 
   return <div className="mx-auto max-w-6xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8">
     <Link href="/collections" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-charcoal-600 hover:text-charcoal-900">
@@ -86,7 +85,8 @@ export default async function CollectionDetailPage({ params }: PageProps) {
         <p className="text-sm text-charcoal-500">{productsInCollection.length} sản phẩm</p>
       </div>
       {productsInCollection.length > 0
-        ? <ProductGrid products={productsInCollection} />
+        ? <CatalogSection scope={{ kind: 'collection', slug: collection.id }} searchParams={searchParams}
+            basePath={`/collections/${collection.id}`} layout="compact" />
         : <p className="rounded-2xl border border-dashed border-cream-300 p-8 text-center text-sm text-charcoal-600">Các thiết kế của bộ sưu tập sẽ sớm được ra mắt.</p>}
     </section>
 

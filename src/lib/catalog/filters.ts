@@ -1,5 +1,10 @@
 import type { Product, ProductSubcategory } from '@/types/product';
 
+/** Các trường của sản phẩm mà tìm kiếm, bộ lọc và sắp xếp cần (máy chủ lọc trên danh sách đã cache). */
+export type CatalogEntry = Pick<Product, 'name' | 'categoryName' | 'subcategory' | 'subcategoryName' | 'collectionId'
+  | 'collectionName' | 'material' | 'materialFeatures' | 'colorName' | 'sku' | 'description' | 'sizes' | 'basePrice'
+  | 'originalPrice' | 'discountPercent' | 'isSale' | 'isNewArrival' | 'isBestSeller' | 'rating' | 'reviewCount'>;
+
 /**
  * Bộ lọc và tìm kiếm danh mục sản phẩm, chạy trên danh sách sản phẩm đã cache ở trình duyệt (vài trăm sản phẩm),
  * nên đổi bộ lọc không gọi lại máy chủ. Theo khuyến nghị của Baymard: chọn được nhiều giá trị trong một nhóm
@@ -76,12 +81,17 @@ export type CatalogFilters = {
   isNew: boolean;
   rating4: boolean;
   sort: SortKey;
+  /** Trang kết quả (bắt đầu từ 1). */
+  page: number;
 };
 
 export const EMPTY_FILTERS: CatalogFilters = {
   q: '', price: [], min: null, max: null, sizes: [], colors: [], collections: [], types: [],
-  inStock: false, sale: false, isNew: false, rating4: false, sort: 'newest',
+  inStock: false, sale: false, isNew: false, rating4: false, sort: 'newest', page: 1,
 };
+
+/** Số sản phẩm mỗi trang: chia hết cho lưới 2, 3 và 4 cột. */
+export const CATALOG_PAGE_SIZE = 24;
 
 type ParamsLike = { get(name: string): string | null };
 const list = (value: string | null) => (value || '').split(',').map((item) => item.trim()).filter(Boolean).slice(0, 20);
@@ -90,8 +100,8 @@ const amount = (value: string | null) => {
   return value && Number.isSafeInteger(number) && number > 0 ? number : null;
 };
 
-/** Đọc bộ lọc từ URL; giá trị lạ bị bỏ qua thay vì làm hỏng trang. */
-export function parseCatalogParams(params: ParamsLike): CatalogFilters {
+/** Đọc bộ lọc từ URL; giá trị lạ bị bỏ qua thay vì làm hỏng trang. `defaultSort` là cách sắp xếp khi URL không ghi. */
+export function parseCatalogParams(params: ParamsLike, defaultSort: SortKey = 'newest'): CatalogFilters {
   const price = list(params.get('price')).filter((value): value is PricePreset => PRICE_PRESETS.some((preset) => preset.value === value));
   const colors = list(params.get('color')).filter((value): value is ColorFamily => COLOR_FAMILIES.some((family) => family.value === value));
   const types = list(params.get('type')).filter((value): value is ProductSubcategory => TYPE_OPTIONS.some((option) => option.value === value));
@@ -99,18 +109,25 @@ export function parseCatalogParams(params: ParamsLike): CatalogFilters {
   let min = amount(params.get('min'));
   let max = amount(params.get('max'));
   if (min !== null && max !== null && min > max) [min, max] = [max, min];
+  const page = Number(params.get('page'));
   return {
     q: (params.get('q') || '').trim().slice(0, 100), price, min, max,
     sizes: list(params.get('size')).map((size) => size.slice(0, 50)),
     colors, collections: list(params.get('collection')).map((slug) => slug.slice(0, 100)), types,
     inStock: params.get('stock') === '1', sale: params.get('sale') === '1', isNew: params.get('new') === '1',
     rating4: params.get('rating') === '4',
-    sort: SORT_OPTIONS.some((option) => option.value === sort) ? sort as SortKey : 'newest',
+    sort: SORT_OPTIONS.some((option) => option.value === sort) ? sort as SortKey : defaultSort,
+    page: Number.isSafeInteger(page) && page > 1 && page <= 1000 ? page : 1,
   };
 }
 
+/** Đọc bộ lọc từ `searchParams` của trang Next.js (giá trị có thể là mảng khi tham số lặp lại). */
+export function catalogParamsFrom(searchParams: Record<string, string | string[] | undefined>): ParamsLike {
+  return { get: (name) => { const value = searchParams[name]; return Array.isArray(value) ? value[0] ?? null : value ?? null; } };
+}
+
 /** Ghi bộ lọc ra chuỗi truy vấn, bỏ qua giá trị mặc định để URL ngắn gọn. */
-export function catalogParams(filters: CatalogFilters): string {
+export function catalogParams(filters: CatalogFilters, defaultSort: SortKey = 'newest'): string {
   const params = new URLSearchParams();
   if (filters.q) params.set('q', filters.q);
   if (filters.price.length) params.set('price', filters.price.join(','));
@@ -124,7 +141,8 @@ export function catalogParams(filters: CatalogFilters): string {
   if (filters.sale) params.set('sale', '1');
   if (filters.isNew) params.set('new', '1');
   if (filters.rating4) params.set('rating', '4');
-  if (filters.sort !== 'newest') params.set('sort', filters.sort);
+  if (filters.sort !== defaultSort) params.set('sort', filters.sort);
+  if (filters.page > 1) params.set('page', String(filters.page));
   return params.toString();
 }
 
@@ -135,8 +153,8 @@ export function activeFilterCount(filters: CatalogFilters) {
     + [filters.inStock, filters.sale, filters.isNew, filters.rating4].filter(Boolean).length;
 }
 
-const isOnSale = (product: Product) => Boolean(product.isSale || (product.originalPrice && product.originalPrice > product.basePrice));
-export function discountOf(product: Product) {
+export const isOnSale = (product: CatalogEntry) => Boolean(product.isSale || (product.originalPrice && product.originalPrice > product.basePrice));
+export function discountOf(product: CatalogEntry) {
   if (product.originalPrice && product.originalPrice > product.basePrice) {
     return Math.round((1 - product.basePrice / product.originalPrice) * 100);
   }
@@ -144,7 +162,7 @@ export function discountOf(product: Product) {
 }
 
 /** Giá dùng để lọc: khi đã chọn size thì lấy giá thấp nhất trong các size đó (giá thay đổi theo size), không thì giá khởi điểm. */
-function priceFor(product: Product, sizes: string[]) {
+function priceFor(product: CatalogEntry, sizes: string[]) {
   if (!sizes.length) return product.basePrice;
   const prices = product.sizes.filter((option) => sizes.includes(option.size)).map((option) => option.price);
   return prices.length ? Math.min(...prices) : product.basePrice;
@@ -153,7 +171,7 @@ function priceFor(product: Product, sizes: string[]) {
 type Group = 'price' | 'sizes' | 'colors' | 'collections' | 'types' | 'flags';
 
 /** Sản phẩm có thỏa mọi nhóm bộ lọc không; `skip` bỏ qua một nhóm (để đếm số sản phẩm cho từng lựa chọn của nhóm đó). */
-function matches(product: Product, filters: CatalogFilters, skip?: Group) {
+function matches(product: CatalogEntry, filters: CatalogFilters, skip?: Group) {
   if (skip !== 'sizes' && filters.sizes.length) {
     const hasSize = product.sizes.some((option) => filters.sizes.includes(option.size) && (!filters.inStock || option.stock > 0));
     if (!hasSize) return false;
@@ -180,7 +198,7 @@ function matches(product: Product, filters: CatalogFilters, skip?: Group) {
 }
 
 /** Điểm khớp từ khóa (0 = không khớp). Mọi từ phải xuất hiện; khớp ở tên sản phẩm được xếp trước. */
-function searchScore(product: Product, tokens: string[], phrase: string) {
+function searchScore(product: CatalogEntry, tokens: string[], phrase: string) {
   const name = normalizeText(product.name);
   const other = normalizeText([product.categoryName, product.subcategoryName, product.collectionName, product.material,
     ...(product.materialFeatures || []), product.colorName, product.sku, product.description].filter(Boolean).join(' '));
@@ -196,7 +214,7 @@ function searchScore(product: Product, tokens: string[], phrase: string) {
 }
 
 /** Tìm theo từ khóa không dấu; giữ thứ tự gốc khi không có từ khóa. */
-export function searchCatalog(products: Product[], query: string): Product[] {
+export function searchCatalog<T extends CatalogEntry>(products: T[], query: string): T[] {
   const phrase = normalizeText(query);
   if (!phrase) return products;
   const tokens = phrase.split(' ');
@@ -206,7 +224,7 @@ export function searchCatalog(products: Product[], query: string): Product[] {
     .map((item) => item.product);
 }
 
-export function sortCatalog(products: Product[], sort: SortKey): Product[] {
+export function sortCatalog<T extends CatalogEntry>(products: T[], sort: SortKey): T[] {
   const indexed = products.map((product, index) => ({ product, index }));
   const compare: Record<SortKey, (a: typeof indexed[number], b: typeof indexed[number]) => number> = {
     newest: (a, b) => a.index - b.index,
@@ -220,7 +238,7 @@ export function sortCatalog(products: Product[], sort: SortKey): Product[] {
 }
 
 /** Danh sách sau tìm kiếm + lọc + sắp xếp. Khi có từ khóa mà chọn "Mới nhất" thì ưu tiên độ khớp. */
-export function filterCatalog(products: Product[], filters: CatalogFilters): Product[] {
+export function filterCatalog<T extends CatalogEntry>(products: T[], filters: CatalogFilters): T[] {
   const searched = searchCatalog(products, filters.q);
   const filtered = searched.filter((product) => matches(product, filters));
   return filters.q && filters.sort === 'newest' ? filtered : sortCatalog(filtered, filters.sort);
@@ -245,15 +263,15 @@ export function compareSizeLabels(a: string, b: string) {
  * Chỉ hiện lựa chọn có sản phẩm trong danh mục đang xem; lựa chọn tạm thời 0 kết quả vẫn hiện (giao diện làm mờ)
  * để bố cục không nhảy khi đổi bộ lọc, và lựa chọn đang chọn luôn hiện để bỏ chọn được.
  */
-export function catalogFacets(products: Product[], filters: CatalogFilters): CatalogFacets {
+export function catalogFacets(products: CatalogEntry[], filters: CatalogFilters): CatalogFacets {
   const pool = searchCatalog(products, filters.q);
   const within = (group: Group) => pool.filter((product) => matches(product, filters, group));
-  const options = <T>(items: readonly T[], selected: string[], value: (item: T) => string, test: (product: Product, item: T) => boolean,
-    base: Product[], extra: (item: T) => Omit<FacetOption, 'value' | 'count'>) => items
+  const options = <T>(items: readonly T[], selected: string[], value: (item: T) => string, test: (product: CatalogEntry, item: T) => boolean,
+    base: CatalogEntry[], extra: (item: T) => Omit<FacetOption, 'value' | 'count'>) => items
     .filter((item) => selected.includes(value(item)) || pool.some((product) => test(product, item)))
     .map((item) => ({ value: value(item), ...extra(item), count: base.filter((product) => test(product, item)).length }));
 
-  const inPreset = (product: Product, preset: (typeof PRICE_PRESETS)[number]) => {
+  const inPreset = (product: CatalogEntry, preset: (typeof PRICE_PRESETS)[number]) => {
     const value = priceFor(product, filters.sizes);
     return value >= preset.min && value <= preset.max;
   };

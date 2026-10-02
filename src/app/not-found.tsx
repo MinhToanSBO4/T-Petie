@@ -5,7 +5,7 @@ import { ErrorScreen, SupportContacts, errorButtonClass } from '@/components/err
 import { ProductCard } from '@/components/product/ProductCard';
 import { getProducts } from '@/server/catalog/queries';
 import { getSiteContent } from '@/server/content/site-content';
-import type { Product } from '@/types/product';
+import { toProductCard, type Product } from '@/types/product';
 
 export const metadata: Metadata = { title: "Không tìm thấy trang | T'Petie" };
 
@@ -17,7 +17,7 @@ export default async function NotFound() {
   // Liên hệ và gợi ý chỉ là phần phụ (đều đọc từ cache): đọc lỗi thì bỏ qua, không để trang 404 biến thành trang lỗi.
   const [content, products] = await Promise.all([getSiteContent().catch(() => null), getProducts().catch((): Product[] => [])]);
   const inStock = products.filter((product) => product.sizes.some((size) => size.stock > 0));
-  const suggestions = [...inStock.filter((product) => product.isNewArrival), ...inStock.filter((product) => !product.isNewArrival)].slice(0, 4);
+  const suggestions = [...inStock.filter((product) => product.isNewArrival), ...inStock.filter((product) => !product.isNewArrival)].slice(0, 4).map(toProductCard);
   const browse = products.some((product) => product.isNewArrival)
     ? { href: '/girls?new=1', label: 'Xem hàng mới về' } : { href: '/girls', label: 'Xem sản phẩm' };
 

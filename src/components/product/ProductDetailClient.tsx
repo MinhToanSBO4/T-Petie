@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   ImageIcon,
 } from 'lucide-react';
-import { Product, ProductSizeOption } from '@/types/product';
+import type { Product, ProductCardData, ProductSizeOption } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
@@ -31,7 +31,7 @@ import { cartSizeLabel } from '@/lib/orders/variant-match';
 import { ProductCard } from '@/components/product/ProductCard';
 import { trackViewItem, trackEvent } from '@/client/analytics/tracker';
 
-export function ProductDetailClient({ product, relatedProducts }: { product: Product; relatedProducts: Product[] }) {
+export function ProductDetailClient({ product, relatedProducts }: { product: Product; relatedProducts: ProductCardData[] }) {
   const router = useRouter();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);

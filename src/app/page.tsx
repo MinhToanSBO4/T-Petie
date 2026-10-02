@@ -11,7 +11,7 @@ import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { getSiteContent } from '@/server/content/site-content';
 import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
-import type { Product } from '@/types/product';
+import { toProductCard, type Product } from '@/types/product';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 export const revalidate = 60;
@@ -28,8 +28,8 @@ export default async function HomePage() {
   const selectedProducts = (ids: string[] | undefined, fallback: Product[]) => ids?.length
     ? ids.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product))
     : fallback;
-  const bestSellers = selectedProducts(sections?.bestSellers.productIds, products.filter((product) => product.isBestSeller)).slice(0, 12);
-  const flashSaleProducts = selectedProducts(sections?.sale.productIds, products.filter((product) => product.isSale)).slice(0, 12);
+  const bestSellers = selectedProducts(sections?.bestSellers.productIds, products.filter((product) => product.isBestSeller)).slice(0, 12).map(toProductCard);
+  const flashSaleProducts = selectedProducts(sections?.sale.productIds, products.filter((product) => product.isSale)).slice(0, 12).map(toProductCard);
   const blockImage = (image?: BlockImage) => image?.imageUrl && <img src={cloudinaryImage(image.imageUrl, { width: 1600 })} alt={image.imageAlt || ''}
     className="mb-5 h-40 w-full rounded-3xl object-cover sm:h-56" />;
   const blocks: Record<HomeBlockId, React.ReactNode> = {

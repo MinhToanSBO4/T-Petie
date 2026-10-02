@@ -6,9 +6,12 @@ import { Product, ProductSizeOption } from '@/types/product';
 import { trackAddToCart } from '@/client/analytics/tracker';
 import { cartSizeLabel } from '@/lib/orders/variant-match';
 
+/** Thông tin sản phẩm giỏ hàng cần lưu: thẻ trong danh sách (dữ liệu gọn) và trang chi tiết đều có đủ. */
+type CartProduct = Pick<Product, 'id' | 'name' | 'sku' | 'thumbnail' | 'categoryName'>;
+
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Product, selectedSize: ProductSizeOption, quantity?: number) => void;
+  addToCart: (product: CartProduct, selectedSize: ProductSizeOption, quantity?: number) => void;
   /** Thêm nhiều món một lần (mua lại đơn cũ): gộp với món cùng size đã có trong giỏ. */
   addItems: (items: CartItem[]) => void;
   removeFromCart: (productId: string, selectedSize: string) => void;
@@ -55,7 +58,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, isHydrated]);
 
-  const addToCart = (product: Product, selectedSize: ProductSizeOption, quantity = 1) => {
+  const addToCart = (product: CartProduct, selectedSize: ProductSizeOption, quantity = 1) => {
     const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
     setItems((prevItems) => {
       const existingIndex = prevItems.findIndex(

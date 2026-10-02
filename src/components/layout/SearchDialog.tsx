@@ -1,44 +1,61 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowRight, Search, X } from 'lucide-react';
 import { useDialog } from '@/hooks/useDialog';
-import { getCachedCatalog, loadCatalogProducts } from '@/client/catalog-cache';
-import { searchCatalog } from '@/lib/catalog/filters';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
-import type { Product } from '@/types/product';
+import type { ProductCardData } from '@/types/product';
 
 const POPULAR = ['Váy công chúa', 'Áo cổ sen', 'Quần bloomer', 'Thô đũi organic', 'Set đồ'];
 const SUGGESTION_LIMIT = 6;
 
+type SearchResult = { products: ProductCardData[]; total: number };
+/** Kết quả đã tìm trong phiên: xóa bớt chữ rồi gõ lại không phải hỏi lại máy chủ. */
+const searchCache = new Map<string, SearchResult>();
+
 /**
- * Tìm kiếm nhanh: gợi ý sản phẩm ngay khi gõ (không dấu vẫn tìm được), chạy trên danh mục đã lưu ở trình duyệt nên
- * không gửi truy vấn nào lên máy chủ mỗi lần gõ. Enter hoặc "Xem tất cả" mở trang kết quả đầy đủ có bộ lọc.
+ * Tìm kiếm nhanh: gợi ý sản phẩm ngay khi gõ (không dấu vẫn tìm được). Máy chủ tìm trên danh mục đã cache và chỉ trả
+ * vài gợi ý (trước đây trình duyệt tải toàn bộ catalog chỉ để gợi ý). Enter hoặc "Xem tất cả" mở trang kết quả đầy đủ.
  */
 export function SearchDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [products, setProducts] = useState<Product[]>(() => getCachedCatalog() || []);
+  const [result, setResult] = useState<SearchResult>({ products: [], total: 0 });
+  const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(-1);
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useDialog(panelRef, onClose, inputRef);
 
   useEffect(() => {
-    let alive = true;
-    loadCatalogProducts().then((data) => { if (alive) setProducts(data); }).catch(() => { /* vẫn tìm được ở trang kết quả */ });
-    return () => { alive = false; };
-  }, []);
-  useEffect(() => {
-    const timer = setTimeout(() => { setDebounced(query); setActive(-1); }, 120);
+    const timer = setTimeout(() => { setDebounced(query); setActive(-1); }, 200);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const results = useMemo(() => debounced.trim() ? searchCatalog(products, debounced) : [], [products, debounced]);
-  const suggestions = results.slice(0, SUGGESTION_LIMIT);
+  useEffect(() => {
+    const keyword = debounced.trim().toLocaleLowerCase('vi-VN');
+    if (!keyword) { setResult({ products: [], total: 0 }); setLoading(false); return; }
+    const cached = searchCache.get(keyword);
+    if (cached) { setResult(cached); setLoading(false); return; }
+    const controller = new AbortController();
+    setLoading(true);
+    fetch(`/api/products?limit=${SUGGESTION_LIMIT}&q=${encodeURIComponent(keyword)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('search failed')))
+      .then((data) => {
+        const next = { products: Array.isArray(data.products) ? data.products : [], total: Number(data.total) || 0 };
+        if (searchCache.size > 50) searchCache.clear();
+        searchCache.set(keyword, next);
+        setResult(next);
+      })
+      .catch(() => { if (!controller.signal.aborted) setResult({ products: [], total: 0 }); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [debounced]);
+
+  const suggestions = result.products;
 
   const searchAll = (keyword: string) => {
     const value = keyword.trim();
@@ -46,7 +63,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
     onClose();
     router.push(`/girls?q=${encodeURIComponent(value)}`);
   };
-  const open = (product: Product) => { onClose(); router.push(`/products/${product.slug}`); };
+  const open = (product: ProductCardData) => { onClose(); router.push(`/products/${product.slug}`); };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!suggestions.length) return;
@@ -93,10 +110,11 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
               <span className="shrink-0 text-xs font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span>
             </button>
           </li>)}
-        </ul> : <p className="px-2 py-4 text-sm text-charcoal-500">Không thấy mẫu nào cho “{debounced.trim()}”. Mẹ thử từ khóa ngắn hơn nhé.</p>}
-        {results.length > 0 && <button type="button" onClick={() => searchAll(query)}
+        </ul> : <p className="px-2 py-4 text-sm text-charcoal-500" aria-live="polite">
+          {loading ? 'Đang tìm…' : `Không thấy mẫu nào cho “${debounced.trim()}”. Mẹ thử từ khóa ngắn hơn nhé.`}</p>}
+        {result.total > 0 && <button type="button" onClick={() => searchAll(query)}
           className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-cream-100 py-2.5 text-xs font-bold text-charcoal-800 hover:bg-honey-100">
-          Xem tất cả {results.length} kết quả <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          Xem tất cả {result.total} kết quả <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </button>}
       </div> : <div className="mt-4">
         <span className="mb-2 block text-xs font-semibold text-charcoal-600">Gợi ý tìm kiếm phổ biến:</span>

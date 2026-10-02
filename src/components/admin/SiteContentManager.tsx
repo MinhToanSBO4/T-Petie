@@ -13,7 +13,7 @@ import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, type HomeBlockId } from '@/lib/content/site-content';
 import type { Collection } from '@/types/collection';
-import type { Product } from '@/types/product';
+import type { Product, ProductCardData } from '@/types/product';
 import type { PublicFeedback } from '@/types/testimonial';
 
 type HomeFeatureRow = { id: string; src: string; icon: string; title: string; description: string; objectPosition: string };
@@ -218,8 +218,8 @@ export function SiteContentManager({ initialContent, collections, products, best
   initialContent: Record<string, unknown>;
   collections: Collection[];
   products: ProductOption[];
-  bestSellers: Product[];
-  saleProducts: Product[];
+  bestSellers: ProductCardData[];
+  saleProducts: ProductCardData[];
   feedback: PublicFeedback[];
   feedbackTotal: number;
 }) {

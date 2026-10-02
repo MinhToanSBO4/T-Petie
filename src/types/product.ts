@@ -58,3 +58,19 @@ export interface Product {
 }
 
 export type ProductCategory = Product['category'];
+
+/** Dữ liệu một thẻ sản phẩm trong danh sách: chỉ các trường thẻ hiển thị và nút "Thêm nhanh" cần. */
+export type ProductCardData = Pick<Product, 'id' | 'slug' | 'sku' | 'name' | 'categoryName' | 'subcategoryName' | 'collectionName' | 'thumbnail' | 'basePrice'
+  | 'originalPrice' | 'discountPercent' | 'isSale' | 'isBestSeller' | 'isNewArrival' | 'material' | 'materialFeatures' | 'sizes'>;
+
+/** Gọn một sản phẩm thành dữ liệu thẻ (bỏ mô tả, thông số, ảnh phụ…) trước khi gửi xuống trình duyệt. */
+export function toProductCard(product: Product): ProductCardData {
+  return {
+    id: product.id, slug: product.slug, sku: product.sku, name: product.name, categoryName: product.categoryName,
+    subcategoryName: product.subcategoryName, collectionName: product.collectionName,
+    thumbnail: product.thumbnail, basePrice: product.basePrice, originalPrice: product.originalPrice,
+    discountPercent: product.discountPercent, isSale: product.isSale, isBestSeller: product.isBestSeller,
+    isNewArrival: product.isNewArrival, material: product.material, materialFeatures: product.materialFeatures.slice(0, 1),
+    sizes: product.sizes,
+  };
+}

@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getProducts } from '@/server/catalog/queries';
+import { getProductBySlug } from '@/server/catalog/queries';
 
 export const dynamic = 'force-dynamic';
 
+/** Một sản phẩm theo slug (hoặc mã cũ); đọc đúng một bản ghi đã cache thay vì lọc toàn bộ catalog. */
 export async function GET(_request: Request, { params }: { params: { slug: string } }) {
-  const product = (await getProducts()).find((entry) => entry.slug === params.slug || entry.id === params.slug);
+  const product = await getProductBySlug(params.slug);
   return product
-    ? NextResponse.json(
-        { product },
-        {
-          headers: {
-            'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=300',
-          },
-        }
-      )
+    ? NextResponse.json({ product }, { headers: { 'Cache-Control': 'no-store' } })
     : NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 });
 }
