@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Script from 'next/script';
 import { SessionProvider } from '@/components/providers/SessionProvider';
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { AuthProvider } from '@/context/AuthContext';
@@ -16,6 +17,8 @@ import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
 import { getCollections } from '@/server/catalog/queries';
 import { Suspense } from 'react';
+
+const DEFAULT_GA4_ID = 'G-LF9P82Z9QM';
 
 export const metadata: Metadata = {
   title: "T'Petie | Thời Trang Trẻ Em Cao Cấp & Dịu Ngọt",
@@ -43,8 +46,10 @@ export default async function RootLayout({
 }) {
   const clarityId = /^[a-z0-9]+$/i.test(process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || '')
     ? process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID : undefined;
-  const ga4Id = /^G-[A-Z0-9]+$/.test(process.env.NEXT_PUBLIC_GA4_ID || '')
-    ? process.env.NEXT_PUBLIC_GA4_ID : undefined;
+  // GA4: NEXT_PUBLIC_GA4_ID nếu có, nếu không dùng property mặc định của T'Petie nhưng chỉ ở bản production trên Vercel,
+  // để lượt truy cập từ máy local và bản preview không lẫn vào báo cáo. Measurement ID là thông tin công khai.
+  const ga4Candidate = process.env.NEXT_PUBLIC_GA4_ID || (process.env.VERCEL_ENV === 'production' ? DEFAULT_GA4_ID : '');
+  const ga4Id = /^G-[A-Z0-9]+$/.test(ga4Candidate) ? ga4Candidate : undefined;
   // Nhận diện thương hiệu và cấu hình bán hàng lấy từ database, không còn số liệu viết cứng.
   // Menu bộ sưu tập đọc từ cache máy chủ (làm mới khi admin sửa bộ sưu tập), không gọi API mỗi lần chuyển trang.
   const [siteContent, commerceSettings, collections] = await Promise.all([getSiteContent(), getCommerceSettings(), getCollections()]);
@@ -75,31 +80,10 @@ export default async function RootLayout({
             `}
           </Script>
         )}
-
-        {/* Google Analytics 4 Script */}
-        {ga4Id && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}
-              strategy="afterInteractive"
-            />
-            <Script
-              id="google-analytics"
-              strategy="afterInteractive"
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', '${ga4Id}');
-                `,
-              }}
-            />
-          </>
-        )}
       </head>
       <body className="min-h-screen flex flex-col antialiased bg-cream-50 text-charcoal-900 font-sans selection:bg-honey-100 selection:text-honey-700">
         <SessionProvider>
+          {ga4Id && <GoogleAnalytics measurementId={ga4Id} />}
           <AuthProvider>
             <ToastProvider>
               <CartProvider>

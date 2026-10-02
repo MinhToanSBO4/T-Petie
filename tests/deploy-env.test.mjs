@@ -10,6 +10,7 @@ const production = {
   NEXTAUTH_SECRET: 'x'.repeat(44),
   CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: 'key', CLOUDINARY_API_SECRET: 'secret',
   CRON_SECRET: 'c'.repeat(32),
+  NEXT_PUBLIC_GA4_ID: 'G-ABC123XYZ9',
 };
 const check = (env, options = { production: true, vercel: true }) => checkDeployEnvironment(env, options);
 
@@ -40,4 +41,11 @@ test('legacy CLOUD_* names are accepted and session pooler on Vercel only warns'
 test('local development needs only the database and session secret', () => {
   const result = check({ CONNECTION_STRING: production.DIRECT_URL, NEXTAUTH_SECRET: 'local-secret' }, { production: false });
   assert.equal(result.errors.length, 0);
+});
+
+test('an invalid GA4 measurement ID only warns', () => {
+  assert.deepEqual(check({ ...production, NEXT_PUBLIC_GA4_ID: 'UA-12345-1' }).errors, []);
+  assert.equal(check({ ...production, NEXT_PUBLIC_GA4_ID: 'UA-12345-1' }).warnings.length, 1);
+  const { NEXT_PUBLIC_GA4_ID, ...withoutAnalytics } = production;
+  assert.deepEqual(check(withoutAnalytics), { errors: [], warnings: [] });
 });

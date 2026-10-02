@@ -55,7 +55,8 @@ Các lần deploy sau, `prisma migrate deploy` chỉ chạy migration mới thê
 | `NEXTAUTH_SECRET` | Chuỗi mới: `openssl rand -base64 32` (không dùng lại khóa local) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Khóa Cloudinary |
 | `CRON_SECRET` | Chuỗi ngẫu nhiên ≥ 16 ký tự (`openssl rand -hex 24`); Vercel gửi kèm khi gọi cron |
-| `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_CLARITY_PROJECT_ID` | Tùy chọn |
+| `NEXT_PUBLIC_GA4_ID` | Tùy chọn: bỏ trống thì production dùng property mặc định `G-LF9P82Z9QM`; chỉ đặt khi đổi sang property GA4 khác (xem mục 5) |
+| `NEXT_PUBLIC_CLARITY_PROJECT_ID` | Tùy chọn: Microsoft Clarity |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Chỉ khi bật đăng nhập Google |
 | `MIGRATE_ON_BUILD` | Tùy chọn: `0` tắt tự migrate, `1` bật cả cho preview (chỉ khi preview có database riêng) |
 
@@ -79,6 +80,16 @@ Các lần deploy sau, `prisma migrate deploy` chỉ chạy migration mới thê
 - **CDN ảnh**: ảnh sản phẩm, bộ sưu tập, feedback lưu trên Cloudinary và phục vụ qua CDN `res.cloudinary.com`; `next/image` sinh URL Cloudinary đúng kích thước hiển thị, định dạng `f_auto` và chất lượng nén theo từng ảnh (không dùng Image Optimization của Vercel). Không cần biến `CDN_URL`.
 - **CDN Vercel**: JS/CSS/font trong `/_next/static` được Vercel cache lâu dài trên Edge; trang tĩnh được cache và làm mới khi deploy.
 - **Đổi `NEXTAUTH_SECRET`** làm mọi phiên đăng nhập hiện tại hết hạn (mọi người phải đăng nhập lại).
+
+### Google Analytics 4 (theo dõi thời gian thực)
+
+1. Bản production trên Vercel tự gửi dữ liệu tới property GA4 `G-LF9P82Z9QM` (lấy từ website giao diện gốc), máy local và bản preview không gửi. Cần quyền xem property này: chủ property vào GA4 → **Quản trị → Quản lý quyền truy cập tài sản** thêm email của bạn.
+2. Trong property: **Quản trị → Luồng dữ liệu → Web**, giữ bật *Enhanced measurement* (đo cả lượt xem trang khi chuyển trang trong website); **Quản trị → Chi tiết tài sản**: đơn vị tiền *VND*, múi giờ *Việt Nam*. Có thể thêm domain chính thức vào luồng dữ liệu (GA4 vẫn nhận dữ liệu từ mọi domain gắn mã).
+   Đổi sang property khác: đặt `NEXT_PUBLIC_GA4_ID` trên Vercel rồi **Redeploy** (biến `NEXT_PUBLIC_` được gắn vào mã lúc build).
+3. Mở website ở cửa sổ ẩn danh (chưa đăng nhập), vào GA4 → **Báo cáo → Thời gian thực**: trong vài giây thấy 1 người dùng, trang đang xem và các sự kiện.
+- Website gửi `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase` (kèm mã đơn, doanh thu VND, sản phẩm), `login`, `select_size`, `open_size_guide`.
+- **Không đo** tài khoản admin/nhân viên và khu `/admin`, `/staff`, để Realtime chỉ hiện khách thật.
+- Kiểm tra lỗi: DevTools → Network lọc `collect`, phải thấy request tới `google-analytics.com/g/collect` trạng thái 204.
 
 ## 6. Giới hạn cần biết
 

@@ -8,6 +8,7 @@ import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
+import { trackPurchase } from '@/client/analytics/tracker';
 
 interface CheckoutData {
   items: {
@@ -108,6 +109,11 @@ export default function CheckoutPage() {
         sessionStorage.setItem('order_success_total', String(result.totalAmount));
         sessionStorage.removeItem('checkout_idempotency');
         sessionStorage.removeItem('checkout_data');
+        // Giá từng món theo báo giá của máy chủ; tổng tiền là số máy chủ trả về cho đơn vừa tạo.
+        trackPurchase(result.orderId, Number(result.totalAmount), checkoutData.items.map((item) => ({
+          item_id: item.productId, item_name: item.productName, item_variant: item.selectedSize, quantity: item.quantity,
+          price: quote.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)?.unitPrice ?? item.price,
+        })));
         checkoutData.items.forEach((item) => removeFromCart(item.productId, item.selectedSize));
         
         // Thành công -> chuyển trang

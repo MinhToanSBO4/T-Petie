@@ -1,14 +1,15 @@
 /** @type {import('next').NextConfig} */
 // Next.js chèn script bootstrap nội tuyến nên CSP cần 'unsafe-inline'; dev cần thêm 'unsafe-eval'
-// cho webpack. Danh sách nguồn chỉ mở cho Cloudinary, Google Fonts, GA4 và Clarity.
+// cho webpack. Danh sách nguồn chỉ mở cho Cloudinary, Google Fonts, GA4 và Clarity. Nguồn GA4 theo hướng dẫn CSP của
+// Google (gtag gửi dữ liệu tới *.google-analytics.com và *.analytics.google.com tùy vùng).
 const isDev = process.env.NODE_ENV === 'development';
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://*.googletagmanager.com https://*.clarity.ms`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://www.google-analytics.com https://www.clarity.ms https://*.clarity.ms",
-  "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com https://*.clarity.ms",
+  "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://www.clarity.ms https://*.clarity.ms",
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.clarity.ms",
   "frame-src 'none'",
   "frame-ancestors 'none'",
   "object-src 'none'",
