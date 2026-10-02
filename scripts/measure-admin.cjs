@@ -1,14 +1,16 @@
 const { loadEnvConfig } = require('@next/env');
+const { loginCredentials } = require('./lib/test-login.cjs');
 loadEnvConfig(process.cwd());
 const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 const cookie = (response) => response.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
 
 async function main() {
+  const adminLogin = await loginCredentials('admin');
   const csrf = await fetch(new URL('/api/auth/csrf', base));
   const login = await fetch(new URL('/api/auth/callback/credentials', base), { method: 'POST', redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookie(csrf) },
-    body: new URLSearchParams({ csrfToken: (await csrf.json()).csrfToken, email: process.env.ADMIN_USERNAME,
-      password: process.env.ADMIN_INITIAL_PASSWORD, callbackUrl: new URL('/admin', base).toString(), json: 'true' }) });
+    body: new URLSearchParams({ csrfToken: (await csrf.json()).csrfToken, email: adminLogin.username,
+      password: adminLogin.password, callbackUrl: new URL('/admin', base).toString(), json: 'true' }) });
   const sessionCookie = [cookie(csrf), cookie(login)].filter(Boolean).join('; ');
   for (const path of ['/admin', '/admin/orders', '/admin/settings']) {
     const samples = [];

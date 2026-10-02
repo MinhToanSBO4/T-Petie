@@ -1,5 +1,6 @@
 const { loadEnvConfig } = require('@next/env');
 
+const { loginCredentials } = require('./lib/test-login.cjs');
 loadEnvConfig(process.cwd());
 const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
@@ -24,11 +25,10 @@ async function main() {
     }
   }
 
-  for (const account of [
-    { username: process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL, password: process.env.ADMIN_INITIAL_PASSWORD, role: 'admin' },
-    { username: process.env.STAFF_USERNAME, password: process.env.STAFF_INITIAL_PASSWORD, role: 'staff' },
-  ]) {
-    if (!account.username || !account.password) continue;
+  for (const role of ['admin', 'staff']) {
+    const login = await loginCredentials(role, { optional: true });
+    if (!login) continue;
+    const account = { ...login, role };
     const csrfResponse = await fetch(new URL('/api/auth/csrf', base));
     const { csrfToken } = await csrfResponse.json();
     const body = new URLSearchParams({

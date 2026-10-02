@@ -1,11 +1,13 @@
 const { loadEnvConfig } = require('@next/env');
 const { PrismaClient } = require('@prisma/client');
+const { loginCredentials } = require('./lib/test-login.cjs');
 loadEnvConfig(process.cwd());
 const prisma = new PrismaClient();
 const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 const cookie = (response) => response.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
 
 async function main() {
+  const adminLogin = await loginCredentials('admin');
   const productsResponse = await fetch(new URL('/api/products?limit=48', base));
   const products = (await productsResponse.json()).products;
   const product = products.find((row) => row.sizes?.some((size) => size.stock > 0));
@@ -36,8 +38,8 @@ async function main() {
   const csrf = await fetch(new URL('/api/auth/csrf', base));
   const login = await fetch(new URL('/api/auth/callback/credentials', base), { method: 'POST', redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookie(csrf) },
-    body: new URLSearchParams({ csrfToken: (await csrf.json()).csrfToken, email: process.env.ADMIN_USERNAME,
-      password: process.env.ADMIN_INITIAL_PASSWORD, callbackUrl: new URL('/admin', base).toString(), json: 'true' }) });
+    body: new URLSearchParams({ csrfToken: (await csrf.json()).csrfToken, email: adminLogin.username,
+      password: adminLogin.password, callbackUrl: new URL('/admin', base).toString(), json: 'true' }) });
   const sessionCookie = [cookie(csrf), cookie(login)].filter(Boolean).join('; ');
   const admin = await fetch(new URL('/api/admin/commerce', base), { headers: { cookie: sessionCookie } });
   const config = await admin.json();

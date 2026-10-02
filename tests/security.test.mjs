@@ -24,8 +24,8 @@ test('build cannot silently erase the database', () => {
   assert.doesNotMatch(config.scripts.build, /db push|accept-data-loss/);
 });
 
-test('seed has no published password', () => {
-  const source = read('../prisma/seed.ts');
+test('admin creation has no published password', () => {
+  const source = read('../scripts/create-admin.cjs');
   assert.doesNotMatch(source, /AdminPassword123|UserPassword123/);
 });
 

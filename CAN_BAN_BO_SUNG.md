@@ -57,7 +57,7 @@ Bản ứng dụng ở thư mục gốc dùng PostgreSQL/Supabase qua Prisma. Sc
 
 ## Chạy và kiểm tra local
 
-Trong thư mục gốc: `npm ci` nếu chưa cài, `npm run dev`, mở `http://localhost:3000`. Không cần seed lại DB hiện tại. Dùng tài khoản đã có trong DB. Với database mới, đặt `ADMIN_*` và tùy chọn `STAFF_*` theo `.env.example`, rồi chạy `npm run accounts:provision`. Lệnh không đổi mật khẩu của tài khoản đã tồn tại. Không đưa mật khẩu vào Git.
+Trong thư mục gốc: `npm ci` nếu chưa cài, `npm run dev`, mở `http://localhost:3000`. Không cần seed lại DB hiện tại. Dùng tài khoản đã có trong DB. Với database mới, chạy `npm run admin:create` và nhập tài khoản quản trị trong terminal; nhân viên tạo tại `/admin/staff`. Tài khoản không đặt trong `.env`. Không đưa mật khẩu vào Git.
 
 Chạy `npm test`, `npx tsc --noEmit`, `npm run build` (dừng dev server trước khi build trên Windows). Khi dev server chạy, dùng `npm run content:check`, `node scripts/smoke-local.cjs`, `node scripts/check-order-workflow.cjs` (chạy ngay sau khi bật server, trước khi bộ quét tự hoàn tất đơn chạy lần đầu), `node scripts/check-admin-dashboard.cjs`, `node scripts/check-collection-pages.cjs`, `node --env-file=.env scripts/check-cloudinary.cjs`, `node scripts/check-admin-flow.cjs`, `node scripts/check-export-flow.cjs`, `node scripts/check-admin-features.cjs`, `node scripts/verify-data-source.cjs`, `node scripts/check-commerce.cjs`, `node scripts/check-customer-flow.cjs`, `node scripts/check-order-flow.cjs`, `node scripts/check-new-product-flow.cjs`, `node scripts/check-staff-reset.cjs`, `node scripts/check-internal-links.cjs`, `node scripts/check-purchase-review-flow.cjs` để đối chiếu API và DB. Các script ghi thử tự dọn dữ liệu thử sau khi hoàn thành.
 
