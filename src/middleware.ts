@@ -10,6 +10,14 @@ import { areaOf, backOfficeHome, isBackOfficeRole, pathInArea } from '@/lib/admi
  * Mỗi trang và API vẫn tự kiểm tra quyền với database (vai trò trong cookie có thể cũ hơn vài giây).
  */
 export async function middleware(request: NextRequest) {
+  if (/^\/(verify-email|reset-password|forgot-password)(\/|$)/.test(request.nextUrl.pathname)) {
+    const response = NextResponse.next();
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    response.headers.set('Cache-Control', 'private, no-store');
+    // Block analytics scripts and beacons, even when globally configured in the storefront layout.
+    response.headers.set('Content-Security-Policy', "script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; frame-src 'none'");
+    return response;
+  }
   const decoded = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET }).catch(() => null);
   const token = decoded?.status === 'active' ? decoded : null;
   const { pathname, search } = request.nextUrl;
@@ -29,4 +37,4 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ['/', '/admin', '/admin/:path*', '/staff', '/staff/:path*'] };
+export const config = { matcher: ['/', '/admin', '/admin/:path*', '/staff', '/staff/:path*', '/verify-email', '/reset-password', '/forgot-password'] };

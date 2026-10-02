@@ -12,6 +12,8 @@ import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { MiniCart } from '@/components/cart/MiniCart';
 import { FloatingMessenger } from '@/components/layout/FloatingMessenger';
 import { NavigationProgress } from '@/components/layout/NavigationProgress';
+import { AuthNotice } from '@/components/auth/AuthNotice';
+import { EmailVerificationProvider } from '@/components/auth/EmailVerification';
 import { PublicChrome } from '@/components/layout/PublicChrome';
 import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
@@ -75,6 +77,7 @@ export default async function RootLayout({
           <Script id="microsoft-clarity" strategy="afterInteractive">
             {`
               (function(c,l,a,r,i,t,y){
+                  if (['verify-email','reset-password','forgot-password'].includes(l.location.pathname.split('/')[1])) return;
                   c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
                   t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
                   y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
@@ -88,8 +91,10 @@ export default async function RootLayout({
           {ga4Id && <GoogleAnalytics measurementId={ga4Id} />}
           <AuthProvider>
             <ToastProvider>
+              <EmailVerificationProvider>
               <CartProvider>
                 <Suspense fallback={null}><NavigationProgress /></Suspense>
+                <AuthNotice />
                 {/* Khu vực quản trị có khung riêng nên các thành phần của trang khách được ẩn ở đó. */}
                 <PublicChrome
                   header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} collectionNav={collectionNav} />}
@@ -103,6 +108,7 @@ export default async function RootLayout({
                   <main className="flex-1 pb-16 md:pb-0">{children}</main>
                 </PublicChrome>
               </CartProvider>
+              </EmailVerificationProvider>
             </ToastProvider>
           </AuthProvider>
         </SessionProvider>

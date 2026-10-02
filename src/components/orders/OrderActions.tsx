@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, PackageCheck, RotateCcw } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { useToast } from '@/context/ToastContext';
+import { errorText, toast } from '@/client/toast';
 import type { CustomerOrderItem } from '@/types/order';
 
 type Action = 'cancel' | 'received';
@@ -24,26 +24,26 @@ export function OrderActions({ code, status, items, detailHref }: {
 }) {
   const router = useRouter();
   const { addItems } = useCart();
-  const { showToast } = useToast();
   const [pending, setPending] = useState<Action | null>(null);
 
   const run = async (action: Action) => {
     if (!window.confirm(CONFIRM[action])) return;
     setPending(action);
+    const notice = toast.loading(action === 'received' ? 'Đang xác nhận đã nhận hàng…' : `Đang hủy đơn ${code}…`, { id: `order-${code}` });
     try {
       const response = await fetch(`/api/orders/${encodeURIComponent(code)}/status`, { method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Không cập nhật được đơn hàng');
-      showToast(action === 'received' ? 'Cảm ơn mẹ! Mẹ đánh giá sản phẩm giúp shop nhé 🌸' : `Đã hủy đơn ${code}.`,
-        action === 'received' ? 'love' : 'info');
+      if (action === 'received') toast.love('Cảm ơn mẹ! Mẹ đánh giá sản phẩm giúp shop nhé 🌸', { id: notice });
+      else toast.success(`Đã hủy đơn ${code}.`, { id: notice });
       router.refresh();
       // Nút "Đã nhận được hàng" nằm cuối đơn: đưa khách về danh sách sản phẩm, nơi nút Đánh giá vừa xuất hiện.
       if (action === 'received') {
         (document.getElementById('order-items-title') || document.getElementById(`order-${code}`))
           ?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
       }
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Có lỗi xảy ra', 'info'); }
+    } catch (error) { toast.error(errorText(error, 'Không cập nhật được đơn hàng'), { id: notice }); }
     finally { setPending(null); }
   };
 
@@ -55,8 +55,9 @@ export function OrderActions({ code, status, items, detailHref }: {
       quantity: Math.min(item.quantity, item.reorder!.stock),
     })));
     const missing = items.length - available.length;
-    if (available.length === 0) { showToast('Các sản phẩm trong đơn đã hết hàng hoặc ngừng bán.', 'info'); return; }
-    showToast(missing > 0 ? `Đã thêm ${available.length} món vào giỏ; ${missing} món đã hết hàng.` : `Đã thêm ${available.length} món vào giỏ hàng.`);
+    if (available.length === 0) { toast.warning('Các sản phẩm trong đơn đã hết hàng hoặc ngừng bán.'); return; }
+    if (missing > 0) toast.warning(`Đã thêm ${available.length} món vào giỏ; ${missing} món đã hết hàng.`);
+    else toast.success(`Đã thêm ${available.length} món vào giỏ hàng.`);
     window.dispatchEvent(new Event('tpetie:navigation-start'));
     router.push('/cart');
   };

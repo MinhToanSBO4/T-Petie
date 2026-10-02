@@ -9,6 +9,7 @@ import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { trackBeginCheckout } from '@/client/analytics/tracker';
 import { useOrderQuote } from '@/hooks/useOrderQuote';
+import { useEmailVerification } from '@/components/auth/EmailVerification';
 
 
 interface BuyNowItem {
@@ -25,6 +26,7 @@ interface BuyNowItem {
 export default function BuyNowPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { requireVerifiedEmail } = useEmailVerification();
   const [item, setItem] = useState<BuyNowItem | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [couponCode, setCouponCode] = useState('');
@@ -53,7 +55,11 @@ export default function BuyNowPage() {
   };
 
   const handleCheckout = () => {
-    if (!quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info'); return; }
+    if (!requireVerifiedEmail()) return;
+    if (!quote) {
+      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
+      return;
+    }
     trackBeginCheckout(
       [{ item_id: item.productId, item_name: item.productName, price: item.price, quantity }],
       quote.total

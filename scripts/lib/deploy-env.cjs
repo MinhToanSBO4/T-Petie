@@ -106,6 +106,23 @@ function checkDeployEnvironment(env, { production = false, vercel = false } = {}
   if (has('GOOGLE_CLIENT_ID') && !/\.apps\.googleusercontent\.com$/.test(env.GOOGLE_CLIENT_ID)) {
     warnings.push('GOOGLE_CLIENT_ID phải có dạng ….apps.googleusercontent.com (Google Cloud → Clients → Client ID).');
   }
+  // Email (xác thực tài khoản, quên mật khẩu, thông báo đơn hàng). Cổng, địa chỉ gửi, tên người gửi có mặc định.
+  const smtpKeys = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'];
+  if (production || smtpKeys.some(has)) {
+    for (const key of smtpKeys) if (!has(key)) (production ? errors : warnings).push(`Thiếu ${key}: khách không nhận được email xác thực nên không đặt hàng được.`);
+    if (has('SMTP_SECURE') && !['true', 'false'].includes(env.SMTP_SECURE)) errors.push('SMTP_SECURE phải là true hoặc false.');
+    if (has('SMTP_PORT') && (!/^\d+$/.test(env.SMTP_PORT) || Number(env.SMTP_PORT) < 1 || Number(env.SMTP_PORT) > 65535)) errors.push('SMTP_PORT không hợp lệ.');
+    const port = has('SMTP_PORT') ? env.SMTP_PORT : '465';
+    const secure = has('SMTP_SECURE') ? env.SMTP_SECURE : String(port === '465');
+    if ((port === '465' && secure !== 'true') || (port === '587' && secure !== 'false')) errors.push('SMTP_PORT không khớp SMTP_SECURE (465 dùng true, 587 dùng false).');
+    for (const key of ['MAIL_FROM_ADDRESS', 'MAIL_REPLY_TO']) if (has(key) && !/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(env[key])) errors.push(`${key} không hợp lệ.`);
+    if (has('MAIL_SITE_URL')) {
+      try {
+        const url = new URL(env.MAIL_SITE_URL);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash || (production && (url.protocol !== 'https:' || /^(localhost|127\.0\.0\.1)$/.test(url.hostname)))) throw new Error();
+      } catch { errors.push('MAIL_SITE_URL phải là origin hợp lệ; production dùng domain HTTPS.'); }
+    }
+  }
   return { errors, warnings };
 }
 

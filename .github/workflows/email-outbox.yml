@@ -1,0 +1,32 @@
+# Dự phòng cho hàng đợi email: thư được gửi ngay sau mỗi thao tác và tự thử lại trong lúc chạy, lượt truy cập của
+# khách cũng kích hoạt gửi thư còn tồn; workflow này chỉ bảo đảm thư lỗi vẫn được gửi khi website vắng khách.
+# Cần: Settings → Secrets and variables → Actions → secret CRON_SECRET (trùng với Vercel) và variable SITE_URL.
+name: Email outbox
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: email-outbox
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch email outbox
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$SITE_URL" ]; then
+            echo "::warning::CRON_SECRET hoặc SITE_URL chưa được cấu hình"; exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 70 \
+            --retry 2 --retry-delay 20 --retry-all-errors \
+            -H "Authorization: Bearer $CRON_SECRET" "${SITE_URL%/}/api/cron/email"

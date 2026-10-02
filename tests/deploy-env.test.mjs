@@ -12,11 +12,19 @@ const production = {
   CRON_SECRET: 'c'.repeat(32),
   NEXT_PUBLIC_GA4_ID: 'G-ABC123XYZ9',
   GOOGLE_CLIENT_ID: '123-abc.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
+  SMTP_HOST: 'smtp.example.com', SMTP_USER: 'mail@example.com', SMTP_PASSWORD: 'test-only',
 };
 const check = (env, options = { production: true, vercel: true }) => checkDeployEnvironment(env, options);
 
 test('a complete production configuration passes without warnings', () => {
   assert.deepEqual(check(production), { errors: [], warnings: [] });
+});
+test('production requires SMTP and a canonical HTTPS mail origin', () => {
+  assert.ok(check({ ...production, SMTP_PASSWORD: '' }).errors.some((e) => e.includes('SMTP_PASSWORD')));
+  assert.ok(check({ ...production, MAIL_SITE_URL: 'http://localhost:3000' }).errors.some((e) => e.includes('MAIL_SITE_URL')));
+  assert.ok(check({ ...production, SMTP_SECURE: 'bad' }).errors.some((e) => e.includes('SMTP_SECURE')));
+  assert.ok(check({ ...production, SMTP_PORT: '587', SMTP_SECURE: 'true' }).errors.some((e) => e.includes('SMTP_SECURE')));
+  assert.deepEqual(check({ ...production, SMTP_PORT: '587' }).errors, []);
 });
 
 test('account credentials in the environment are rejected', () => {

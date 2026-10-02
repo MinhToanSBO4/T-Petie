@@ -5,10 +5,12 @@ import { revalidateTag } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import { quoteOrder, type QuoteItem } from './quote-order';
 import { DASHBOARD_TAG } from '@/server/admin/dashboard';
+import { enqueueOrderEmail, scheduleEmailDispatch } from '@/server/email/outbox';
+import { normalizeEmail } from '@/lib/email/config';
 
 export type CheckoutInput = {
   fullName: string; phone: string; address: string; city: string; district: string; ward?: string;
-  note?: string; couponCode?: string; source?: string; items: QuoteItem[];
+  note?: string; couponCode?: string; source?: string; email?: string; items: QuoteItem[];
 };
 
 /** Mã chống trùng đã dùng cho một đơn của người khác/số điện thoại khác: trả 409, không phải lỗi máy chủ. */
@@ -26,6 +28,8 @@ async function existingOrder(idempotencyKey: string, phone: string, userId: stri
 }
 
 export async function createOrder(input: CheckoutInput, userId: string | undefined, idempotencyKey: string | null) {
+  const customerEmail = input.email?.trim() ? normalizeEmail(input.email) : null;
+  if (input.email?.trim() && !customerEmail) throw new Error('Email đặt hàng không hợp lệ');
   if (idempotencyKey) {
     const existing = await existingOrder(idempotencyKey, input.phone, userId);
     if (existing) return existing;
@@ -55,13 +59,14 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
       });
       if (updated.count !== 1) throw new Error(`Sản phẩm "${item.productName}" (${item.size}) vừa hết hoặc không đủ số lượng`);
     }
-    return tx.order.create({
+    const created = await tx.order.create({
       data: {
         orderCode: `TP-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`,
         idempotencyKey,
         userId,
         customerName: input.fullName,
         customerPhone: input.phone,
+        customerEmail,
         shippingAddress: input.address,
         city: input.city,
         district: input.district,
@@ -85,6 +90,8 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
         statusEvents: { create: { status: 'PENDING' } },
       },
     });
+    await enqueueOrderEmail(tx, created.id, `receipt:${created.id}`, 'receipt', 'PENDING');
+    return created;
     });
   } catch (error) {
     // Hai lần gửi cùng mã chống trùng gần như đồng thời: lần sau gặp khóa duy nhất, trả lại đơn của lần trước.
@@ -97,5 +104,6 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
   revalidateTag('products');
   // Đơn mới làm thay đổi doanh thu, số đơn chờ và tồn kho trên trang Tổng quan.
   revalidateTag(DASHBOARD_TAG);
+  scheduleEmailDispatch();
   return { orderId: order.orderCode, totalAmount: quote.total };
 }

@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
-import { normalizePhone } from '@/lib/account/account-input';
+import { readJson } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
+import { normalizePhone, PASSWORD_MIN } from '@/lib/account/account-input';
 
 type Staff = {
   id: string; name: string; username: string; email: string; phone?: string;
@@ -22,7 +24,7 @@ const STAFF_FILTERS: TableFilter[] = [
 
 async function fetchStaff(query: TableQuery) {
   const response = await fetch(`/api/admin/users?${tableParams(query, { filter: 'staff' })}`, { cache: 'no-store' });
-  const data = await response.json();
+  const data = await readJson(response);
   if (!response.ok) throw new Error(data.error || 'Không tải được nhân viên');
   return { items: data.items as Staff[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
@@ -30,8 +32,7 @@ async function fetchStaff(query: TableQuery) {
 export function StaffManager() {
   const [view, setView] = useState<View>({ mode: 'list' });
   const [reloadKey, setReloadKey] = useState(0);
-  const [message, setMessage] = useState('');
-  const back = (text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
+  const back = () => { setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
 
   if (view.mode === 'create') return <StaffCreateForm onDone={back} />;
   if (view.mode === 'detail') return <StaffDetail staff={view.staff} onBack={back} />;
@@ -50,7 +51,6 @@ export function StaffManager() {
   ];
 
   return <div className="space-y-4">
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchStaff} reloadKey={reloadKey}
       searchPlaceholder="Tìm tên, email, tên đăng nhập"
       sorts={STAFF_SORTS} filters={STAFF_FILTERS}
@@ -62,7 +62,7 @@ export function StaffManager() {
 }
 
 /** Tạo tài khoản nhân viên mới. */
-function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
+function StaffCreateForm({ onDone }: { onDone: () => void }) {
   const [draft, setDraft] = useState({ name: '', username: '', email: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -70,12 +70,17 @@ function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true); setError('');
+    const id = toast.loading('Đang tạo tài khoản…');
     try {
       const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không tạo được tài khoản');
-      onDone(`Đã tạo tài khoản nhân viên ${draft.name}.`);
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
+      toast.success(`Đã tạo tài khoản nhân viên ${draft.name}`, { id });
+      onDone();
+    } catch (submitError) {
+      const text = errorText(submitError, 'Không tạo được tài khoản');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -91,11 +96,11 @@ function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
         <input className={`${field} mt-1`} required value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} /></label>
       <label className="text-sm font-semibold">Email
         <input className={`${field} mt-1`} type="email" required value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
-      <label className="text-sm font-semibold">Mật khẩu ban đầu (tối thiểu 12 ký tự)
-        <input className={`${field} mt-1`} type="text" required minLength={12} value={draft.password}
+      <label className="text-sm font-semibold">Mật khẩu ban đầu (tối thiểu {PASSWORD_MIN} ký tự)
+        <input className={`${field} mt-1`} type="text" required minLength={PASSWORD_MIN} value={draft.password}
           onChange={(event) => setDraft({ ...draft, password: event.target.value })} /></label>
     </div>
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang tạo…' : 'Tạo tài khoản'}
     </button>
@@ -103,36 +108,40 @@ function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
 }
 
 /** Chi tiết nhân viên: sửa thông tin liên hệ, khóa/mở tài khoản và đặt lại mật khẩu. */
-function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: (message?: string) => void }) {
+function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => void }) {
   const [staff, setStaff] = useState(initial);
   const [draft, setDraft] = useState({ name: initial.name, email: initial.email, phone: initial.phone || '' });
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  // Lỗi nhập liệu và lỗi thao tác hiện trên form (thông báo góc màn hình tự ẩn); kết quả thành công hiện ở góc màn hình.
   const [error, setError] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const dirty = draft.name.trim() !== staff.name || draft.email.trim().toLowerCase() !== staff.email.toLowerCase()
     || draft.phone.trim() !== (staff.phone || '');
 
-  const update = async (body: Record<string, unknown>, okMessage: string) => {
-    setBusy(true); setMessage(''); setError('');
+  const update = async (body: Record<string, unknown>, pending: string, okMessage: string) => {
+    setBusy(true); setError('');
+    const id = toast.loading(pending);
     try {
       const response = await fetch(`/api/admin/users/${staff.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Thao tác thất bại');
       // Hiện ngay trạng thái/thông tin mới thay vì giữ bản đọc từ danh sách.
       setStaff((current) => ({ ...current, ...data.user, ...(typeof body.phone === 'string' ? { phone: body.phone } : {}) }));
-      setMessage(okMessage);
+      toast.success(okMessage, { id });
       if (data.temporaryPassword) setTemporaryPassword(data.temporaryPassword);
-    } catch (updateError) { setError(updateError instanceof Error ? updateError.message : 'Có lỗi xảy ra'); }
+    } catch (updateError) {
+      const text = errorText(updateError, 'Thao tác thất bại');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
   const saveContact = (event: React.FormEvent) => {
     event.preventDefault();
     const phone = draft.phone.trim() ? normalizePhone(draft.phone) : '';
-    if (phone === null) { setMessage(''); setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
+    if (phone === null) { setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
     setDraft({ ...draft, phone });
-    void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đã lưu thông tin nhân viên.');
+    void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đang lưu thông tin…', 'Đã lưu thông tin nhân viên');
   };
 
   return <div className="space-y-4">
@@ -143,7 +152,6 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: (messag
       </div>
       <button type="button" onClick={() => onBack()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
       Mật khẩu tạm thời mới: <strong className="font-mono">{temporaryPassword}</strong> — hãy gửi cho nhân viên và yêu cầu đổi ngay sau khi đăng nhập.
@@ -174,11 +182,11 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: (messag
 
     <div className="flex flex-wrap gap-2">
       {staff.status === 'active'
-        ? <button type="button" disabled={busy} onClick={() => void update({ status: 'blocked' }, 'Đã khóa tài khoản nhân viên.')}
+        ? <button type="button" disabled={busy} onClick={() => void update({ status: 'blocked' }, 'Đang khóa tài khoản…', 'Đã khóa tài khoản nhân viên')}
             className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Khóa tài khoản</button>
-        : <button type="button" disabled={busy} onClick={() => void update({ status: 'active' }, 'Đã mở lại tài khoản.')}
+        : <button type="button" disabled={busy} onClick={() => void update({ status: 'active' }, 'Đang mở khóa tài khoản…', 'Đã mở lại tài khoản')}
             className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Mở khóa</button>}
-      <button type="button" disabled={busy} onClick={() => void update({ resetPassword: true }, 'Đã tạo mật khẩu tạm thời mới.')}
+      <button type="button" disabled={busy} onClick={() => void update({ resetPassword: true }, 'Đang tạo mật khẩu tạm thời…', 'Đã tạo mật khẩu tạm thời mới')}
         className="min-h-11 rounded-xl bg-sage-700 px-5 text-sm font-bold text-white disabled:opacity-50">Đặt lại mật khẩu</button>
     </div>
   </div>;

@@ -6,8 +6,10 @@ import { vnDayStart } from '@/lib/admin/dashboard-range';
 import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
 import { OLDEST_FIRST_STATUSES, ORDER_STATUSES } from '@/lib/orders/status';
 import { autoCompleteShippedOrders } from '@/server/orders/order-status';
+import { scheduleEmailDispatch } from '@/server/email/outbox';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /** Cách sắp xếp danh sách đơn; luôn kèm id để phân trang ổn định khi trùng thời điểm hoặc tổng tiền. */
 const SORTS: Record<string, Prisma.OrderOrderByWithRelationInput[]> = {
@@ -26,6 +28,7 @@ const PERIOD_DAYS: Record<string, number> = { today: 1, '7d': 7, '30d': 30 };
 export async function GET(request: Request) {
   if (!(await requireStaffApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   await autoCompleteShippedOrders();
+  scheduleEmailDispatch();
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
   const search = parseSearch(searchParams);

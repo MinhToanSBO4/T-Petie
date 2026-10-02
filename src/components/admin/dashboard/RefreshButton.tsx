@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
+import { readJson } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
 
 /**
  * Lấy số liệu mới nhất rồi dựng lại trang, giữ nguyên vị trí cuộn. `clearCache`: xóa cache số liệu tổng quan trên máy
@@ -16,8 +18,14 @@ export function RefreshButton({ clearCache = true }: { clearCache?: boolean }) {
   const refresh = async () => {
     if (clearCache) {
       setBusy(true);
-      try { await fetch('/api/admin/dashboard/refresh', { method: 'POST' }); }
-      finally { setBusy(false); }
+      try {
+        const response = await fetch('/api/admin/dashboard/refresh', { method: 'POST' });
+        if (!response.ok) throw new Error(String((await readJson(response)).error || 'Không làm mới được số liệu'));
+      } catch (error) {
+        // Cache số liệu chưa xóa được thì làm mới cũng chỉ hiện lại số cũ.
+        toast.error(errorText(error, 'Không làm mới được số liệu'));
+        return;
+      } finally { setBusy(false); }
     }
     startTransition(() => router.refresh());
   };

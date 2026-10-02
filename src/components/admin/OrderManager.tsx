@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2, Undo2, X } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
+import { errorText, toast } from '@/client/toast';
 import { DataTable, clearTableCache, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
 import { OrderDrawer } from '@/components/admin/OrderDrawer';
@@ -50,6 +50,8 @@ const CONFLICT_MESSAGE = 'đã được cập nhật trước đó (có thể kh
 
 /** Tab đang xem được nhớ trong tab trình duyệt để quay lại trang đơn hàng đúng chỗ. */
 let rememberedTab: OrderStatus | '' = 'PENDING';
+/** Mỗi lần xử lý một thông báo riêng: hai lần xử lý cùng lúc không bị gộp vì trùng câu "Đang cập nhật…". */
+let runSequence = 0;
 
 type UndoItem = { code: string; current: OrderStatus; to: OrderStatus };
 type UndoState = { items: UndoItem[]; message: string };
@@ -69,7 +71,6 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
   initialTab?: OrderStatus;
   initialOrder?: string;
 }) {
-  const { showToast } = useToast();
   const [tab, setTab] = useState<OrderStatus | ''>(initialTab ?? rememberedTab);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -90,7 +91,11 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
   useEffect(() => {
     if (!initialOrder) return;
     let cancelled = false;
-    void fetchOrder(initialOrder).then((order) => { if (order && !cancelled) { setOpenCode(order.orderCode); setOpenOrder(order); } });
+    void fetchOrder(initialOrder).then((order) => {
+      if (cancelled) return;
+      if (order) { setOpenCode(order.orderCode); setOpenOrder(order); }
+      else toast.error(`Không tìm thấy đơn ${initialOrder}`);
+    }, (error) => { if (!cancelled) toast.error(errorText(error, `Không mở được đơn ${initialOrder}`)); });
     return () => { cancelled = true; };
   }, [initialOrder]);
 
@@ -128,14 +133,14 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
   }, [reload]);
 
   /** Đơn đã đổi ở nơi khác: tải lại danh sách, cập nhật ngăn kéo đang mở và báo rõ cho người dùng. */
-  const resolveConflicts = async (codes: string[]) => {
+  const resolveConflicts = async (codes: string[], toastId?: string) => {
     if (!codes.length) return;
     reload();
     if (openOrder && codes.includes(openOrder.orderCode)) {
-      const fresh = await fetchOrder(openOrder.orderCode);
+      const fresh = await fetchOrder(openOrder.orderCode).catch(() => null);
       if (fresh) setOpenOrder(fresh);
     }
-    showToast(`${label(codes)} ${CONFLICT_MESSAGE}`, 'info');
+    toast.warning(`${label(codes)} ${CONFLICT_MESSAGE}`, { id: toastId });
   };
 
   const setBusyFor = (codes: string[], on: boolean) => setBusy((current) => {
@@ -150,26 +155,34 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
     undoTimer.current = setTimeout(() => setUndo(null), UNDO_VISIBLE_MS);
   };
 
-  /** Gửi một thao tác cho các đơn; báo xung đột và lỗi; trả về mã các đơn đã xử lý xong. */
-  const run = async (codes: string[], request: () => Promise<BulkResult[]>) => {
+  /**
+   * Gửi một thao tác cho các đơn; báo xung đột và lỗi; trả về mã các đơn đã xử lý xong và id thông báo "đang xử lý"
+   * (`pending`; một đơn thì nút đã có vòng quay nên không cần) để nơi gọi đổi thành kết quả.
+   */
+  const run = async (codes: string[], request: () => Promise<BulkResult[]>, pending?: string) => {
     setBusyFor(codes, true);
+    const id = pending ? toast.loading(pending, { id: `orders-${++runSequence}` }) : undefined;
     let results: BulkResult[];
     try {
       results = await request();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Có lỗi xảy ra', 'info');
-      return [];
+      toast.error(errorText(error, 'Không cập nhật được đơn hàng, vui lòng thử lại'), { id });
+      return { done: [] as string[], id: undefined };
     } finally {
       setBusyFor(codes, false);
     }
     const done = results.filter((result) => result.ok).map((result) => result.code);
-    await resolveConflicts(results.filter((result) => result.conflict).map((result) => result.code));
+    const conflicts = results.filter((result) => result.conflict).map((result) => result.code);
     const failed = results.filter((result) => !result.ok && !result.conflict);
+    // Không đơn nào xong: thông báo "đang xử lý" đổi thành lỗi (hoặc xung đột) thay vì treo lại.
+    const resultId = done.length ? undefined : id;
     if (failed.length) {
-      showToast(`${failed.length > 1 ? `${failed.length} đơn` : `Đơn ${failed[0].code}`} chưa cập nhật được: ${failed[0].error}`, 'info');
+      toast.error(`${failed.length > 1 ? `${failed.length} đơn` : `Đơn ${failed[0].code}`} chưa cập nhật được: ${failed[0].error}`, { id: resultId });
     }
+    await resolveConflicts(conflicts, failed.length ? undefined : resultId);
+    if (!done.length && !failed.length && !conflicts.length && id) toast.dismiss(id);
     if (done.length) { setSelected(new Set()); reload(); }
-    return done;
+    return { done, id: done.length ? id : undefined };
   };
 
   /** Chuyển các đơn tới bước `to` (một hoặc nhiều bước); đơn đã ở bước đó hoặc sau đó được bỏ qua. */
@@ -178,8 +191,11 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
     if (!eligible.length) return;
     const origin = new Map(eligible.map((order) => [order.orderCode, order.orderStatus]));
     const codes = eligible.map((order) => order.orderCode);
-    const done = await run(codes, () => bulkOrders({ action: 'advance', codes, to }));
+    const { done, id } = await run(codes, () => bulkOrders({ action: 'advance', codes, to }),
+      codes.length > 1 ? `Đang cập nhật ${codes.length} đơn…` : undefined);
     if (!done.length) return;
+    // Kết quả hiện ở thanh "Hoàn tác" bên dưới nên thông báo "đang xử lý" chỉ cần đóng lại.
+    if (id) toast.dismiss(id);
     // Cập nhật ngay đơn đang mở trong ngăn kéo để không phải chờ tải lại.
     setOpenOrder((order) => {
       const from = order && done.includes(order.orderCode) ? origin.get(order.orderCode) : undefined;
@@ -199,13 +215,14 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
 
   const cancel = async (orders: AdminOrder[], reason: string) => {
     const codes = orders.map((order) => order.orderCode);
-    const done = await run(codes, () => bulkOrders({ action: 'cancel', codes, note: reason }));
+    const { done, id } = await run(codes, () => bulkOrders({ action: 'cancel', codes, note: reason }),
+      codes.length > 1 ? `Đang hủy ${codes.length} đơn…` : undefined);
     setCancelTarget(null);
     if (!done.length) return;
     setOpenOrder((order) => order && done.includes(order.orderCode)
       ? { ...order, orderStatus: 'CANCELLED', events: [...order.events, { status: 'CANCELLED', actor, note: reason, createdAt: new Date().toISOString() }] }
       : order);
-    showToast(`Đã hủy ${done.length > 1 ? `${done.length} đơn` : `đơn ${done[0]}`}`, 'info');
+    toast.success(`Đã hủy ${done.length > 1 ? `${done.length} đơn` : `đơn ${done[0]}`}`, { id });
   };
 
   const runUndo = async () => {
@@ -213,7 +230,8 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
     const { items } = undo;
     clearTimeout(undoTimer.current);
     setUndo(null);
-    const done = await run(items.map((item) => item.code), () => bulkOrders({ action: 'undo', items }));
+    // Thanh "Hoàn tác" vừa đóng, không còn gì báo đang chạy: luôn hiện thông báo chờ.
+    const { done, id } = await run(items.map((item) => item.code), () => bulkOrders({ action: 'undo', items }), 'Đang hoàn tác…');
     if (!done.length) return;
     const byCode = new Map(items.map((item) => [item.code, item]));
     setOpenOrder((order) => {
@@ -224,8 +242,8 @@ export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
       return { ...order, orderStatus: item.to, paymentStatus, events: order.events.slice(0, -removed) };
     });
     const targets = new Set(items.filter((item) => done.includes(item.code)).map((item) => item.to));
-    showToast(`Đã hoàn tác ${done.length > 1 ? `${done.length} đơn` : 'đơn'}${targets.size === 1
-      ? ` về lại "${ORDER_STATUS_LABELS[[...targets][0]]}"` : ' về trạng thái trước đó'}`, 'success');
+    toast.success(`Đã hoàn tác ${done.length > 1 ? `${done.length} đơn` : 'đơn'}${targets.size === 1
+      ? ` về lại "${ORDER_STATUS_LABELS[[...targets][0]]}"` : ' về trạng thái trước đó'}`, { id });
   };
 
   // Ngăn kéo luôn hiện dữ liệu mới nhất của đơn đang mở; nhớ vị trí để "Đơn tiếp theo" vẫn đúng khi đơn vừa xử lý rời tab.

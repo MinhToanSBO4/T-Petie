@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useToast } from '@/context/ToastContext';
+import { errorText } from '@/client/toast';
+import { PASSWORD_MIN } from '@/lib/account/account-input';
 
-const PASSWORD_MIN = 12;
 const field = 'w-full rounded-2xl border border-cream-300 px-4 py-2.5 text-sm outline-none focus:border-honey-500 focus:ring-2 focus:ring-honey-100';
 
 /**
@@ -31,7 +32,7 @@ export function ChangePasswordForm() {
       if (data.email) await signIn('credentials', { redirect: false, email: data.email, password: draft.next });
       setDraft({ current: '', next: '', confirm: '' });
       showToast('Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.', 'success');
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
+    } catch (submitError) { setError(errorText(submitError, 'Có lỗi xảy ra')); }
     finally { setBusy(false); }
   };
 

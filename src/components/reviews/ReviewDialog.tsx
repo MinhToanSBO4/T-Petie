@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Info, Star, X } from 'lucide-react';
 import { compressImage, REVIEW_PHOTO_OPTIONS } from '@/client/image-compress';
+import { readJson, sendWithProgress, type JsonBody } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
 import { useDialog } from '@/hooks/useDialog';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { RATING_LABELS, REVIEW_CONTENT_MAX, REVIEW_MAX_IMAGES, REVIEW_QUICK_TAGS, SIZE_FIT_OPTIONS } from '@/lib/content/review-input';
@@ -71,7 +73,7 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
         const preview = URL.createObjectURL(compressed);
         previews.current.push(preview);
         prepared.push({ key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`, file: compressed, preview });
-      } catch (compressError) { setError(compressError instanceof Error ? compressError.message : 'Không đọc được ảnh'); }
+      } catch (compressError) { setError(errorText(compressError, 'Không đọc được ảnh')); }
     }
     setPhotos((current) => [...current, ...prepared]);
     if (files.length > chosen.length) setError(`Mỗi đánh giá tối đa ${REVIEW_MAX_IMAGES} ảnh.`);
@@ -93,27 +95,33 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
     setBusy(true); setError('');
     const fields: Record<string, string> = { rating: String(rating), content, sizeFit, isAnonymous: String(isAnonymous) };
     if (!editing) fields.orderItemId = target.orderItemId;
-    let body: BodyInit;
-    let headers: HeadersInit | undefined;
-    if (photos.length > 0) {
-      const form = new FormData();
-      for (const [key, value] of Object.entries(fields)) form.set(key, value);
-      for (const url of keptImages) form.append('keepImages', url);
-      for (const photo of photos) form.append('images', photo.file);
-      body = form;
-    } else {
-      body = JSON.stringify({ ...fields, rating, isAnonymous, keepImages: keptImages });
-      headers = { 'Content-Type': 'application/json' };
-    }
+    const url = editing ? `/api/reviews/${review!.id}` : '/api/reviews';
+    const method = editing ? 'PATCH' : 'POST';
+    // Có ảnh: báo tiến độ tải lên ở góc màn hình (mạng điện thoại chậm có thể mất vài giây); lỗi vẫn hiện trong hộp thoại.
+    // Id riêng mỗi lần gửi: khách tự đóng thông báo lần trước thì lần gửi sau vẫn hiện tiến độ.
+    const upload = photos.length > 0
+      ? toast.loading(`Đang tải ${photos.length} ảnh đánh giá…`, { id: `review-upload-${Date.now()}`, progress: 0 }) : null;
     try {
-      const response = await fetch(editing ? `/api/reviews/${review!.id}` : '/api/reviews',
-        { method: editing ? 'PATCH' : 'POST', headers, body });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Không gửi được đánh giá');
+      let result: { ok: boolean; data: JsonBody };
+      if (upload) {
+        const form = new FormData();
+        for (const [key, value] of Object.entries(fields)) form.set(key, value);
+        for (const kept of keptImages) form.append('keepImages', kept);
+        for (const photo of photos) form.append('images', photo.file);
+        result = await sendWithProgress(url, { method, body: form, onProgress: (fraction) => toast.update(upload, fraction < 1
+          ? { progress: fraction * 100 } : { message: 'Đang lưu đánh giá…', progress: null }) });
+      } else {
+        const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...fields, rating, isAnonymous, keepImages: keptImages }) });
+        result = { ok: response.ok, data: await readJson(response) };
+      }
+      if (!result.ok) throw new Error(result.data.error || 'Không gửi được đánh giá');
+      if (upload) toast.dismiss(upload);
       onSaved(editing ? 'Đã lưu đánh giá.'
         : 'Cảm ơn mẹ đã đánh giá! 🌸');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra');
+      if (upload) toast.dismiss(upload);
+      setError(errorText(submitError, 'Có lỗi xảy ra'));
       setBusy(false);
     }
   };

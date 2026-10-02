@@ -1,0 +1,24 @@
+Xin chào Mẹ An,
+
+Đơn hàng đã được giao cho đơn vị vận chuyển. Bạn để ý điện thoại để nhận hàng nhé.
+
+Mã đơn: TP-PREVIEW · Ngày đặt: 22:00 2 thg 10, 2026
+Trạng thái: Đang giao hàng
+
+- Váy organic dịu ngọt · Size 2 (10–12kg) · 2 x 250.000 ₫ = 500.000 ₫
+
+Tạm tính: 500.000 ₫
+Phí vận chuyển: 25.000 ₫
+Giảm giá: -50.000 ₫
+Tổng thanh toán: 475.000 ₫
+
+Giao tới: Mẹ An, 12 Nguyễn Trãi, Thanh Xuân, Hà Nội
+Thanh toán khi nhận hàng (COD).
+
+Tra cứu đơn hàng: https://shop.example.com/order-lookup
+
+Tra cứu đơn bằng mã TP-PREVIEW và số điện thoại đặt hàng.
+
+—
+Đây là email tự động từ hệ thống T'Petie, vui lòng không trả lời email này.
+Website: https://shop.example.com

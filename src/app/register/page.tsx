@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { normalizePhone } from '@/lib/account/account-input';
+import { normalizePhone, PASSWORD_MIN } from '@/lib/account/account-input';
+import { normalizeEmail } from '@/lib/email/config';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { BrandLogo } from '@/components/layout/BrandLogo';
 import { 
   Lock, 
@@ -24,7 +25,6 @@ import {
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading } = useAuth();
-  const { showToast } = useToast();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,8 +49,7 @@ export default function RegisterPage() {
       setErrorMessage('Vui lòng nhập địa chỉ Email.');
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!normalizeEmail(email)) {
       setErrorMessage('Email không hợp lệ. Vui lòng nhập đúng định dạng (VD: mebe@gmail.com).');
       return;
     }
@@ -63,8 +62,8 @@ export default function RegisterPage() {
       setErrorMessage('Vui lòng tạo mật khẩu cho tài khoản.');
       return;
     }
-    if (password.length < 12) {
-      setErrorMessage('Mật khẩu phải có ít nhất 12 ký tự.');
+    if (password.length < PASSWORD_MIN) {
+      setErrorMessage(`Mật khẩu phải có ít nhất ${PASSWORD_MIN} ký tự.`);
       return;
     }
     if (password !== confirmPassword) {
@@ -81,8 +80,9 @@ export default function RegisterPage() {
     setIsSubmitting(false);
 
     if (result.success) {
-      showToast('🎉 Đăng ký thành công! Chào mừng Mẹ đến với T\'Petie.');
-      router.push('/');
+      if (result.emailSent) toast.success('Tạo tài khoản thành công!', { description: 'Mẹ mở email và bấm "Xác thực email" để bắt đầu đặt hàng nhé.' });
+      else toast.warning('Tài khoản đã tạo nhưng chưa gửi được email xác thực', { description: 'Mẹ bấm "Gửi lại email" ở trang tiếp theo nhé.' });
+      router.replace(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&sent=${result.emailSent ? '1' : '0'}`);
     } else {
       setErrorMessage(result.error || 'Đăng ký thất bại. Vui lòng thử lại.');
     }
@@ -220,7 +220,7 @@ export default function RegisterPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Tối thiểu 6 ký tự"
+                    placeholder={`Tối thiểu ${PASSWORD_MIN} ký tự`}
                     className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-cream-300 focus:border-honey-500 focus:ring-2 focus:ring-honey-100 outline-none text-xs sm:text-sm text-charcoal-900 placeholder:text-charcoal-400"
                   />
                   <button

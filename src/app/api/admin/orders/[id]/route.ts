@@ -7,6 +7,8 @@ import { CANCEL_REASON_MAX, ORDER_STATUSES, type OrderStatus } from '@/lib/order
 const isStatus = (value: unknown): value is OrderStatus =>
   typeof value === 'string' && (ORDER_STATUSES as readonly string[]).includes(value);
 
+export const maxDuration = 60;
+
 /**
  * Quản trị viên hoặc nhân viên chuyển trạng thái đơn: `{ status, note? }` (hủy bắt buộc có lý do),
  * hoặc hoàn tác bước vừa bấm: `{ undo: <trạng thái hiện tại> }`. Lịch sử đơn ghi rõ ai thao tác.

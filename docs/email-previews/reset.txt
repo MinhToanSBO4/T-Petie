@@ -1,0 +1,11 @@
+Xin chào Mẹ An,
+
+Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Bấm nút bên dưới để tạo mật khẩu mới. Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần.
+
+Đặt mật khẩu mới: https://shop.example.com/reset-password?token=preview-only
+
+Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email; tài khoản của bạn vẫn an toàn. Không chia sẻ liên kết này với bất kỳ ai.
+
+—
+Đây là email tự động từ hệ thống T'Petie, vui lòng không trả lời email này.
+Website: https://shop.example.com

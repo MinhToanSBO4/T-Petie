@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { 
   User as UserIcon, 
@@ -35,20 +36,30 @@ import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { EmailVerificationBanner } from '@/components/auth/EmailVerification';
 
 export default function UserDashboardPage() {
   return (
     <ProtectedRoute requiredRole="user">
-      <DashboardContent />
+      <Suspense fallback={null}>
+        <DashboardContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }
 
+const TABS = ['profile', 'baby', 'orders', 'rewards', 'security'] as const;
+type DashboardTab = typeof TABS[number];
+
 function DashboardContent() {
   const { user, updateProfile, updateBabyProfile, logout } = useAuth();
-  const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'baby' | 'orders' | 'rewards' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
+  // `?tab=security`: mở thẳng mục Mật khẩu, ví dụ từ thông báo sau khi liên kết Google.
+  const requestedTab = useSearchParams().get('tab');
+  useEffect(() => {
+    if (TABS.includes(requestedTab as DashboardTab)) setActiveTab(requestedTab as DashboardTab);
+  }, [requestedTab]);
 
   // Form State cá nhân
   const [name, setName] = useState(user?.name || '');
@@ -92,13 +103,14 @@ function DashboardContent() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingProfile(true);
+    const notice = toast.loading('Đang lưu thông tin cá nhân…', { id: 'profile-save' });
     const result = await updateProfile({ name, phone, address, city });
     setIsSavingProfile(false);
 
     if (result.success) {
-      showToast('Đã lưu thay đổi thông tin cá nhân thành công! 🌸');
+      toast.success('Đã lưu thay đổi thông tin cá nhân thành công! 🌸', { id: notice });
     } else {
-      showToast(result.error || 'Có lỗi xảy ra khi lưu thông tin.', 'info');
+      toast.error(result.error || 'Có lỗi xảy ra khi lưu thông tin.', { id: notice });
     }
   };
 
@@ -106,10 +118,11 @@ function DashboardContent() {
   const handleSaveBaby = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!babyName.trim() || weight <= 0 || height <= 0) {
-      showToast('Vui lòng nhập tên, cân nặng và chiều cao hợp lệ của bé.', 'info');
+      toast.warning('Vui lòng nhập tên, cân nặng và chiều cao hợp lệ của bé.');
       return;
     }
     setIsSavingBaby(true);
+    const notice = toast.loading('Đang lưu hồ sơ bé…', { id: 'baby-save' });
     const result = await updateBabyProfile({
       name: babyName,
       birthDate,
@@ -118,7 +131,8 @@ function DashboardContent() {
       recommendedSize: currentRecommendedSize,
     });
     setIsSavingBaby(false);
-    showToast(result.success ? 'Đã cập nhật hồ sơ bé yêu. ✨' : result.error || 'Không lưu được hồ sơ bé.', result.success ? 'success' : 'info');
+    if (result.success) toast.success('Đã cập nhật hồ sơ bé yêu. ✨', { id: notice });
+    else toast.error(result.error || 'Không lưu được hồ sơ bé.', { id: notice });
   };
 
   // Đơn mua: lấy số đơn theo tab và vài đơn gần nhất; danh sách đầy đủ nằm ở trang /orders.
@@ -137,6 +151,7 @@ function DashboardContent() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
+      <EmailVerificationBanner />
 
       {/* 1. TOP USER CARD (Warm & Sweet) */}
       <div className="bg-gradient-to-r from-cream-100 via-blush-50 to-honey-100 rounded-3xl p-6 sm:p-8 border border-cream-200 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-6">

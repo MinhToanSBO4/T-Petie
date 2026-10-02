@@ -4,11 +4,11 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { safeCallbackPath } from '@/lib/auth-identity';
 import { landingPath } from '@/lib/admin/back-office';
 import { authErrorMessage } from '@/lib/auth-errors';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { GoogleSignInButton, useGoogleSignInEnabled } from '@/components/auth/GoogleSignInButton';
 import {
   Lock,
   Mail,
@@ -28,7 +28,7 @@ function LoginForm() {
   const callbackUrl = safeCallbackPath(searchParams.get('callbackUrl'));
 
   const { login, isLoading } = useAuth();
-  const { showToast } = useToast();
+  const googleEnabled = useGoogleSignInEnabled();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,11 +65,21 @@ function LoginForm() {
 
     if (result.success) {
       window.dispatchEvent(new Event('tpetie:navigation-start'));
-      showToast(`Chào mừng bạn trở lại với T'Petie! 🌸`);
+      if (result.emailVerified === false) {
+        toast.warning('Mẹ chưa xác thực email', {
+          description: 'Mẹ vẫn xem và thêm vào giỏ được; xác thực email để đặt hàng nhé.',
+          action: { label: 'Xác thực ngay', href: '/verify-email' }, duration: 10_000,
+        });
+      } else {
+        toast.success(`Chào mừng bạn trở lại với T'Petie! 🌸`);
+      }
       router.push(landingPath(result.role, callbackUrl));
     } else {
       setIsSubmitting(false);
-      setErrorMessage(result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      const message = result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
+      // Tài khoản đã liên kết Google có thể không còn mật khẩu (lib/auth-google.ts): nhắc lối đăng nhập còn lại.
+      setErrorMessage(result.reason === 'credentials' && googleEnabled
+        ? `${message} Nếu từng đăng nhập bằng Google, Mẹ bấm "Đăng nhập với Google" nhé.` : message);
     }
   };
 
@@ -170,13 +180,12 @@ function LoginForm() {
             >
               Đăng ký tài khoản mới
             </Link>
-            <button
-              type="button"
-              onClick={() => setErrorMessage('Mẹ nhắn shop qua Zalo/Messenger (nút chat góc màn hình) kèm email đã đăng ký: shop sẽ gửi mật khẩu tạm để mẹ đăng nhập rồi đổi trong mục Tài khoản → Mật khẩu. Nếu mẹ từng đăng nhập bằng Google, chỉ cần bấm "Đăng nhập với Google".')}
+            <a
+              href="/forgot-password"
               className="font-medium text-charcoal-900 hover:text-honey-600 transition-colors underline underline-offset-4"
             >
               Quên mật khẩu?
-            </button>
+            </a>
           </div>
 
         </div>

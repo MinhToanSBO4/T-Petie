@@ -69,8 +69,9 @@ test('staff and admins edit their own profile with a login email and an optional
 
 test('a new password must be long enough and differ from the current one', () => {
   assert.equal(newPasswordProblem('mat-khau-moi-2026', 'mat-khau-cu-2025'), null);
-  assert.match(newPasswordProblem('ngan', 'x'), /12–128/);
-  assert.match(newPasswordProblem('x'.repeat(129)), /12–128/);
+  assert.equal(newPasswordProblem('8-ky-tu!', 'x'), null);
+  assert.match(newPasswordProblem('7kytu!!', 'x'), /ít nhất 8/);
+  assert.match(newPasswordProblem('x'.repeat(129)), /tối đa 128/);
   assert.match(newPasswordProblem('giong-het-mat-khau', 'giong-het-mat-khau'), /khác/);
-  assert.match(newPasswordProblem(undefined), /12–128/);
+  assert.match(newPasswordProblem(undefined), /ít nhất 8/);
 });

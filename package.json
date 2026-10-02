@@ -2,13 +2,14 @@
   "name": "t-petie",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "predev": "node scripts/dev-sync.cjs",
     "dev": "next dev",
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/architecture-boundary.test.mjs && node tests/security.test.mjs && node tests/content-input.test.mjs && node tests/site-content.test.mjs && node tests/admin-account.test.mjs && node tests/deploy-env.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/baby-profile.test.mjs && node tests/admin-dashboard.test.mjs && node tests/export-workbook.test.mjs && node tests/purchase-review.test.mjs && node tests/catalog-filters.test.mjs && node tests/stability.test.mjs && node tests/product-input.test.mjs",
+    "test": "node tests/architecture-boundary.test.mjs && node tests/security.test.mjs && node tests/content-input.test.mjs && node tests/site-content.test.mjs && node tests/admin-account.test.mjs && node tests/deploy-env.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/auth-google.test.mjs && node tests/toast-queue.test.mjs && node tests/password-reset.test.mjs && node tests/baby-profile.test.mjs && node tests/admin-dashboard.test.mjs && node tests/export-workbook.test.mjs && node tests/purchase-review.test.mjs && node tests/catalog-filters.test.mjs && node tests/stability.test.mjs && node tests/product-input.test.mjs && node tests/email.test.mjs && node tests/smtp-timeout.test.cjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -18,7 +19,10 @@
     "admin:create": "node scripts/create-admin.cjs",
     "env:check": "node scripts/check-env.cjs",
     "db:clone-structure": "node scripts/clone-db-structure.cjs",
-    "db:verify-structure": "node scripts/verify-db-structure.cjs"
+    "db:verify-structure": "node scripts/verify-db-structure.cjs",
+    "email:verify": "node scripts/email-verify.cjs",
+    "email:preview": "node scripts/email-preview.cjs",
+    "email:test": "node scripts/check-email-flow.cjs"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -31,6 +35,7 @@
     "lucide-react": "^0.395.0",
     "next": "^14.2.4",
     "next-auth": "^4.24.7",
+    "nodemailer": "^7.0.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.3.0"
@@ -38,6 +43,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.19.43",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",

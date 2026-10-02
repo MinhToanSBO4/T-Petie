@@ -2,12 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { getProviders, signIn } from 'next-auth/react';
+import { toast } from '@/client/toast';
+
+const REDIRECT_TOAST = 'google-sign-in';
 
 /** Kết quả hỏi máy chủ một lần cho cả phiên: Google đã được cấu hình hay chưa. */
 let googleEnabled: Promise<boolean> | null = null;
 function isGoogleEnabled() {
   googleEnabled ??= getProviders().then((providers) => Boolean(providers?.google)).catch(() => false);
   return googleEnabled;
+}
+
+/** Google đã bật hay chưa (null khi đang hỏi máy chủ), để các trang chỉ nhắc tới nút Google khi nút đó có thật. */
+export function useGoogleSignInEnabled() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void isGoogleEnabled().then((value) => { if (alive) setEnabled(value); });
+    return () => { alive = false; };
+  }, []);
+  return enabled;
 }
 
 /**
@@ -19,25 +33,37 @@ export function GoogleSignInButton({ callbackUrl, label, disabled, onStart, sepa
   /** Hiện kèm nút (ví dụ dòng "Hoặc"), ẩn cùng nút khi Google chưa bật. */
   separator?: React.ReactNode;
 }) {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const enabled = useGoogleSignInEnabled();
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    void isGoogleEnabled().then((value) => { if (alive) setEnabled(value); });
-    return () => { alive = false; };
-  }, []);
   // Bấm "Quay lại" từ trang Google: trình duyệt khôi phục trang cũ (bfcache) còn trạng thái đang chờ.
   useEffect(() => {
-    const reset = (event: PageTransitionEvent) => { if (event.persisted) setBusy(false); };
+    const reset = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setBusy(false);
+      toast.dismiss(REDIRECT_TOAST);
+    };
     window.addEventListener('pageshow', reset);
     return () => window.removeEventListener('pageshow', reset);
   }, []);
   if (enabled === false) return null;
 
+  const start = async () => {
+    setBusy(true);
+    onStart?.();
+    toast.loading('Đang chuyển sang trang đăng nhập Google…', { id: REDIRECT_TOAST });
+    try {
+      await signIn('google', { callbackUrl });
+    } catch {
+      // signIn chỉ lỗi khi chưa kịp chuyển trang (mất mạng, máy chủ không phản hồi); lỗi gốc kiểu "Failed to fetch" không có ích cho khách.
+      setBusy(false);
+      toast.error('Chưa mở được trang đăng nhập Google. Mẹ kiểm tra mạng rồi thử lại nhé.', { id: REDIRECT_TOAST });
+    }
+  };
+
   return <>
   <button
     type="button"
-    onClick={() => { setBusy(true); onStart?.(); void signIn('google', { callbackUrl }); }}
+    onClick={() => void start()}
     disabled={disabled || busy || enabled === null}
     className="flex h-14 w-full flex-1 cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-cream-200 font-medium text-charcoal-700 shadow-2xs transition-all duration-200 hover:border-honey-500 hover:bg-cream-50/50 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
   >

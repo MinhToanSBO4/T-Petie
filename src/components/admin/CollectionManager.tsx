@@ -8,6 +8,7 @@ import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { ACCENT_COLOR_PRESETS, THEME_COLOR_PRESETS } from '@/lib/content/collection-colors';
 import type { AdminCollection } from '@/types/admin-content';
 import { readJson } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; collection: AdminCollection };
@@ -26,7 +27,7 @@ const COLLECTION_FILTERS: TableFilter[] = [
 
 async function fetchCollections(query: TableQuery) {
   const response = await fetch(`/api/admin/collections?${tableParams(query)}`, { cache: 'no-store' });
-  const data = await response.json();
+  const data = await readJson(response);
   if (!response.ok) throw new Error(data.error || 'Không tải được bộ sưu tập');
   return { items: data.items as AdminCollection[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
@@ -34,8 +35,7 @@ async function fetchCollections(query: TableQuery) {
 export function CollectionManager() {
   const [view, setView] = useState<View>({ mode: 'list' });
   const [reloadKey, setReloadKey] = useState(0);
-  const [message, setMessage] = useState('');
-  const back = (text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
+  const back = () => { setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
 
   if (view.mode !== 'list') return <CollectionForm collection={view.mode === 'edit' ? view.collection : null} onDone={back} />;
 
@@ -56,7 +56,6 @@ export function CollectionManager() {
   ];
 
   return <div className="space-y-4">
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchCollections} reloadKey={reloadKey}
       searchPlaceholder="Tìm theo tên hoặc slug"
       sorts={COLLECTION_SORTS} filters={COLLECTION_FILTERS}
@@ -68,7 +67,7 @@ export function CollectionManager() {
 }
 
 /** Tạo mới hoặc chỉnh sửa một bộ sưu tập. */
-function CollectionForm({ collection, onDone }: { collection: AdminCollection | null; onDone: (message?: string) => void }) {
+function CollectionForm({ collection, onDone }: { collection: AdminCollection | null; onDone: () => void }) {
   const editing = Boolean(collection);
   const [draft, setDraft] = useState({
     title: collection?.title || '', slug: collection?.slug || '', subtitle: collection?.subtitle || '',
@@ -90,6 +89,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true); setError('');
+    const id = toast.loading(editing ? 'Đang lưu bộ sưu tập…' : 'Đang tạo bộ sưu tập…');
     try {
       const response = await fetch(editing ? `/api/admin/collections/${collection!.id}` : '/api/admin/collections', {
         method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
@@ -97,8 +97,12 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được bộ sưu tập');
-      onDone(editing ? 'Đã lưu bộ sưu tập.' : `Đã tạo bộ sưu tập ${draft.title}.`);
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
+      toast.success(editing ? 'Đã lưu bộ sưu tập' : `Đã tạo bộ sưu tập ${draft.title}`, { id });
+      onDone();
+    } catch (submitError) {
+      const text = errorText(submitError, 'Không lưu được bộ sưu tập');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -107,7 +111,6 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
       <h2 className="text-lg font-bold">{editing ? 'Sửa bộ sưu tập' : 'Thêm bộ sưu tập mới'}</h2>
       <button type="button" onClick={leave} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="text-sm font-semibold">Tên bộ sưu tập
@@ -117,7 +120,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
         <input className={`${field} read-only:bg-cream-100`} required readOnly={editing} maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*"
           value={draft.slug} onChange={(event) => setDraft({ ...draft, slug: event.target.value.toLowerCase() })} /></label>
       <div className="sm:col-span-2">
-        <MediaPicker label="Ảnh banner" value={draft.bannerUrl} altText={draft.title} onError={setError}
+        <MediaPicker label="Ảnh banner" value={draft.bannerUrl} altText={draft.title}
           onChange={(bannerUrl) => setDraft({ ...draft, bannerUrl })} />
         <p className="mt-1 text-xs text-charcoal-500">Ảnh ngang, nên khoảng 2048 × 780 px. Banner hiển thị nguyên ảnh, không bị cắt, nên chữ thiết kế trong ảnh vẫn giữ nguyên.</p>
       </div>
@@ -134,7 +137,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
         <textarea className={field} rows={4} maxLength={5000} value={draft.story}
           onChange={(event) => setDraft({ ...draft, story: event.target.value })} /></label>
       <div className="sm:col-span-2">
-        <MediaListPicker label="Ảnh lookbook" values={draft.lookbookUrls} onError={setError}
+        <MediaListPicker label="Ảnh lookbook" values={draft.lookbookUrls}
           onChange={(lookbookUrls) => setDraft({ ...draft, lookbookUrls })} />
         <p className="mt-1 text-xs text-charcoal-500">Ảnh dọc (tỉ lệ 2:3) đẹp nhất. 3 ảnh đầu hiện ở trang Bộ sưu tập; ảnh đầu tiên là ảnh lớn trong trang chi tiết. Dùng nút lên/xuống để đổi thứ tự.</p>
       </div>
@@ -149,6 +152,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
           <input type="checkbox" className="size-5" checked={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.checked })} /> {label}
         </label>)}
     </div>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !draft.bannerUrl} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang lưu…' : editing ? 'Lưu bộ sưu tập' : 'Tạo bộ sưu tập'}
     </button>

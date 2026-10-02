@@ -5,7 +5,8 @@ import { getSession, signIn, signOut, useSession } from 'next-auth/react';
 import { AuthCredentials, BabyProfile, RegisterData, User, UserRole } from '@/types/auth';
 import { trackLogin, trackLogout } from '@/client/analytics/tracker';
 
-type Result = { success: boolean; error?: string; role?: UserRole };
+/** `reason: 'credentials'`: sai tên đăng nhập/email hoặc mật khẩu (hoặc tài khoản không có mật khẩu). */
+type Result = { success: boolean; error?: string; role?: UserRole; reason?: 'credentials'; emailVerified?: boolean; emailSent?: boolean };
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -15,6 +16,8 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<Result>;
   updateBabyProfile: (baby: BabyProfile) => Promise<Result>;
+  /** Đọc lại phiên từ database (ví dụ sau khi khách xác thực email ở tab hoặc thiết bị khác). */
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     address: session.user.address || undefined,
     city: session.user.city || undefined,
     points: session.user.points,
+    emailVerified: session.user.emailVerified !== false,
     babyProfile: session.user.babyProfile || undefined,
     createdAt: '',
   } : null;
@@ -43,12 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: credentials.email.trim().toLowerCase(),
       password: credentials.password,
     });
-    if (!result || result.error) return { success: false, error: 'Tên đăng nhập, email hoặc mật khẩu không đúng.' };
+    if (!result || result.error) return { success: false, error: 'Tên đăng nhập, email hoặc mật khẩu không đúng.', reason: 'credentials' };
     const fresh = await getSession();
     if (!fresh?.user || fresh.user.status !== 'active') return { success: false, error: 'Không thể xác thực tài khoản.' };
     // Mã tài khoản nội bộ, không gửi email: điều khoản Google Analytics cấm gửi thông tin nhận dạng cá nhân.
     trackLogin('password', fresh.user.id);
-    return { success: true, role: fresh.user.role };
+    return { success: true, role: fresh.user.role, emailVerified: fresh.user.emailVerified !== false };
   };
 
   const register = async (data: RegisterData): Promise<Result> => {
@@ -60,7 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) return { success: false, error: json.error || 'Đăng ký không thành công.' };
-      return login({ email: data.email, password: data.password });
+      // Đăng nhập luôn để khách xem tài khoản, giỏ hàng; đặt hàng mở khi email đã xác thực.
+      const signedIn = await login({ email: data.email, password: data.password }).catch(() => null);
+      return { success: true, emailVerified: false, emailSent: json.emailSent === true, role: signedIn?.role };
     } catch {
       return { success: false, error: 'Không kết nối được máy chủ.' };
     }
@@ -95,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading: status === 'loading',
     login, register, logout, updateProfile,
     updateBabyProfile: (baby) => updateProfile({ babyProfile: baby }),
+    refreshSession: async () => { await updateSession(); },
   }}>{children}</AuthContext.Provider>;
 }
 

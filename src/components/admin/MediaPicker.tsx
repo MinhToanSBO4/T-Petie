@@ -3,17 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { BANNER_PHOTO_OPTIONS } from '@/client/image-compress';
-import { uploadMedia } from '@/client/media-upload';
+import { uploadMediaBatch } from '@/client/media-upload';
+import { errorText, toast } from '@/client/toast';
 
 export type MediaAssetRow = {
   id: string; url: string; publicId: string | null; altText: string | null;
   width: number | null; height: number | null; createdAt: string;
 };
-
-/** Nén (ảnh lớn) rồi tải một tệp lên thư viện media, trả về URL để lưu vào cấu hình. */
-async function uploadMediaFile(file: File, altText: string): Promise<string> {
-  return (await uploadMedia(file, BANNER_PHOTO_OPTIONS, altText)).url;
-}
 
 type MediaPickerProps = {
   value: string;
@@ -22,22 +18,25 @@ type MediaPickerProps = {
   altText?: string;
   /** Ảnh hiển thị dạng nền lớn (banner) hay thu nhỏ (avatar). */
   aspect?: 'banner' | 'square';
+  /** Báo lỗi tải ảnh cho form cha (lỗi cũng hiện ngay dưới ô ảnh). */
   onError?: (message: string) => void;
 };
 
 /**
  * Ô chọn ảnh: kéo-thả hoặc bấm để tải lên, hoặc chọn lại ảnh đã có trong thư viện.
  * Mọi ảnh đều đi qua thư viện media (database + Cloudinary), không nhập URL thủ công.
+ * Tiến độ tải ảnh hiện ở thông báo góc màn hình; lỗi hiện thêm ngay dưới ô ảnh để không mất khi thông báo tự ẩn.
  */
 export function MediaPicker({ value, onChange, label, altText, aspect = 'banner', onError }: MediaPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [assets, setAssets] = useState<MediaAssetRow[]>([]);
+  const [assets, setAssets] = useState<MediaAssetRow[] | null>(null);
   const [error, setError] = useState('');
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
-  const fail = useCallback((message: string) => { setError(message); onError?.(message); }, [onError]);
   // Bên gọi dựng onChange từ form ở lần render hiện tại. Ảnh tải mất vài giây: gọi onChange cũ sẽ ghi đè những gì
   // người dùng gõ trong lúc chờ (tiêu đề, mô tả…). Luôn gọi onChange của lần render mới nhất.
   const onChangeRef = useRef(onChange);
@@ -45,10 +44,11 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
 
   const upload = useCallback(async (file: File) => {
     setBusy(true); setError('');
-    try { const url = await uploadMediaFile(file, altText || label); onChangeRef.current(url); }
-    catch (uploadError) { fail(uploadError instanceof Error ? uploadError.message : 'Tải ảnh thất bại'); }
-    finally { setBusy(false); }
-  }, [altText, fail, label]);
+    try {
+      const result = await uploadMediaBatch([file], BANNER_PHOTO_OPTIONS, altText || label, (asset) => onChangeRef.current(asset.url));
+      if (result.error) { setError(result.error); onErrorRef.current?.(result.error); }
+    } finally { setBusy(false); }
+  }, [altText, label]);
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -56,9 +56,13 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
     fetch('/api/admin/media', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được thư viện ảnh')))
       .then((data) => setAssets(data.assets || []))
-      .catch((libraryError) => { if (libraryError.name !== 'AbortError') fail(libraryError.message); });
+      .catch((libraryError) => {
+        if (controller.signal.aborted) return;
+        toast.error(errorText(libraryError, 'Không tải được thư viện ảnh'));
+        setLibraryOpen(false);
+      });
     return () => controller.abort();
-  }, [libraryOpen, fail]);
+  }, [libraryOpen]);
 
   return <div className="space-y-2">
     <span className="block text-sm font-semibold">{label}</span>
@@ -78,7 +82,7 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
             ? 'w-full max-h-56 rounded-lg object-cover bg-white' : 'size-16 rounded-lg object-cover bg-white'} />
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-              className="min-h-11 rounded-xl border border-cream-300 bg-white px-3 text-sm font-semibold">Đổi ảnh</button>
+              className="min-h-11 rounded-xl border border-cream-300 bg-white px-3 text-sm font-semibold">{busy ? 'Đang tải…' : 'Đổi ảnh'}</button>
             <button type="button" onClick={() => setLibraryOpen((open) => !open)}
               className="min-h-11 rounded-xl border border-cream-300 bg-white px-3 text-sm font-semibold">Thư viện</button>
             <button type="button" onClick={() => onChange('')} disabled={busy}
@@ -102,12 +106,13 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" className="hidden"
         onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
     </div>
-    {busy && value && <p className="text-xs text-charcoal-500">Đang tải ảnh…</p>}
     {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
     {libraryOpen && <div className="max-h-64 overflow-y-auto rounded-xl border border-cream-200 bg-white p-2">
-      {assets.length === 0 && <p className="p-3 text-sm text-charcoal-500">Thư viện chưa có ảnh.</p>}
+      {!assets && <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{Array.from({ length: 5 }, (_, index) =>
+        <div key={index} className="h-20 rounded-lg shimmer" />)}</div>}
+      {assets?.length === 0 && <p className="p-3 text-sm text-charcoal-500">Thư viện chưa có ảnh.</p>}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {assets.map((asset) => <button key={asset.id} type="button" title={asset.altText || asset.publicId || ''}
+        {(assets || []).map((asset) => <button key={asset.id} type="button" title={asset.altText || asset.publicId || ''}
           onClick={() => { onChange(asset.url); setLibraryOpen(false); }}
           className="overflow-hidden rounded-lg border border-cream-200 hover:border-honey-500">
           <img src={cloudinaryImage(asset.url, { width: 200 })} alt={asset.altText || 'Ảnh thư viện'} loading="lazy" className="h-20 w-full object-cover" />

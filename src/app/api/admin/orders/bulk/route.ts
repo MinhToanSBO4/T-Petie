@@ -5,6 +5,7 @@ import { bulkChangeOrderStatus, bulkUndoOrderStatus } from '@/server/orders/orde
 import { BULK_ORDER_LIMIT, CANCEL_REASON_MAX, MAIN_FLOW, ORDER_STATUSES, type OrderStatus } from '@/lib/orders/status';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const CODE = /^[A-Za-z0-9-]{4,60}$/;
 const isStatus = (value: unknown): value is OrderStatus =>

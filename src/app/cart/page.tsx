@@ -20,6 +20,7 @@ import { trackBeginCheckout } from '@/client/analytics/tracker';
 import { useRouter } from 'next/navigation';
 import { useOrderQuote } from '@/hooks/useOrderQuote';
 import { reconcileCartSelection } from '@/client/cart-selection';
+import { useEmailVerification } from '@/components/auth/EmailVerification';
 
 // Bỏ link Google Form cũ
 // const GOOGLE_FORM_URL = 'https://forms.gle/t866jwRWJ38f4tKD6';
@@ -79,13 +80,17 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(selectedItems, appliedCoupon);
 
+  const { requireVerifiedEmail } = useEmailVerification();
+
   const applyCoupon = () => {
     setAppliedCoupon(couponCode.trim().toUpperCase());
   };
 
   const handleStartCheckout = () => {
-    if (selectedItems.length === 0 || !quote) {
-      showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info');
+    if (selectedItems.length === 0) { showToast('Mẹ chọn ít nhất một sản phẩm để đặt hàng nhé.', 'warning'); return; }
+    if (!requireVerifiedEmail()) return;
+    if (!quote) {
+      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
       return;
     }
     trackBeginCheckout(

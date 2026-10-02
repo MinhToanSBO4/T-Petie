@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BadgeCheck, EyeOff, Eye, Loader2, MessageSquareReply, Search, Trash2 } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
+import { errorText, toast } from '@/client/toast';
 import { PhotoLightbox } from '@/components/reviews/PhotoLightbox';
 import { StarRating } from '@/components/reviews/StarRating';
 import { REVIEW_REPLY_MAX, sizeFitLabel } from '@/lib/content/review-input';
@@ -37,7 +37,6 @@ async function call(url: string, init?: RequestInit) {
  * ẩn/hiện và xóa. Truyền `productId` để chỉ xem đánh giá của một sản phẩm.
  */
 export function ReviewModerationPanel({ productId }: { productId?: string }) {
-  const { showToast } = useToast();
   const [filter, setFilter] = useState('');
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
@@ -65,7 +64,7 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
       if (request !== latest.current) return;
       setData((current) => append && current ? { ...result, items: [...current.items, ...result.items] } : result);
     } catch (loadError) {
-      if (request === latest.current) setError(loadError instanceof Error ? loadError.message : 'Không tải được đánh giá');
+      if (request === latest.current) setError(errorText(loadError, 'Không tải được đánh giá'));
     } finally { if (request === latest.current) setLoading(false); }
   }, [filter, search, productId]);
 
@@ -78,16 +77,18 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
     total: patch ? current.total : current.total - 1,
   });
 
-  const update = async (review: AdminReview, body: Record<string, unknown>, done: string, patch: Partial<AdminReview>) => {
+  // Thông báo theo từng đánh giá: thao tác trên hai đánh giá cùng lúc không đè kết quả của nhau.
+  const update = async (review: AdminReview, body: Record<string, unknown>, pending: string, done: string, patch: Partial<AdminReview>) => {
     setBusy(review.id);
+    const id = toast.loading(pending, { id: `review-${review.id}` });
     try {
       await call('/api/admin/reviews', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: review.id, ...body }) });
       patchLocal(review.id, patch);
-      showToast(done, 'success');
+      toast.success(done, { id });
       return true;
     } catch (updateError) {
-      showToast(updateError instanceof Error ? updateError.message : 'Có lỗi xảy ra', 'info');
+      toast.error(errorText(updateError, 'Không cập nhật được đánh giá'), { id });
       return false;
     } finally { setBusy(''); }
   };
@@ -96,18 +97,19 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
     if (!window.confirm(`Xóa hẳn đánh giá của ${review.customerName}? Ảnh khách gửi kèm cũng bị xóa và không khôi phục được. `
       + 'Nếu chỉ muốn không hiển thị, hãy dùng "Ẩn".')) return;
     setBusy(review.id);
+    const id = toast.loading('Đang xóa đánh giá…', { id: `review-${review.id}` });
     try {
       await call(`/api/admin/reviews?id=${encodeURIComponent(review.id)}`, { method: 'DELETE' });
       patchLocal(review.id, null);
-      showToast('Đã xóa đánh giá', 'success');
-    } catch (removeError) { showToast(removeError instanceof Error ? removeError.message : 'Có lỗi xảy ra', 'info'); }
+      toast.success('Đã xóa đánh giá', { id });
+    } catch (removeError) { toast.error(errorText(removeError, 'Không xóa được đánh giá'), { id }); }
     finally { setBusy(''); }
   };
 
   const saveReply = async (review: AdminReview) => {
     const reply = draft.trim();
-    const ok = await update(review, { reply: reply || null }, reply ? 'Đã đăng câu trả lời' : 'Đã gỡ câu trả lời',
-      { reply: reply || null, repliedAt: reply ? new Date().toISOString() : null });
+    const ok = await update(review, { reply: reply || null }, reply ? 'Đang đăng câu trả lời…' : 'Đang gỡ câu trả lời…',
+      reply ? 'Đã đăng câu trả lời' : 'Đã gỡ câu trả lời', { reply: reply || null, repliedAt: reply ? new Date().toISOString() : null });
     if (ok) setReplying(null);
   };
 
@@ -199,6 +201,7 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
               <MessageSquareReply className="h-3.5 w-3.5" aria-hidden />{review.reply ? 'Sửa trả lời' : 'Trả lời'}
             </button>}
             <button type="button" disabled={pending} onClick={() => void update(review, { isHidden: !review.isHidden },
+              review.isHidden ? 'Đang hiện lại đánh giá…' : 'Đang ẩn đánh giá…',
               review.isHidden ? 'Đã hiện lại đánh giá' : 'Đã ẩn đánh giá khỏi trang sản phẩm',
               { isHidden: !review.isHidden })}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-cream-300 px-3 text-xs font-semibold text-charcoal-700 hover:bg-cream-50 disabled:opacity-50">

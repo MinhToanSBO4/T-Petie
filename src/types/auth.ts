@@ -26,6 +26,8 @@ export interface User {
   address?: string;
   city?: string;
   points?: number;
+  /** false khi khách chưa xác thực email: chưa được đặt hàng. */
+  emailVerified: boolean;
   babyProfile?: BabyProfile;
   createdAt: string;
   lastLoginAt?: string;

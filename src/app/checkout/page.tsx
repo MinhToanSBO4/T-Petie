@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowLeft, CheckCircle2, Loader2, MapPin, CreditCard, Phone, User, Search, ImageIcon } from 'lucide-react';
 import { formatPriceCompact } from '@/lib/utils/formatters';
-import { useToast } from '@/context/ToastContext';
+import { errorText, toast } from '@/client/toast';
 import { useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
 import { trackPurchase } from '@/client/analytics/tracker';
 import { normalizePhone } from '@/lib/account/account-input';
+import { useAuth } from '@/context/AuthContext';
+import { EmailVerificationBanner, useEmailVerification } from '@/components/auth/EmailVerification';
 
 interface CheckoutData {
   items: {
@@ -45,8 +47,10 @@ function idempotencyKeyFor(fingerprint: string) {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { showToast } = useToast();
   const { removeFromCart } = useCart();
+  const { user } = useAuth();
+  const { requireVerifiedEmail, openVerificationDialog } = useEmailVerification();
+  const [emailTouched, setEmailTouched] = useState(false);
   
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
   const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(checkoutData?.items || [], checkoutData?.couponCode || '');
@@ -56,6 +60,7 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
+    email: '',
     address: '',
     city: '',
     district: '',
@@ -63,6 +68,10 @@ export default function CheckoutPage() {
     note: '',
     source: ''
   });
+
+  useEffect(() => {
+    if (!emailTouched && user?.email) setFormData((prev) => ({ ...prev, email: user.email }));
+  }, [user?.email, emailTouched]);
 
   useEffect(() => {
     // Lấy dữ liệu thanh toán từ session storage
@@ -82,28 +91,34 @@ export default function CheckoutPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'email') setEmailTouched(true);
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    if (!requireVerifiedEmail()) return;
+
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
-      showToast('Vui lòng điền đầy đủ thông tin bắt buộc!', 'info');
+      toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc!');
       return;
     }
     
     // Cùng quy tắc với máy chủ; chấp nhận "0912 345 678", "+84 912 345 678".
     const phone = normalizePhone(formData.phone);
     if (!phone) {
-      showToast('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.', 'info');
+      toast.warning('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.');
       return;
     }
 
-    if (!checkoutData || !quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho.', 'info'); return; }
+    if (!checkoutData || !quote) {
+      if (quoteError) toast.error(quoteError); else toast.info('Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.');
+      return;
+    }
 
     setIsSubmitting(true);
     let completed = false;
+    const notice = toast.loading('Đang gửi đơn hàng…', { id: 'checkout' });
 
     try {
       const payload = {
@@ -114,7 +129,7 @@ export default function CheckoutPage() {
       };
 
       const key = idempotencyKeyFor(JSON.stringify({ items: checkoutData.items.map((item) => [item.productId, item.selectedSize, item.quantity]),
-        couponCode: checkoutData.couponCode || '', phone }));
+        couponCode: checkoutData.couponCode || '', phone, email: formData.email.trim().toLowerCase() }));
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
@@ -139,15 +154,18 @@ export default function CheckoutPage() {
         
         // Thành công -> chuyển trang
         completed = true;
+        toast.success('Đặt hàng thành công! Đơn của Mẹ đã được ghi nhận 🌸', { id: notice });
         window.dispatchEvent(new Event('tpetie:navigation-start'));
         router.push('/checkout/success');
+      } else if (res.status === 403 && result.code === 'EMAIL_UNVERIFIED') {
+        toast.dismiss(notice);
+        openVerificationDialog();
       } else {
         throw new Error(result.message || 'Lỗi không xác định');
       }
     } catch (error: unknown) {
       console.error('Lỗi khi thanh toán:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra, vui lòng thử lại sau.';
-      showToast(errorMessage, 'info');
+      toast.error(errorText(error, 'Có lỗi xảy ra, vui lòng thử lại sau.'), { id: notice });
     } finally {
       if (!completed) setIsSubmitting(false);
     }
@@ -191,6 +209,7 @@ export default function CheckoutPage() {
           Thanh Toán
         </h1>
       </div>
+      <EmailVerificationBanner className="mb-6" />
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Form Thông Tin */}
@@ -239,6 +258,10 @@ export default function CheckoutPage() {
               </div>
               
               <div>
+                <label className="block text-sm font-semibold text-charcoal-700 mb-1" htmlFor="order-email">Email nhận thông báo đơn hàng (không bắt buộc)</label>
+                <input id="order-email" name="email" type="email" autoComplete="email" value={formData.email} onChange={handleInputChange} maxLength={254}
+                  placeholder="mebe@gmail.com" className="w-full px-4 py-2.5 rounded-xl border border-cream-300 bg-cream-50 text-sm" />
+                <p className="mt-1 mb-4 text-xs text-charcoal-500">Nhận xác nhận và cập nhật giao hàng qua email.</p>
                 <label className="block text-sm font-semibold text-charcoal-700 mb-1">Tỉnh/Thành phố <span className="text-red-500">*</span></label>
                 <input name="city" value={formData.city} onChange={handleInputChange} required maxLength={100}
                   placeholder="VD: Hà Nội" className="w-full px-4 py-2.5 rounded-xl border border-cream-300 bg-cream-50 text-sm" />

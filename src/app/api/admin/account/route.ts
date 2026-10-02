@@ -30,13 +30,18 @@ export async function PATCH(request: Request) {
   const id = session.user.id;
   const user = await prisma.user.findUnique({ where: { id }, select: { email: true, password: true } });
   if (!user) return NextResponse.json({ error: 'Không tìm thấy tài khoản' }, { status: 404 });
-  if (input.email !== user.email?.toLowerCase()) {
+  const emailChanged = input.email !== user.email?.toLowerCase();
+  if (emailChanged) {
     const check = await checkCurrentPassword(id, user.password, body.currentPassword);
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
   try {
-    const updated = await prisma.user.update({ where: { id }, data: input, select: { name: true, email: true, phone: true } });
+    // Dấu "đã xác minh" thuộc về email cũ (đăng nhập Google dựa vào nó để quyết định giữ mật khẩu khi liên kết).
+    const updated = await prisma.user.update({
+      where: { id }, data: { ...input, ...(emailChanged ? { emailVerified: null } : {}) },
+      select: { name: true, email: true, phone: true },
+    });
     forgetUserSnapshot(id);
     return NextResponse.json({ profile: updated }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

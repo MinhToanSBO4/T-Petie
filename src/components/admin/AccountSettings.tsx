@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { Check, Eye, EyeOff, KeyRound, UserRound } from 'lucide-react';
 import { markAdminPagesStale } from '@/client/admin-freshness';
+import { errorText, toast } from '@/client/toast';
 import { PASSWORD_MIN } from '@/lib/account/account-input';
 
 export type AccountProfile = {
@@ -59,21 +60,26 @@ function ContactForm({ saved, onSaved }: {
   const [draft, setDraft] = useState(saved);
   const [currentPassword, setCurrentPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [error, setError] = useState('');
   const emailChanged = draft.email.trim().toLowerCase() !== saved.email.toLowerCase();
   const dirty = emailChanged || draft.name.trim() !== saved.name || draft.phone.trim() !== saved.phone;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setNotice(null);
+    setBusy(true); setError('');
+    const id = toast.loading('Đang lưu thông tin…');
     try {
       const { profile } = await send('/api/admin/account', 'PATCH', { ...draft, ...(emailChanged ? { currentPassword } : {}) });
       const next = { name: profile.name || '', email: profile.email || '', phone: profile.phone || '' };
       onSaved(next); setDraft(next); setCurrentPassword('');
       // Tên trên thanh đầu trang được làm mới ở lần chuyển trang kế tiếp.
       markAdminPagesStale();
-      setNotice({ ok: true, text: emailChanged ? 'Đã lưu. Từ giờ đăng nhập bằng email mới hoặc tên đăng nhập.' : 'Đã lưu thông tin.' });
-    } catch (error) { setNotice({ ok: false, text: (error as Error).message }); }
+      toast.success('Đã lưu thông tin', { id,
+        description: emailChanged ? 'Từ giờ đăng nhập bằng email mới hoặc tên đăng nhập.' : undefined });
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không lưu được thông tin');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -93,7 +99,7 @@ function ContactForm({ saved, onSaved }: {
         <input className={field} type="password" required autoComplete="current-password" value={currentPassword}
           onChange={(event) => setCurrentPassword(event.target.value)} /></label>}
     </div>
-    {notice && <p role={notice.ok ? 'status' : 'alert'} className={`rounded-xl p-3 text-sm ${notice.ok ? 'bg-sage-50 text-sage-800' : 'bg-red-50 text-red-700'}`}>{notice.text}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !dirty} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang lưu…' : 'Lưu thay đổi'}
     </button>
@@ -105,22 +111,26 @@ function PasswordForm({ loginName }: { loginName: string }) {
   const [draft, setDraft] = useState(empty);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [error, setError] = useState('');
   const longEnough = draft.next.length >= PASSWORD_MIN;
   const matches = draft.confirm.length > 0 && draft.confirm === draft.next;
   const type = visible ? 'text' : 'password';
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setNotice(null);
+    setBusy(true); setError('');
+    const id = toast.loading('Đang đổi mật khẩu…');
     try {
       await send('/api/admin/account/password', 'POST', { currentPassword: draft.current, newPassword: draft.next });
       // Phiên cũ hết hiệu lực ngay khi đổi mật khẩu: đăng nhập lại bằng mật khẩu mới để không bị đẩy ra trang đăng nhập.
       const result = await signIn('credentials', { redirect: false, email: loginName, password: draft.next });
       if (!result?.ok) { window.location.href = '/login'; return; }
       setDraft(empty);
-      setNotice({ ok: true, text: 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.' });
-    } catch (error) { setNotice({ ok: false, text: (error as Error).message }); }
+      toast.success('Đã đổi mật khẩu', { id, description: 'Các thiết bị khác đã được đăng xuất.' });
+    } catch (saveError) {
+      const text = errorText(saveError, 'Không đổi được mật khẩu');
+      setError(text); toast.error(text, { id });
+    }
     finally { setBusy(false); }
   };
 
@@ -151,7 +161,7 @@ function PasswordForm({ loginName }: { loginName: string }) {
       <li className={`flex items-center gap-1.5 ${matches ? 'text-sage-700' : draft.confirm ? 'text-red-700' : 'text-charcoal-500'}`}>
         <Check className={`size-3.5 ${matches ? '' : 'opacity-30'}`} aria-hidden />{draft.confirm && !matches ? 'Mật khẩu nhập lại chưa khớp' : 'Nhập lại khớp mật khẩu mới'}</li>
     </ul>
-    {notice && <p role={notice.ok ? 'status' : 'alert'} className={`rounded-xl p-3 text-sm ${notice.ok ? 'bg-sage-50 text-sage-800' : 'bg-red-50 text-red-700'}`}>{notice.text}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !draft.current || !longEnough || !matches} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang đổi…' : 'Đổi mật khẩu'}
     </button>

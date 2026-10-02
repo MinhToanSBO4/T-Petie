@@ -7,7 +7,6 @@ import { ImageIcon, ShoppingBag } from 'lucide-react';
 import type { ProductCardData } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
-import { useToast } from '@/context/ToastContext';
 
 /**
  * Thẻ sản phẩm trong lưới. Hiệu ứng nổi khi rê chuột bằng CSS (trước đây mỗi thẻ là một motion.div có layoutId,
@@ -15,7 +14,6 @@ import { useToast } from '@/context/ToastContext';
  */
 export function ProductCard({ product, priority = false }: { product: ProductCardData; priority?: boolean }) {
   const { addToCart } = useCart();
-  const { showToast } = useToast();
   const availableSize = product.sizes.find((size) => size.stock > 0);
   const discount = product.discountPercent ?? 0;
   const highlight = product.materialFeatures[0] || product.material;
@@ -24,8 +22,8 @@ export function ProductCard({ product, priority = false }: { product: ProductCar
     e.preventDefault();
     e.stopPropagation();
     if (availableSize) {
+      // Giỏ hàng nhanh tự mở là phản hồi đủ rõ; thêm toast sẽ đè lên chính giỏ hàng đó.
       addToCart(product, availableSize, 1);
-      showToast(`Đã thêm "${product.name}" vào giỏ hàng!`, 'success');
     }
   };
 

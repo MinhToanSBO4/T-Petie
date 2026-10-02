@@ -6,6 +6,7 @@ import { isSameOrigin } from '@/server/security/origin';
 import { CUSTOMER_CANCEL_NOTE, CUSTOMER_ORDER_ACTIONS, type CustomerOrderAction } from '@/lib/orders/status';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const BLOCKED: Record<CustomerOrderAction, string> = {
   cancel: 'Shop đã xác nhận đơn nên mẹ không tự hủy được nữa. Mẹ nhắn shop để được hỗ trợ nhé.',

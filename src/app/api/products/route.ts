@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { getCatalogListing } from '@/server/catalog/listing';
 import { parseCatalogParams } from '@/lib/catalog/filters';
 import { defaultSortFor, parseScopeParam } from '@/lib/catalog/scope';
+import { kickEmailOutbox } from '@/server/email/outbox';
 
 export const dynamic = 'force-dynamic';
+// Gửi thư còn tồn trong hàng đợi sau phản hồi (tối đa một lần mỗi 2 phút mỗi máy chủ); cần đủ thời gian cho một lần gửi.
+export const maxDuration = 60;
 
 /**
  * Danh mục công khai theo trang: lọc, sắp xếp và cắt trang trên máy chủ (danh sách sản phẩm đã cache), cùng tham số
@@ -11,6 +14,7 @@ export const dynamic = 'force-dynamic';
  * (0 chỉ đếm, dùng cho số "Xem N sản phẩm" trong bảng lọc), `facets=1` kèm số lượng cho từng lựa chọn lọc.
  */
 export async function GET(request: Request) {
+  kickEmailOutbox();
   const url = new URL(request.url);
   const scope = parseScopeParam(url.searchParams.get('scope'));
   const filters = parseCatalogParams(url.searchParams, defaultSortFor(scope));

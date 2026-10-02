@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { markAdminPagesStale } from '@/client/admin-freshness';
+import { readJson } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MediaPicker } from '@/components/admin/MediaPicker';
@@ -227,18 +229,19 @@ export function SiteContentManager({ initialContent, collections, products, best
   const [dirty, setDirty] = useState<ContentKey[]>([]);
   const [editing, setEditing] = useState<ContentKey | null>(null);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const revisionRef = useRef(0);
 
+  /** "Hoàn tác": bỏ mọi thay đổi chưa lưu, nạp lại nội dung đang có trên website. */
   const load = useCallback(async () => {
+    const id = toast.loading('Đang hoàn tác…');
     try {
       const response = await fetch('/api/admin/site-content', { cache: 'no-store' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không tải được nội dung');
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(String(data.error || 'Không tải được nội dung'));
       setDraft(toDraft(data.content));
       setDirty([]);
-    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Có lỗi xảy ra'); }
+      toast.success('Đã hoàn tác các thay đổi chưa lưu', { id });
+    } catch (loadError) { toast.error(errorText(loadError, 'Không tải được nội dung'), { id }); }
   }, []);
 
   const update = <K extends ContentKey>(key: K, value: ContentDraft[K]) => {
@@ -253,26 +256,34 @@ export function SiteContentManager({ initialContent, collections, products, best
     if (dirty.length === 0) return;
     const keysToSave = [...dirty];
     const savedRevision = revisionRef.current;
-    setSaving(true); setMessage(''); setError('');
+    setSaving(true);
+    const id = toast.loading(`Đang lưu ${keysToSave.length} khối nội dung…`);
     const failed: ContentKey[] = [];
+    const errors: string[] = [];
     try {
-      // Các khối độc lập nhau nên lưu song song thay vì chờ lần lượt từng khối.
+      // Các khối độc lập nhau nên lưu song song thay vì chờ lần lượt từng khối; một khối lỗi không chặn các khối khác.
       await Promise.all(keysToSave.map(async (key) => {
-        const response = await fetch(`/api/admin/site-content/${key}`, { method: 'PUT',
-          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft[key]) });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) { failed.push(key); setError(data.error || `Không lưu được khối ${key}`); }
+        try {
+          const response = await fetch(`/api/admin/site-content/${key}`, { method: 'PUT',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft[key]) });
+          const data = await readJson(response);
+          if (!response.ok) throw new Error(String(data.error || `Không lưu được khối ${key}`));
+        } catch (saveError) { failed.push(key); errors.push(errorText(saveError, `Không lưu được khối ${key}`)); }
       }));
+      const saved = keysToSave.length - failed.length;
+      // Trang này dựng từ dữ liệu máy chủ: lần mở sau được làm mới để thấy nội dung mới. Không làm mới ngay vì
+      // sẽ dựng lại trang đang sửa.
+      if (saved > 0) markAdminPagesStale();
       if (failed.length === 0) {
         const changedDuringSave = revisionRef.current !== savedRevision;
-        setMessage(changedDuringSave
-          ? `Đã lưu ${keysToSave.length} khối. Bạn còn thay đổi mới chưa được lưu.`
-          : `Đã lưu ${keysToSave.length} khối nội dung. Website sẽ hiển thị nội dung mới trong ít phút.`);
+        toast.success(`Đã lưu ${keysToSave.length} khối nội dung`, { id, description: changedDuringSave
+          ? 'Còn thay đổi mới chưa được lưu.' : 'Website sẽ hiển thị nội dung mới trong ít phút.' });
         if (!changedDuringSave) setDirty([]);
-        // Trang này dựng từ dữ liệu máy chủ: lần mở sau được làm mới để thấy nội dung mới. Không làm mới ngay vì
-        // sẽ dựng lại trang đang sửa và mất thông báo vừa lưu.
-        markAdminPagesStale();
       } else {
+        const description = [...new Set(errors)].join('; ');
+        if (keysToSave.length === 1) toast.error(errors[0], { id });
+        else if (saved === 0) toast.error(`Không lưu được ${failed.length} khối nội dung`, { id, description });
+        else toast.error(`Đã lưu ${saved}/${keysToSave.length} khối, ${failed.length} khối chưa lưu được`, { id, description });
         if (revisionRef.current === savedRevision) setDirty(failed);
       }
     } finally { setSaving(false); }
@@ -300,8 +311,6 @@ export function SiteContentManager({ initialContent, collections, products, best
       </div>
     </div>
 
-    {message && <p role="status" className="mb-4 rounded-xl bg-cream-100 p-3 text-sm text-charcoal-900">{message}</p>}
-    {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <HomeOrderEditor order={draft.home_layout.order} onChange={(order) => update('home_layout', { order })} />
 
     {/* Mô phỏng trang chủ bằng chính các khối thật */}
@@ -364,7 +373,7 @@ export function SiteContentManager({ initialContent, collections, products, best
         preview={<div className="space-y-2">{previewImage(draft.sale_page.bannerUrl, draft.sale_page.bannerAlt)}
           <p className="text-sm font-bold">{draft.sale_page.title || '—'}</p>
           <p className="text-xs text-charcoal-600">{draft.sale_page.description || '—'}</p></div>}>
-        <MediaPicker label="Ảnh banner" value={draft.sale_page.bannerUrl} altText={draft.sale_page.bannerAlt} onError={setError}
+        <MediaPicker label="Ảnh banner" value={draft.sale_page.bannerUrl} altText={draft.sale_page.bannerAlt}
           onChange={(bannerUrl) => update('sale_page', { ...draft.sale_page, bannerUrl })} />
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField label="Mô tả ảnh (alt)" value={draft.sale_page.bannerAlt} maxLength={200}
@@ -385,7 +394,7 @@ export function SiteContentManager({ initialContent, collections, products, best
             <p className="text-xs">{draft.about_page.ctaDescription || '—'}</p>
             <p className="mt-1 text-xs font-bold text-honey-700">{draft.about_page.ctaLabel || '—'}</p>
           </div></div>}>
-        <MediaPicker label="Ảnh nền đầu trang" value={draft.about_page.heroImageUrl} altText={draft.about_page.heroImageAlt} onError={setError}
+        <MediaPicker label="Ảnh nền đầu trang" value={draft.about_page.heroImageUrl} altText={draft.about_page.heroImageAlt}
           onChange={(heroImageUrl) => update('about_page', { ...draft.about_page, heroImageUrl })} />
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField label="Mô tả ảnh (alt)" value={draft.about_page.heroImageAlt} maxLength={200}
@@ -415,7 +424,7 @@ export function SiteContentManager({ initialContent, collections, products, best
           </div>)}</div>}>
         {draft.category_pages.items.map((item, index) => <div key={item.id} className="space-y-3 rounded-2xl border border-cream-200 p-4">
           <h3 className="font-bold">{CATEGORY_PAGE_LABELS[item.id as keyof typeof CATEGORY_PAGE_LABELS]?.label || item.id}</h3>
-          <MediaPicker label="Ảnh chủ đề" value={item.imageUrl} altText={item.imageAlt} onError={setError}
+          <MediaPicker label="Ảnh chủ đề" value={item.imageUrl} altText={item.imageAlt}
             onChange={(imageUrl) => update('category_pages', { items: draft.category_pages.items
               .map((row, position) => position === index ? { ...row, imageUrl } : row) })} />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -477,7 +486,7 @@ export function SiteContentManager({ initialContent, collections, products, best
             : <span className="font-heading text-lg font-bold text-honey-700">T&apos;Petie</span>}
           <span className="text-xs text-charcoal-600">{draft.brand_assets.logoAlt || 'Chưa có mô tả'}</span>
         </div>}>
-        <MediaPicker label="Logo" value={draft.brand_assets.logoUrl} altText={draft.brand_assets.logoAlt} aspect="square" onError={setError}
+        <MediaPicker label="Logo" value={draft.brand_assets.logoUrl} altText={draft.brand_assets.logoAlt} aspect="square"
           onChange={(logoUrl) => update('brand_assets', { ...draft.brand_assets, logoUrl })} />
         <TextField label="Mô tả logo (alt)" value={draft.brand_assets.logoAlt} maxLength={200}
           onChange={(logoAlt) => update('brand_assets', { ...draft.brand_assets, logoAlt })} />
@@ -522,7 +531,7 @@ export function SiteContentManager({ initialContent, collections, products, best
           <p className="rounded-xl bg-cream-100 p-3 text-xs text-charcoal-600">Danh sách ảnh Hero hoạt động giống phần Ảnh chủ đề: thêm nhiều ảnh, mỗi ảnh có nội dung riêng.</p>
           {draft.home_hero.slides.map((slide, index) => <div key={slide.id} className="space-y-2 rounded-2xl border border-cream-200 p-3">
             <div className="flex justify-between"><strong>Ảnh Hero {index + 1}</strong><button type="button" className="text-sm text-red-700" onClick={() => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.filter((_, position) => position !== index) })}>Xóa ảnh</button></div>
-            <MediaPicker label="Ảnh nền" value={slide.imageUrl} altText={slide.imageAlt} onError={setError} onChange={(imageUrl) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, imageUrl } : item) })} />
+            <MediaPicker label="Ảnh nền" value={slide.imageUrl} altText={slide.imageAlt} onChange={(imageUrl) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, imageUrl } : item) })} />
             <div className="grid gap-2 sm:grid-cols-2"><TextField label="Mô tả ảnh (alt)" value={slide.imageAlt} onChange={(imageAlt) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, imageAlt } : item) })} /><TextField label="Biểu tượng (emoji)" value={slide.icon} onChange={(icon) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, icon } : item) })} /><TextField label="Tiêu đề" value={slide.title} onChange={(title) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, title } : item) })} /><TextField label="Mô tả" value={slide.description} onChange={(description) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, description } : item) })} /><TextField label="Vị trí ảnh" value={slide.objectPosition} placeholder="center center" onChange={(objectPosition) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, objectPosition } : item) })} /><DestinationField label="Bấm vào ảnh sẽ mở" value={slide.href} onChange={(href) => update('home_hero', { ...draft.home_hero, slides: draft.home_hero.slides.map((item, position) => position === index ? { ...item, href } : item) })} /></div>
           </div>)}
           {draft.home_hero.slides.length < 12 && <button type="button" className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold" onClick={() => update('home_hero', { ...draft.home_hero, slides: [...draft.home_hero.slides, { id: `hero-${Date.now().toString(36)}`, imageUrl: '', imageAlt: '', icon: '✨', title: '', description: '', badge: '', href: '', objectPosition: 'center center' }] })}>Thêm ảnh Hero</button>}
@@ -561,7 +570,7 @@ export function SiteContentManager({ initialContent, collections, products, best
               <button type="button" className="min-h-11 px-3 text-sm font-semibold text-red-700"
                 onClick={() => update('home_features', { ...draft.home_features,
                   items: draft.home_features.items.filter((_, position) => position !== index) })}>Xóa ảnh</button></div>
-            <MediaPicker label="Ảnh nền" value={item.src} altText={item.title} onError={setError}
+            <MediaPicker label="Ảnh nền" value={item.src} altText={item.title}
               onChange={(src) => update('home_features', { ...draft.home_features,
                 items: draft.home_features.items.map((row, position) => position === index ? { ...row, src } : row) })} />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -591,7 +600,7 @@ export function SiteContentManager({ initialContent, collections, products, best
             Ảnh feedback quản lý ở mục &ldquo;Feedback&rdquo;; đánh giá của khách đã mua chọn hiện trang chủ ở mục
             &ldquo;Đánh giá sản phẩm&rdquo;. Tại đây chỉ chỉnh tiêu đề khối (dùng chung cho trang album /feedback).
           </p>
-          <MediaPicker label="Ảnh minh họa đánh giá" value={draft.testimonials_section.imageUrl} altText={draft.testimonials_section.imageAlt} onError={setError}
+          <MediaPicker label="Ảnh minh họa đánh giá" value={draft.testimonials_section.imageUrl} altText={draft.testimonials_section.imageAlt}
             onChange={(imageUrl) => update('testimonials_section', { ...draft.testimonials_section, imageUrl })} />
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField label="Mô tả ảnh (alt)" value={draft.testimonials_section.imageAlt} maxLength={200}

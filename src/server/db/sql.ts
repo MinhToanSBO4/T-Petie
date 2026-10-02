@@ -14,7 +14,7 @@ function appSchema() {
 const SCHEMA = appSchema();
 
 type AppTable = 'orders' | 'order_items' | 'order_status_events' | 'customer_testimonials' | 'site_content'
-  | 'rate_limit_counters' | 'product_images' | 'products' | 'product_variants' | 'product_reviews';
+  | 'rate_limit_counters' | 'product_images' | 'products' | 'product_variants' | 'product_reviews' | 'email_jobs';
 
 /**
  * Tên bảng kèm schema cho câu SQL viết tay (`$queryRaw`/`$executeRaw`). Truy vấn model của Prisma luôn tự ghi schema,
