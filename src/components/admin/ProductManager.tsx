@@ -5,10 +5,16 @@ import { ArrowDown, ArrowUp, Trash2, Upload } from 'lucide-react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { ReviewModerationPanel } from '@/components/admin/ReviewModerationPanel';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { MIN_PRICE, PRODUCT_TYPES } from '@/lib/content/product-input';
+import { slugify } from '@/lib/utils/formatters';
+import { PRODUCT_PHOTO_OPTIONS } from '@/client/image-compress';
+import { readJson, uploadMedia } from '@/client/media-upload';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
-type VariantRow = { id: string; size: string; stock: number; price: number; weightRange: string; ageRange: string };
+type VariantRow = { id: string; size: string; stock: number; price: number; weightRange: string; ageRange: string; active: boolean };
 type ProductRow = { id: string; slug: string; sku: string; name: string; active: boolean; price: number;
   description: string; originalPrice: number | null; discountPercent: number; collectionId: string | null;
+  subcategory: string; subcategoryName: string; material: string; colorName: string;
   isBestSeller: boolean; isNewArrival: boolean; isSale: boolean;
   images: { id: string; url: string }[]; variants: VariantRow[] };
 type CollectionOption = { id: string; title: string };
@@ -16,9 +22,15 @@ type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; product: Pro
 
 const field = 'mt-2 block w-full rounded-xl border-2 border-cream-300 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-honey-500 focus:ring-4 focus:ring-honey-100';
 const formatPrice = (value: number) => `${value.toLocaleString('vi-VN')}₫`;
+const MAX_IMAGES = 20;
 
 /** Tổng tồn kho của sản phẩm trên mọi size đang bán. */
-const totalStock = (product: ProductRow) => product.variants.reduce((sum, variant) => sum + variant.stock, 0);
+const totalStock = (product: ProductRow) => product.variants.reduce((sum, variant) => sum + (variant.active ? variant.stock : 0), 0);
+
+/** Ô giá: số nguyên từ MIN_PRICE trở lên. Ô để trống (Number('') = 0) không còn bị lưu thành giá 0đ. */
+const validPrice = (value: string) => /^\d+$/.test(value.trim()) && Number(value) >= MIN_PRICE && Number(value) <= 1_000_000_000;
+const validStock = (value: string) => /^\d+$/.test(value.trim()) && Number(value) <= 100000;
+const priceHint = `Giá phải là số nguyên từ ${MIN_PRICE.toLocaleString('vi-VN')}đ`;
 
 /** Danh sách bộ sưu tập đi kèm mỗi lần tải bảng sản phẩm; ô lọc và form sửa dùng lại, không gọi API thêm. */
 let collectionOptions: CollectionOption[] | null = null;
@@ -42,14 +54,17 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   const back = useCallback((text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); }, []);
   const fetchProducts = useCallback(async (query: TableQuery) => {
     const response = await fetch(`/api/admin/products?${tableParams(query)}`, { cache: 'no-store' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Không tải được sản phẩm');
-    if (Array.isArray(data.collections)) { collectionOptions = data.collections; setCollections(data.collections); }
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(String(data.error || 'Không tải được sản phẩm'));
+    if (Array.isArray(data.collections)) { collectionOptions = data.collections as CollectionOption[]; setCollections(collectionOptions); }
     return { items: data.items as ProductRow[], total: data.total as number, page: data.page as number, pages: data.pages as number };
   }, []);
 
-  if (view.mode === 'create') return <ProductCreateForm onDone={back} />;
-  if (view.mode === 'edit') return <ProductEditForm product={view.product} onBack={back} />;
+  if (view.mode === 'create') {
+    return <ProductCreateForm onCancel={() => back()}
+      onCreated={(product) => { setMessage(''); setReloadKey((key) => key + 1); setView({ mode: 'edit', product }); }} />;
+  }
+  if (view.mode === 'edit') return <ProductEditLoader key={view.product.id} product={view.product} onBack={back} />;
 
   const columns: Column<ProductRow>[] = [
     { key: 'image', header: 'Ảnh', className: 'w-20', render: (row) => row.images[0]
@@ -61,7 +76,7 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
       </div> },
     { key: 'price', header: 'Giá', render: (row) => formatPrice(row.price) },
     { key: 'stock', header: 'Tồn kho', render: (row) => <span className={totalStock(row) === 0 ? 'font-bold text-red-700' : ''}>{totalStock(row)}</span> },
-    { key: 'sizes', header: 'Size', render: (row) => <span className="text-xs text-charcoal-600">{row.variants.map((variant) => variant.size).join(', ') || '—'}</span> },
+    { key: 'sizes', header: 'Size', render: (row) => <span className="text-xs text-charcoal-600">{row.variants.filter((variant) => variant.active).map((variant) => variant.size).join(', ') || '—'}</span> },
     { key: 'status', header: 'Trạng thái', render: (row) => <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${
       row.active ? 'bg-sage-100 text-sage-800' : 'bg-cream-200 text-charcoal-600'}`}>{row.active ? 'Đang bán' : 'Đang ẩn'}</span> },
     { key: 'action', header: '', render: (row) => <button type="button" onClick={(event) => { event.stopPropagation(); setView({ mode: 'edit', product: row }); }} className="min-h-9 whitespace-nowrap rounded-lg border border-cream-300 px-3 text-xs font-bold">Chỉnh sửa</button> },
@@ -69,7 +84,8 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
 
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
-    <DataTable columns={columns} fetchPage={fetchProducts} reloadKey={reloadKey}
+    {/* Tồn kho đổi theo từng đơn hàng: luôn tải lại ngầm khi quay về bảng. */}
+    <DataTable columns={columns} fetchPage={fetchProducts} reloadKey={reloadKey} alwaysRevalidate
       searchPlaceholder="Tìm theo tên, SKU hoặc slug"
       sorts={PRODUCT_SORTS}
       filters={[STATUS_FILTER, CONDITION_FILTER, { key: 'collection', label: 'Bộ sưu tập', options: [
@@ -84,45 +100,81 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   </div>;
 }
 
-/** Tạo sản phẩm mới: tách riêng khỏi màn hình chỉnh sửa sản phẩm đã có. */
-function ProductCreateForm({ onDone }: { onDone: (message?: string) => void }) {
-  const [draft, setDraft] = useState({ name: '', slug: '', sku: '', price: '', size: 'Size 90', stock: '0' });
+/** Tạo sản phẩm mới: tách riêng khỏi màn hình chỉnh sửa sản phẩm đã có. Tạo xong mở ngay form sửa để thêm ảnh và size. */
+function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: (product: ProductRow) => void }) {
+  const [draft, setDraft] = useState({ name: '', slug: '', sku: '', subcategory: '', price: '', size: 'Size 90', stock: '0' });
+  // Đường dẫn tự sinh theo tên cho tới khi người dùng tự sửa ô đường dẫn.
+  const [slugEdited, setSlugEdited] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const dirty = Boolean(draft.name || draft.sku || draft.price);
+  useUnsavedChangesGuard(dirty && !busy);
+
+  const validationError = () => {
+    if (draft.name.trim().length < 2) return 'Nhập tên sản phẩm (ít nhất 2 ký tự)';
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft.slug) || draft.slug.length < 3) {
+      return 'Đường dẫn cần ít nhất 3 ký tự: chữ thường không dấu, số và dấu gạch ngang (ví dụ vay-hoa-nhi)';
+    }
+    if (!/^[A-Z0-9-]{3,50}$/.test(draft.sku.trim())) return 'Mã sản phẩm (SKU) cần 3–50 ký tự: chữ không dấu, số và dấu gạch ngang (ví dụ TP-VAY-001)';
+    if (!draft.subcategory) return 'Chọn loại sản phẩm để sản phẩm hiện đúng trang Áo / Quần / Váy / Set đồ';
+    if (!validPrice(draft.price)) return priceHint;
+    if (!draft.size.trim()) return 'Nhập tên size đầu tiên';
+    if (!validStock(draft.stock)) return 'Tồn kho phải là số nguyên từ 0 đến 100000';
+    return '';
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const invalid = validationError();
+    if (invalid) { setError(invalid); return; }
     setBusy(true); setError('');
     try {
       const response = await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, price: Number(draft.price), stock: Number(draft.stock) }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không tạo được sản phẩm');
-      onDone(`Đã tạo sản phẩm ${draft.name}. Bấm vào dòng trong danh sách để thêm ảnh và size khác.`);
+        body: JSON.stringify({ ...draft, sku: draft.sku.trim(), price: Number(draft.price), stock: Number(draft.stock) }) });
+      const data = await readJson(response);
+      if (!response.ok || !data.product) throw new Error(String(data.error || 'Không tạo được sản phẩm'));
+      onCreated(data.product as ProductRow);
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
 
-  return <form onSubmit={submit} className="space-y-6 rounded-2xl border border-cream-200 bg-white p-6">
+  const leave = () => {
+    if (dirty && !window.confirm('Thông tin đang nhập chưa được lưu. Bỏ và quay về danh sách?')) return;
+    onCancel();
+  };
+
+  return <form onSubmit={submit} noValidate className="space-y-6 rounded-2xl border border-cream-200 bg-white p-6">
     <header className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-2xl font-bold text-charcoal-900">Thêm sản phẩm mới</h2>
-      <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+      <div>
+        <h2 className="text-2xl font-bold text-charcoal-900">Thêm sản phẩm mới</h2>
+        <p className="mt-1 text-sm text-charcoal-600">Sản phẩm được tạo ở trạng thái <strong>đang ẩn</strong>. Thêm ảnh, các size còn lại rồi bật “Đang bán”.</p>
+      </div>
+      <button type="button" onClick={leave} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
     <div className="grid gap-5 sm:grid-cols-2">
       <label className="text-sm font-semibold">Tên sản phẩm
-        <input className={field} required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-      <label className="text-sm font-semibold">Slug
-        <input className={field} required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={draft.slug}
-          onChange={(event) => setDraft({ ...draft, slug: event.target.value.toLowerCase() })} /></label>
-      <label className="text-sm font-semibold">SKU
-        <input className={field} required value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value.toUpperCase() })} /></label>
+        <input className={field} maxLength={150} value={draft.name}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value,
+            ...(slugEdited ? {} : { slug: slugify(event.target.value).slice(0, 100) }) })} /></label>
+      <label className="text-sm font-semibold">Đường dẫn (slug)
+        <input className={field} maxLength={100} value={draft.slug} placeholder="vay-hoa-nhi"
+          onChange={(event) => { setSlugEdited(true); setDraft({ ...draft, slug: event.target.value.toLowerCase() }); }} />
+        <span className="mt-1 block text-xs font-normal text-charcoal-500">Tự tạo theo tên; không đổi được sau khi tạo.</span></label>
+      <label className="text-sm font-semibold">Mã sản phẩm (SKU)
+        <input className={field} maxLength={50} value={draft.sku} placeholder="TP-VAY-001"
+          onChange={(event) => setDraft({ ...draft, sku: event.target.value.toUpperCase().replace(/\s+/g, '-') })} /></label>
+      <label className="text-sm font-semibold">Loại sản phẩm
+        <select className={field} value={draft.subcategory} onChange={(event) => setDraft({ ...draft, subcategory: event.target.value })}>
+          <option value="">— Chọn loại —</option>
+          {PRODUCT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+        </select></label>
       <label className="text-sm font-semibold">Giá bán (đ)
-        <input className={field} type="number" min="0" required value={draft.price}
+        <input className={field} type="number" inputMode="numeric" min={MIN_PRICE} step="1000" value={draft.price}
           onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></label>
       <label className="text-sm font-semibold">Size đầu tiên
-        <input className={field} required value={draft.size} onChange={(event) => setDraft({ ...draft, size: event.target.value })} /></label>
+        <input className={field} maxLength={50} value={draft.size} onChange={(event) => setDraft({ ...draft, size: event.target.value })} /></label>
       <label className="text-sm font-semibold">Tồn kho
-        <input className={field} type="number" min="0" required value={draft.stock}
+        <input className={field} type="number" inputMode="numeric" min="0" value={draft.stock}
           onChange={(event) => setDraft({ ...draft, stock: event.target.value })} /></label>
     </div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -133,25 +185,64 @@ function ProductCreateForm({ onDone }: { onDone: (message?: string) => void }) {
 }
 
 /**
+ * Mở form sửa với số liệu mới nhất của sản phẩm. Dòng trong bảng có thể đã cũ (bảng được lưu trong tab),
+ * còn tồn kho đổi theo từng đơn hàng; dựng form từ dữ liệu cũ khiến lần lưu sau báo xung đột.
+ */
+function ProductEditLoader({ product, onBack }: { product: ProductRow; onBack: (message?: string) => void }) {
+  const [fresh, setFresh] = useState<ProductRow | null>(null);
+  const [warning, setWarning] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/admin/products/${product.id}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const data = await readJson(response);
+        if (!response.ok || !data.product) throw new Error(String(data.error || 'unavailable'));
+        setFresh(data.product as ProductRow);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setWarning(`Không tải được số liệu mới nhất (${error instanceof Error ? error.message : 'lỗi mạng'}); đang hiện dữ liệu trong bảng.`);
+        setFresh(product);
+      });
+    return () => controller.abort();
+  }, [product]);
+  if (!fresh) return <p role="status" className="rounded-2xl border border-cream-200 bg-white p-6 text-sm text-charcoal-600">Đang tải sản phẩm…</p>;
+  return <ProductEditForm product={fresh} onBack={onBack} initialWarning={warning} />;
+}
+
+type VariantDraft = { id: string; size: string; stock: string; price: string; weightRange: string; ageRange: string; active: boolean };
+type NewVariantDraft = { key: string; size: string; price: string; stock: string; weightRange: string; ageRange: string };
+
+const toVariantDrafts = (product: ProductRow): VariantDraft[] => product.variants.map((variant) => ({
+  id: variant.id, size: variant.size, stock: String(variant.stock), price: String(variant.price),
+  weightRange: variant.weightRange, ageRange: variant.ageRange, active: variant.active }));
+
+/**
  * Chi tiết và chỉnh sửa một sản phẩm đã có.
  * Mọi thay đổi — kể cả thêm, xóa hay sắp xếp ảnh — chỉ được ghi vào database
  * khi bấm "Lưu thay đổi"; nút "Hủy thay đổi" khôi phục lại trạng thái ban đầu.
+ * Chỉ trường đã đổi được gửi lên; tồn kho gửi kèm số lúc mở form để máy chủ không ghi đè đơn vừa đặt.
  */
-function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (message?: string) => void }) {
+function ProductEditForm({ product, onBack, initialWarning }: { product: ProductRow; onBack: (message?: string) => void; initialWarning: string }) {
   const initial = {
-    name: product.name, description: product.description, basePrice: String(product.price),
+    name: product.name, description: product.description,
     originalPrice: product.originalPrice === null ? '' : String(product.originalPrice),
     discountPercent: String(product.discountPercent), collectionId: product.collectionId || '',
+    subcategory: product.subcategory, subcategoryName: product.subcategoryName,
+    material: product.material, colorName: product.colorName,
     isActive: product.active, isBestSeller: product.isBestSeller, isNewArrival: product.isNewArrival, isSale: product.isSale,
   };
+  const initialVariants = toVariantDrafts(product);
+  const initialImages = product.images.map((image) => image.url);
   const [draft, setDraft] = useState(initial);
-  const [variants, setVariants] = useState(product.variants.map((variant) => ({
-    id: variant.id, size: variant.size, stock: String(variant.stock), price: String(variant.price) })));
-  const [images, setImages] = useState(product.images.map((image) => image.url));
-  const [newVariants, setNewVariants] = useState<{ size: string; price: string; stock: string }[]>([]);
+  const [variants, setVariants] = useState(initialVariants);
+  const [images, setImages] = useState(initialImages);
+  const [newVariants, setNewVariants] = useState<NewVariantDraft[]>([]);
   const [collections, setCollections] = useState<CollectionOption[]>(collectionOptions || []);
+  const [allPrice, setAllPrice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [message, setMessage] = useState(initialWarning);
   const [error, setError] = useState('');
 
   // Nạp danh sách bộ sưu tập một lần để chọn cho sản phẩm.
@@ -165,17 +256,14 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
     return () => controller.abort();
   }, []);
 
-  const dirty = JSON.stringify({ draft, variants, images, newVariants }) !== JSON.stringify({
-    draft: initial,
-    variants: product.variants.map((variant) => ({ id: variant.id, size: variant.size, stock: String(variant.stock), price: String(variant.price) })),
-    images: product.images.map((image) => image.url),
-    newVariants: [] as { size: string; price: string; stock: string }[],
-  });
+  const dirty = JSON.stringify({ draft, variants, images, newVariants })
+    !== JSON.stringify({ draft: initial, variants: initialVariants, images: initialImages, newVariants: [] });
+  useUnsavedChangesGuard(dirty || busy);
 
   const cancel = () => {
     setDraft(initial);
-    setVariants(product.variants.map((variant) => ({ id: variant.id, size: variant.size, stock: String(variant.stock), price: String(variant.price) })));
-    setImages(product.images.map((image) => image.url));
+    setVariants(initialVariants);
+    setImages(initialImages);
     setNewVariants([]);
     setMessage('Đã hủy các thay đổi chưa lưu.');
     setError('');
@@ -186,19 +274,30 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
     onBack();
   };
 
-  /** Tải nhiều ảnh trong một lần gửi; giữ đúng thứ tự tệp được chọn. */
-  const uploadImages = async (files: FileList) => {
-    setBusy(true); setMessage('Đang tải ảnh lên…'); setError('');
-    try {
-      const body = new FormData();
-      for (const file of Array.from(files)) body.append('file', file);
-      const response = await fetch('/api/admin/media', { method: 'POST', body });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Tải ảnh thất bại');
-      setImages((current) => [...current, ...(data.assets || []).map((asset: { url: string }) => asset.url)]);
-      setMessage(`Đã tải ${data.assets?.length || 0} ảnh. Bấm "Lưu thay đổi" để ghi vào sản phẩm.`);
-    } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : 'Tải ảnh thất bại'); }
-    finally { setBusy(false); }
+  /** Nén rồi tải từng ảnh một (mỗi request nhỏ hơn giới hạn 4,5 MB của Vercel); một ảnh lỗi không làm hỏng cả loạt. */
+  const uploadImages = async (list: FileList) => {
+    const room = MAX_IMAGES - images.length;
+    const files = Array.from(list).slice(0, Math.max(0, room));
+    if (files.length === 0) { setError(`Mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh.`); return; }
+    setBusy(true); setMessage(''); setError('');
+    setProgress({ done: 0, total: files.length });
+    const failures: string[] = [];
+    let uploaded = 0;
+    for (const [index, file] of files.entries()) {
+      try {
+        const asset = await uploadMedia(file, PRODUCT_PHOTO_OPTIONS, draft.name);
+        setImages((current) => [...current, asset.url]);
+        uploaded += 1;
+      } catch (uploadError) { failures.push(uploadError instanceof Error ? uploadError.message : `${file.name}: lỗi`); }
+      setProgress({ done: index + 1, total: files.length });
+    }
+    setProgress(null); setBusy(false);
+    const skipped = list.length - files.length;
+    if (uploaded > 0) setMessage(`Đã tải ${uploaded} ảnh. Bấm "Lưu thay đổi" để ghi vào sản phẩm.`);
+    if (failures.length || skipped > 0) {
+      setError([failures.length ? `Không tải được ${failures.length} ảnh — ${failures.join('; ')}` : '',
+        skipped > 0 ? `Bỏ qua ${skipped} ảnh vì mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh.` : ''].filter(Boolean).join(' '));
+    }
   };
 
   const moveImage = (index: number, direction: -1 | 1) => {
@@ -211,28 +310,82 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
     });
   };
 
+  const updateVariant = (id: string, patch: Partial<VariantDraft>) =>
+    setVariants((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+  const updateNewVariant = (key: string, patch: Partial<NewVariantDraft>) =>
+    setNewVariants((current) => current.map((row) => row.key === key ? { ...row, ...patch } : row));
+
+  const validationError = () => {
+    if (draft.name.trim().length < 2) return 'Tên sản phẩm cần ít nhất 2 ký tự';
+    if (draft.originalPrice.trim() && !validPrice(draft.originalPrice)) return `Giá gốc: ${priceHint.toLowerCase()}, hoặc bỏ trống`;
+    if (!/^\d+$/.test(draft.discountPercent.trim()) || Number(draft.discountPercent) > 100) return 'Giảm giá (%) phải từ 0 đến 100';
+    for (const variant of variants) {
+      if (!validPrice(variant.price)) return `${variant.size}: ${priceHint.toLowerCase()}`;
+      if (!validStock(variant.stock)) return `${variant.size}: tồn kho phải là số nguyên từ 0 đến 100000`;
+    }
+    const sizes = new Set(variants.map((variant) => variant.size.toLocaleLowerCase('vi-VN')));
+    for (const variant of newVariants) {
+      const size = variant.size.trim();
+      if (!size) return 'Size mới: nhập tên size (ví dụ Size 110)';
+      if (sizes.has(size.toLocaleLowerCase('vi-VN'))) return `${size} đã có trong sản phẩm`;
+      sizes.add(size.toLocaleLowerCase('vi-VN'));
+      if (!validPrice(variant.price)) return `${size}: ${priceHint.toLowerCase()}`;
+      if (!validStock(variant.stock || '0')) return `${size}: tồn kho phải là số nguyên từ 0 đến 100000`;
+    }
+    if (draft.isActive && !variants.some((variant) => variant.active) && newVariants.length === 0) {
+      return 'Sản phẩm đang bán cần ít nhất một size đang bán';
+    }
+    return '';
+  };
+
+  /** Chỉ các trường đã đổi so với lúc mở form. */
+  const buildPayload = () => {
+    const productPatch: Record<string, unknown> = {};
+    const text = (key: keyof typeof initial) => { if (draft[key] !== initial[key]) productPatch[key] = draft[key]; };
+    (['name', 'description', 'collectionId', 'subcategoryName', 'material', 'colorName',
+      'isActive', 'isBestSeller', 'isNewArrival', 'isSale'] as const).forEach(text);
+    if (draft.subcategory !== initial.subcategory) productPatch.subcategory = draft.subcategory || null;
+    if (draft.originalPrice !== initial.originalPrice) productPatch.originalPrice = draft.originalPrice.trim() === '' ? null : Number(draft.originalPrice);
+    if (draft.discountPercent !== initial.discountPercent) productPatch.discountPercent = Number(draft.discountPercent);
+    if (productPatch.collectionId === '') productPatch.collectionId = null;
+
+    const variantPatches = variants.flatMap((variant) => {
+      const before = initialVariants.find((row) => row.id === variant.id)!;
+      const patch: Record<string, unknown> = {};
+      if (variant.stock !== before.stock) { patch.stock = Number(variant.stock); patch.expectedStock = Number(before.stock); }
+      if (variant.price !== before.price) patch.price = Number(variant.price);
+      if (variant.weightRange !== before.weightRange) patch.weightRange = variant.weightRange;
+      if (variant.ageRange !== before.ageRange) patch.ageRange = variant.ageRange;
+      if (variant.active !== before.active) patch.isActive = variant.active;
+      return Object.keys(patch).length ? [{ id: variant.id, ...patch }] : [];
+    });
+    return {
+      ...(Object.keys(productPatch).length ? { product: productPatch } : {}),
+      ...(variantPatches.length ? { variants: variantPatches } : {}),
+      ...(newVariants.length ? { newVariants: newVariants.map((variant) => ({ size: variant.size.trim(), price: Number(variant.price),
+        stock: Number(variant.stock || 0), weightRange: variant.weightRange, ageRange: variant.ageRange })) } : {}),
+      ...(JSON.stringify(images) !== JSON.stringify(initialImages) ? { images } : {}),
+    };
+  };
+
   const save = async () => {
+    const invalid = validationError();
+    if (invalid) { setError(invalid); setMessage(''); return; }
     setBusy(true); setMessage(''); setError('');
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, { method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product: {
-            name: draft.name, description: draft.description, basePrice: Number(draft.basePrice),
-            originalPrice: draft.originalPrice === '' ? null : Number(draft.originalPrice),
-            discountPercent: Number(draft.discountPercent), collectionId: draft.collectionId || null,
-            isActive: draft.isActive, isBestSeller: draft.isBestSeller, isNewArrival: draft.isNewArrival, isSale: draft.isSale,
-          },
-          variants: variants.map((variant) => ({ id: variant.id, stock: Number(variant.stock), price: Number(variant.price) })),
-          newVariants: newVariants.map((variant) => ({ size: variant.size, price: Number(variant.price), stock: Number(variant.stock || 0) })),
-          images,
-        }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không lưu được sản phẩm');
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()) });
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(String(data.error || 'Không lưu được sản phẩm'));
       onBack(`Đã lưu sản phẩm ${draft.name}.`);
     } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
+
+  const activePrices = [...variants.filter((variant) => variant.active).map((variant) => variant.price), ...newVariants.map((variant) => variant.price)]
+    .filter(validPrice).map(Number);
+  const displayPrice = activePrices.length ? Math.min(...activePrices) : product.price;
+  const collectionMissing = draft.collectionId && !collections.some((collection) => collection.id === draft.collectionId);
 
   return <div className="space-y-6 pb-2">
     <header className="flex flex-wrap items-center justify-between gap-3">
@@ -253,14 +406,38 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
         <label className="text-sm font-semibold">Bộ sưu tập
           <select className={field} value={draft.collectionId} onChange={(event) => setDraft({ ...draft, collectionId: event.target.value })}>
             <option value="">Không thuộc bộ sưu tập</option>
+            {collectionMissing && <option value={draft.collectionId}>Bộ sưu tập đã ẩn/lưu trữ</option>}
             {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.title}</option>)}
           </select></label>
-        <label className="text-sm font-semibold">Giá bán (đ)
-          <input className={field} type="number" min="0" value={draft.basePrice} onChange={(event) => setDraft({ ...draft, basePrice: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Loại sản phẩm
+          <select className={field} value={draft.subcategory} onChange={(event) => {
+            const type = PRODUCT_TYPES.find((item) => item.value === event.target.value);
+            // Tên loại đang trống hoặc đang là tên mặc định thì đổi theo loại mới; tên tự đặt (ví dụ "Chân váy") giữ nguyên.
+            const defaultName = PRODUCT_TYPES.some((item) => item.label === draft.subcategoryName) || !draft.subcategoryName;
+            setDraft({ ...draft, subcategory: event.target.value, ...(defaultName ? { subcategoryName: type?.label || '' } : {}) });
+          }}>
+            <option value="">— Chưa chọn (không hiện ở trang Áo/Quần/Váy/Set) —</option>
+            {PRODUCT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+          </select></label>
+        <label className="text-sm font-semibold">Tên loại hiển thị
+          <input className={field} maxLength={50} placeholder="Ví dụ: Chân váy" value={draft.subcategoryName}
+            onChange={(event) => setDraft({ ...draft, subcategoryName: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Chất liệu
+          <input className={field} maxLength={200} placeholder="Ví dụ: Đũi organic" value={draft.material}
+            onChange={(event) => setDraft({ ...draft, material: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Màu
+          <input className={field} maxLength={100} placeholder="Ví dụ: Hồng phấn" value={draft.colorName}
+            onChange={(event) => setDraft({ ...draft, colorName: event.target.value })} />
+          <span className="mt-1 block text-xs font-normal text-charcoal-500">Dùng cho bộ lọc màu; màu đầu tiên quyết định nhóm màu.</span></label>
+        <div className="text-sm font-semibold">Giá hiển thị
+          <p className="mt-2 rounded-xl bg-cream-50 px-4 py-3 font-bold text-charcoal-900">Từ {formatPrice(displayPrice)}</p>
+          <span className="mt-1 block text-xs font-normal text-charcoal-500">Tự lấy theo size rẻ nhất đang bán; sửa giá ở từng size bên dưới.</span></div>
         <label className="text-sm font-semibold">Giá gốc (đ, bỏ trống nếu không có)
-          <input className={field} type="number" min="0" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
+          <input className={field} type="number" inputMode="numeric" min={MIN_PRICE} value={draft.originalPrice}
+            onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
         <label className="text-sm font-semibold">Giảm giá (%)
-          <input className={field} type="number" min="0" max="100" value={draft.discountPercent} onChange={(event) => setDraft({ ...draft, discountPercent: event.target.value })} /></label>
+          <input className={field} type="number" inputMode="numeric" min="0" max="100" value={draft.discountPercent}
+            onChange={(event) => setDraft({ ...draft, discountPercent: event.target.value })} /></label>
         <div className="flex flex-wrap items-end gap-6 text-sm font-semibold">
           {([['isActive', 'Đang bán'], ['isBestSeller', 'Bán chạy'], ['isNewArrival', 'Hàng mới'], ['isSale', 'Đang giảm giá']] as const)
             .map(([key, label]) => <label key={key} className="flex items-center gap-2">
@@ -275,38 +452,60 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
 
     <section className="space-y-6 rounded-2xl border border-cream-200 bg-white p-6">
       <h3 className="border-b border-cream-100 pb-3 text-xl font-bold text-charcoal-900">Size, giá và tồn kho</h3>
+      {variants.length > 1 && <div className="flex flex-wrap items-end gap-3 rounded-xl bg-honey-50 p-4">
+        <label className="text-sm font-semibold">Đặt cùng một giá cho mọi size (đ)
+          <input className={field} type="number" inputMode="numeric" min={MIN_PRICE} value={allPrice} onChange={(event) => setAllPrice(event.target.value)} /></label>
+        <button type="button" disabled={!validPrice(allPrice)}
+          onClick={() => setVariants((current) => current.map((row) => ({ ...row, price: String(Number(allPrice)) })))}
+          className="min-h-12 rounded-xl border border-honey-400 bg-white px-5 text-sm font-semibold disabled:opacity-50">Áp dụng</button>
+      </div>}
       <div className="space-y-4">
-        {variants.map((variant, index) => <div key={variant.id} className="grid gap-4 rounded-xl bg-cream-50 p-4 sm:grid-cols-3">
-          <p className="self-center text-base font-bold text-charcoal-900">{variant.size}</p>
+        {variants.map((variant) => <div key={variant.id}
+          className={`grid gap-4 rounded-xl p-4 sm:grid-cols-6 ${variant.active ? 'bg-cream-50' : 'bg-cream-100 opacity-70'}`}>
+          <div className="space-y-2 self-center">
+            <p className="text-base font-bold text-charcoal-900">{variant.size}</p>
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <input type="checkbox" className="size-4" checked={variant.active}
+                onChange={(event) => updateVariant(variant.id, { active: event.target.checked })} /> Đang bán size này</label>
+          </div>
           <label className="text-sm font-semibold">Tồn kho
-            <input className={field} type="number" min="0" max="100000" value={variant.stock}
-              onChange={(event) => setVariants((current) => current.map((row, position) =>
-                position === index ? { ...row, stock: event.target.value } : row))} /></label>
+            <input className={field} type="number" inputMode="numeric" min="0" max="100000" value={variant.stock}
+              onChange={(event) => updateVariant(variant.id, { stock: event.target.value })} /></label>
           <label className="text-sm font-semibold">Giá bán (đ)
-            <input className={field} type="number" min="0" value={variant.price}
-              onChange={(event) => setVariants((current) => current.map((row, position) =>
-                position === index ? { ...row, price: event.target.value } : row))} /></label>
+            <input className={field} type="number" inputMode="numeric" min={MIN_PRICE} value={variant.price}
+              onChange={(event) => updateVariant(variant.id, { price: event.target.value })} /></label>
+          <label className="text-sm font-semibold">Cân nặng
+            <input className={field} maxLength={100} placeholder="10 - 12kg" value={variant.weightRange}
+              onChange={(event) => updateVariant(variant.id, { weightRange: event.target.value })} /></label>
+          <label className="text-sm font-semibold sm:col-span-2">Độ tuổi
+            <input className={field} maxLength={100} placeholder="1 - 2 tuổi" value={variant.ageRange}
+              onChange={(event) => updateVariant(variant.id, { ageRange: event.target.value })} /></label>
         </div>)}
       </div>
       <div className="space-y-4 border-t border-cream-100 pt-5">
         <p className="text-sm font-semibold text-charcoal-700">Thêm size mới</p>
-        {newVariants.map((variant, index) => <div key={index} className="grid gap-4 rounded-xl border border-dashed border-cream-300 p-4 sm:grid-cols-4">
+        {newVariants.map((variant) => <div key={variant.key} className="grid gap-4 rounded-xl border border-dashed border-cream-300 p-4 sm:grid-cols-6">
           <label className="text-sm font-semibold">Size
-            <input className={field} placeholder="Size 110" value={variant.size}
-              onChange={(event) => setNewVariants((current) => current.map((row, position) =>
-                position === index ? { ...row, size: event.target.value } : row))} /></label>
+            <input className={field} maxLength={50} placeholder="Size 110" value={variant.size}
+              onChange={(event) => updateNewVariant(variant.key, { size: event.target.value })} /></label>
           <label className="text-sm font-semibold">Giá bán (đ)
-            <input className={field} type="number" min="0" value={variant.price}
-              onChange={(event) => setNewVariants((current) => current.map((row, position) =>
-                position === index ? { ...row, price: event.target.value } : row))} /></label>
+            <input className={field} type="number" inputMode="numeric" min={MIN_PRICE} value={variant.price}
+              onChange={(event) => updateNewVariant(variant.key, { price: event.target.value })} /></label>
           <label className="text-sm font-semibold">Tồn kho
-            <input className={field} type="number" min="0" value={variant.stock}
-              onChange={(event) => setNewVariants((current) => current.map((row, position) =>
-                position === index ? { ...row, stock: event.target.value } : row))} /></label>
-          <button type="button" onClick={() => setNewVariants((current) => current.filter((_, position) => position !== index))}
+            <input className={field} type="number" inputMode="numeric" min="0" value={variant.stock}
+              onChange={(event) => updateNewVariant(variant.key, { stock: event.target.value })} /></label>
+          <label className="text-sm font-semibold">Cân nặng
+            <input className={field} maxLength={100} placeholder="16 - 20kg" value={variant.weightRange}
+              onChange={(event) => updateNewVariant(variant.key, { weightRange: event.target.value })} /></label>
+          <label className="text-sm font-semibold">Độ tuổi
+            <input className={field} maxLength={100} placeholder="4 - 5 tuổi" value={variant.ageRange}
+              onChange={(event) => updateNewVariant(variant.key, { ageRange: event.target.value })} /></label>
+          <button type="button" onClick={() => setNewVariants((current) => current.filter((row) => row.key !== variant.key))}
             className="min-h-12 self-end rounded-xl px-4 text-sm font-semibold text-red-700">Bỏ size này</button>
         </div>)}
-        <button type="button" onClick={() => setNewVariants((current) => [...current, { size: '', price: '', stock: '0' }])}
+        <button type="button" onClick={() => setNewVariants((current) => [...current, { key: crypto.randomUUID(), size: '',
+          // Size mới mặc định cùng giá size cuối để không vô tình để trống giá.
+          price: variants.at(-1)?.price ?? '', stock: '0', weightRange: '', ageRange: '' }])}
           className="min-h-12 rounded-xl border border-cream-300 px-5 text-sm font-semibold">+ Thêm size</button>
       </div>
     </section>
@@ -332,11 +531,13 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
       </div>}
 
       <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${
-        busy ? 'border-cream-300 bg-cream-50 opacity-60' : 'border-honey-300 bg-honey-50 hover:border-honey-500'}`}>
+        busy || images.length >= MAX_IMAGES ? 'border-cream-300 bg-cream-50 opacity-60' : 'border-honey-300 bg-honey-50 hover:border-honey-500'}`}>
         <Upload className="h-6 w-6 text-honey-600" />
-        <span className="text-sm font-bold text-charcoal-900">Tải ảnh lên (chọn được nhiều ảnh)</span>
-        <span className="text-xs text-charcoal-500">JPEG, PNG, WebP, AVIF · tối đa 5 MB mỗi ảnh · thứ tự chọn được giữ nguyên</span>
-        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} className="hidden"
+        <span className="text-sm font-bold text-charcoal-900">
+          {progress ? `Đang tải ảnh ${Math.min(progress.done + 1, progress.total)}/${progress.total}…` : 'Tải ảnh lên (chọn được nhiều ảnh)'}
+        </span>
+        <span className="text-xs text-charcoal-500">JPEG, PNG, WebP · ảnh lớn được tự nén · tối đa {MAX_IMAGES} ảnh · thứ tự chọn được giữ nguyên</span>
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" disabled={busy || images.length >= MAX_IMAGES} className="hidden"
           onChange={(event) => { const files = event.target.files; if (files && files.length > 0) void uploadImages(files); event.target.value = ''; }} />
       </label>
     </section>
@@ -349,7 +550,7 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
           className="min-h-12 rounded-xl border border-cream-300 px-6 text-sm font-semibold disabled:opacity-50">Hủy thay đổi</button>
         <button type="button" disabled={!dirty || busy} onClick={() => void save()}
           className="min-h-12 rounded-xl bg-sage-700 px-8 text-sm font-bold text-white disabled:opacity-50">
-          {busy ? 'Đang lưu…' : 'Lưu thay đổi'}
+          {busy && !progress ? 'Đang lưu…' : 'Lưu thay đổi'}
         </button>
       </div>
     </div>

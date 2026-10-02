@@ -13,7 +13,8 @@ export function cloudinaryConfig() {
 }
 
 export const MEDIA_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
-export const MEDIA_MAX_BYTES = 5_000_000;
+/** Một ảnh tối đa 4 MB: Vercel từ chối mọi request lớn hơn 4,5 MB trước khi tới mã của ứng dụng. */
+export const MEDIA_MAX_BYTES = 4_000_000;
 
 export type UploadedImage = {
   url: string; publicId: string; width: number | null; height: number | null;

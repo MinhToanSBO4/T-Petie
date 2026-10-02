@@ -150,7 +150,7 @@ async function main() {
 
     // Sửa giá và tồn của một size trong cùng một yêu cầu rồi khôi phục.
     const repriced = await request(`/api/admin/products/${productId}`, 'PATCH', cookie,
-      { variants: [{ id: variantId, price: originalPrice + 1000, stock: originalStock }] });
+      { variants: [{ id: variantId, price: originalPrice + 1000, stock: originalStock, expectedStock: originalStock }] });
     assert(repriced.status === 200, `Variant price update failed: ${repriced.status} ${repriced.data.error || ''}`);
     const afterPrice = await request('/api/admin/products', 'GET', cookie);
     const variants = afterPrice.data.items.find((row) => row.id === productId).variants;
@@ -205,7 +205,7 @@ async function main() {
 
     // Phân quyền: nhân viên sửa được sản phẩm nhưng không xóa được mã giảm giá và không tạo được sản phẩm.
     const staffPatch = await request(`/api/admin/products/${productId}`, 'PATCH', staffCookie,
-      { variants: [{ id: variantId, stock: originalStock }] });
+      { variants: [{ id: variantId, stock: originalStock, expectedStock: originalStock }] });
     assert(staffPatch.status === 200, `Staff stock update failed: ${staffPatch.status} ${staffPatch.data.error || ''}`);
     const staffDeleteCoupon = await request('/api/admin/coupons?code=MEMBERVIP', 'DELETE', staffCookie);
     assert(staffDeleteCoupon.status === 403, 'Staff was allowed to delete a coupon.');
@@ -219,7 +219,7 @@ async function main() {
     // Khôi phục sản phẩm thử trước khi xóa tài khoản tạm.
     if (productId && originalName) {
       await request(`/api/admin/products/${productId}`, 'PATCH', cookie || '', { product: { name: originalName },
-        variants: variantId ? [{ id: variantId, price: originalPrice, stock: originalStock }] : [],
+        variants: variantId ? [{ id: variantId, price: originalPrice, stock: originalStock, expectedStock: originalStock }] : [],
         ...(originalImages ? { images: originalImages } : {}) }).catch(() => {});
     }
     if (productId) await prisma.productVariant.deleteMany({ where: { productId, size: variantSize } });
