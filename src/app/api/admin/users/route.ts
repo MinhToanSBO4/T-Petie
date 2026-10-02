@@ -1,27 +1,55 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth/options';
+import type { Prisma } from '@prisma/client';
+import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
+import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
 
-// GET: Lấy danh sách toàn bộ người dùng trong hệ thống (Chỉ Admin)
-export async function GET() {
+/** Cách sắp xếp danh sách tài khoản; luôn kèm id để phân trang ổn định. Chưa từng đăng nhập/chưa đặt tên xếp cuối. */
+const SORTS: Record<string, Prisma.UserOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  login: [{ lastLoginAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+  name: [{ name: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+  orders: [{ orders: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }],
+};
+const STATUS: Record<string, Prisma.UserWhereInput> = { active: { status: 'active' }, blocked: { status: 'blocked' } };
+/** Đơn gắn với tài khoản (khách đặt khi đã đăng nhập). */
+const ORDERED: Record<string, Prisma.UserWhereInput> = { yes: { orders: { some: {} } }, no: { orders: { none: {} } } };
+
+// GET: Lấy danh sách người dùng trong hệ thống, có tìm kiếm và phân trang (Chỉ Admin)
+export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-
-    // Kiểm tra quyền Admin
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!(await requireAdminApi())) {
       return NextResponse.json(
         { error: '403 Forbidden: Chỉ Quản Trị Viên (Admin) mới có quyền truy cập.' },
         { status: 403 }
       );
     }
 
-    const users = await prisma.user.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'desc' },
+    const searchParams = new URL(request.url).searchParams;
+    const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
+    const search = parseSearch(searchParams);
+    const roleFilter = searchParams.get('filter') || '';
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      ...(roleFilter === 'user' || roleFilter === 'staff' || roleFilter === 'admin' ? { role: roleFilter } : {}),
+      ...parseChoice(searchParams, 'status', STATUS),
+      ...parseChoice(searchParams, 'ordered', ORDERED),
+      ...(search ? { OR: [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search, mode: 'insensitive' as const } },
+        { username: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search, mode: 'insensitive' as const } },
+      ] } : {}),
+    };
+
+    const [users, total] = await Promise.all([prisma.user.findMany({
+      where,
+      orderBy: parseChoice(searchParams, 'sort', SORTS) ?? SORTS.newest,
+      skip,
+      take,
       select: {
         id: true,
         name: true,
@@ -41,8 +69,9 @@ export async function GET() {
         recommendedSize: true,
         createdAt: true,
         lastLoginAt: true,
+        _count: { select: { orders: true } },
       },
-    });
+    }), prisma.user.count({ where })]);
 
     // Định dạng lại theo type User của ứng dụng
     const formattedUsers = users.map((u) => ({
@@ -57,13 +86,14 @@ export async function GET() {
       address: u.address || undefined,
       city: u.city || undefined,
       points: u.points,
+      orderCount: u._count.orders,
       babyProfile: u.babyName
         ? {
             name: u.babyName,
             birthDate: u.babyBirthDate ? u.babyBirthDate.toISOString().split('T')[0] : undefined,
             weight: u.babyWeight || 10,
             height: u.babyHeight || 80,
-            gender: 'be-gai' as const,
+            gender: 'girl' as const,
             recommendedSize: u.recommendedSize || 'Size 2 (10 - 12kg)',
           }
         : undefined,
@@ -71,7 +101,7 @@ export async function GET() {
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : undefined,
     }));
 
-    return NextResponse.json({ success: true, users: formattedUsers });
+    return NextResponse.json({ success: true, ...paginated(formattedUsers, total, page, limit) });
   } catch (error) {
     console.error('Error in Admin GET /api/admin/users:', error);
     return NextResponse.json({ error: 'Lỗi server khi tải danh sách người dùng' }, { status: 500 });
@@ -83,9 +113,7 @@ export async function POST(req: Request) {
   try {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
-    const session = await getServerSession(authOptions);
-
-    if (!session || session.user?.role !== 'admin' || session.user.status !== 'active') {
+    if (!(await requireAdminApi())) {
       return NextResponse.json(
         { error: '403 Forbidden: Chỉ Quản Trị Viên (Admin) mới có quyền tạo người dùng.' },
         { status: 403 }

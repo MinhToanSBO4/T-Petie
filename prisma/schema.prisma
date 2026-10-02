@@ -5,9 +5,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// CONNECTION_STRING: kết nối của ứng dụng lúc chạy (Vercel: transaction pooler cổng 6543 + pgbouncer=true).
+// DIRECT_URL: kết nối cho Prisma CLI (migrate deploy/status) — session pooler cổng 5432 hoặc kết nối trực tiếp,
+// vì transaction pooler không hỗ trợ khóa và prepared statement mà migration cần. Chạy local có thể dùng cùng một giá trị.
 datasource db {
   provider  = "postgresql"
   url       = env("CONNECTION_STRING")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -83,7 +87,9 @@ model Product {
   collection Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
   images ProductImage[]
   variants ProductVariant[]
+  reviews ProductReview[]
   orderItems OrderItem[]
+  testimonials CustomerTestimonial[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -147,11 +153,99 @@ model Collection {
   season String?
   badge String?
   isActive Boolean @default(true)
+  showInMenu Boolean @default(true)
+  showOnHome Boolean @default(true)
   sortOrder Int @default(0)
   products Product[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("collections")
+}
+
+/// Đánh giá sản phẩm của khách đã mua: mỗi món trong đơn đã hoàn tất được đánh giá một lần và sửa tối đa một lần.
+/// Quản trị viên duyệt trước khi hiển thị và chọn đánh giá nổi bật cho trang chủ.
+model ProductReview {
+  id           String   @id @default(cuid())
+  productId    String
+  userId       String?
+  /// Món đã mua được đánh giá; null chỉ với đánh giá cũ trước khi có xác minh mua hàng.
+  orderItemId  String?  @unique
+  customerName String
+  /// Khách chọn ẩn tên: trang công khai chỉ hiện tên đã che.
+  isAnonymous  Boolean  @default(false)
+  rating       Int
+  /// Có thể để trống khi khách chỉ chấm sao.
+  content      String   @db.Text
+  /// Kích cỡ khách đã mua, hiển thị như "Phân loại" trên đánh giá.
+  variantLabel String?
+  /// Cảm nhận về kích cỡ: "small" | "fit" | "large".
+  sizeFit      String?
+  imageUrls    String[] @default([])
+  editCount    Int      @default(0)
+  /// Đánh giá hiển thị ngay khi khách gửi; quản trị viên/nhân viên có thể ẩn đánh giá không phù hợp.
+  isHidden     Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  /// Phản hồi của shop, hiện ngay dưới đánh giá trên trang sản phẩm.
+  reply        String?  @db.Text
+  repliedAt    DateTime?
+  repliedById  String?
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([productId, isHidden])
+  @@index([isFeatured, isHidden])
+  @@index([userId])
+  @@map("product_reviews")
+}
+
+/// Feedback khách hàng dạng ảnh chụp màn hình tin nhắn khen shop.
+/// Chỉ bản đã xác nhận khách đồng ý và bật công bố mới hiển thị công khai.
+model CustomerTestimonial {
+  id String @id @default(cuid())
+  /// Ảnh trong thư viện media (Cloudinary).
+  imageUrl String
+  imageWidth Int?
+  imageHeight Int?
+  /// Chú thích ngắn tùy chọn, ví dụ "Mẹ bé Na · Hà Nội"; đồng thời là mô tả ảnh cho trình đọc màn hình.
+  caption String?
+  /// Sản phẩm được khen trong feedback, hiện nút xem sản phẩm khi xem feedback.
+  productId String?
+  sortOrder Int @default(0)
+  consentConfirmed Boolean @default(false)
+  isPublished Boolean @default(false)
+  createdById String?
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isPublished, sortOrder])
+  @@map("customer_testimonials")
+}
+
+model SiteContent {
+  key String @id
+  data Json
+  updatedAt DateTime @updatedAt
+  @@map("site_content")
+}
+
+/// Thư viện ảnh dùng chung: mọi ảnh hiển thị trên website đều có bản ghi tại đây.
+/// Ảnh được lưu trên Cloudinary, database giữ metadata và URL phân phối.
+model MediaAsset {
+  id           String   @id @default(cuid())
+  url          String   @unique
+  publicId     String?  @unique
+  folder       String   @default("tpetie/site")
+  altText      String?
+  width        Int?
+  height       Int?
+  bytes        Int?
+  format       String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([createdAt])
+  @@map("media_assets")
 }
 
 model ProductImage {
@@ -198,6 +292,7 @@ model Order {
   district String
   ward String?
   orderNote String? @db.Text
+  source String? // Kênh khách biết đến cửa hàng, do khách chọn khi thanh toán
   subtotal BigInt
   shippingFee BigInt @default(0)
   discountAmount BigInt @default(0)
@@ -207,14 +302,33 @@ model Order {
   paymentMethod String @default("COD")
   paymentStatus String @default("PENDING")
   orderStatus String @default("PENDING")
+  /// Thời điểm đơn chuyển sang Hoàn tất; mốc tính hạn đánh giá sản phẩm.
+  completedAt DateTime?
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   coupon Coupon? @relation(fields: [couponCode], references: [code], onDelete: SetNull)
   items OrderItem[]
+  statusEvents OrderStatusEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([userId, createdAt])
   @@index([orderStatus, createdAt])
+  @@index([couponCode])
   @@map("orders")
+}
+
+/// Lịch sử chuyển trạng thái đơn, dùng cho dòng thời gian "hành trình đơn hàng" của khách.
+model OrderStatusEvent {
+  id String @id @default(cuid())
+  orderId String
+  status String
+  /// Ai chuyển trạng thái: admin, customer (khách tự hủy/xác nhận đã nhận) hoặc system (tự hoàn tất).
+  actor String?
+  /// Ghi chú hiển thị trong lịch sử đơn, ví dụ lý do hủy.
+  note String?
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+  @@map("order_status_events")
 }
 
 model OrderItem {
@@ -231,8 +345,26 @@ model OrderItem {
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  review ProductReview?
   @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
   @@map("order_items")
+}
+
+/// Tiến trình xuất dữ liệu chạy nền: người dùng kích hoạt rồi nhận thông báo khi file sẵn sàng.
+model ExportJob {
+  id            String    @id @default(cuid())
+  status        String    @default("pending") // "pending" | "processing" | "completed" | "failed"
+  requestedById String?
+  fileName      String?
+  fileUrl       String?
+  orderCount    Int       @default(0)
+  error         String?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+  @@index([createdAt])
+  @@map("export_jobs")
 }
 
 model RateLimitCounter {

@@ -9,7 +9,7 @@ export type UserStatus = 'active' | 'blocked';
 export interface BabyProfile {
   name: string;
   birthDate?: string;
-  gender?: 'be-gai';
+  gender?: 'girl';
   weight: number;      // kg
   height: number;      // cm
   recommendedSize: string; // VD: "Size 2 (10 - 12kg)"

@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     typeof body.phone !== 'string' || !/^0[35789]\d{8}$/.test(body.phone) ||
     (body.ward !== undefined && (typeof body.ward !== 'string' || body.ward.length > 100)) ||
     (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 1000)) ||
+    (body.source !== undefined && (typeof body.source !== 'string' || body.source.length > 100)) ||
     (body.couponCode !== undefined && (typeof body.couponCode !== 'string' || body.couponCode.length > 30)) ||
     !Array.isArray(body.items) || body.items.length < 1 || body.items.length > 30 ||
     body.items.some((item) => !item || typeof item !== 'object' ||
@@ -49,7 +50,8 @@ export async function POST(request: Request) {
     const result = await createOrder({
       fullName: input.fullName.trim(), phone: input.phone.trim(), address: input.address.trim(),
       city: input.city.trim(), district: input.district.trim(), ward: input.ward?.trim(),
-      note: input.note?.slice(0, 1000), couponCode: input.couponCode?.slice(0, 30), items: input.items,
+      note: input.note?.slice(0, 1000), couponCode: input.couponCode?.slice(0, 30),
+      source: input.source?.trim().slice(0, 100) || undefined, items: input.items,
     }, session?.user?.status === 'active' ? session.user.id : undefined, idempotencyKey);
     return NextResponse.json({ status: 'success', ...result }, { status: 201 });
   } catch (error) {

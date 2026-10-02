@@ -30,20 +30,18 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   },
   {
     label: 'Sản Phẩm',
-    href: '/be-gai',
+    href: '/girls',
     children: [
-      { label: 'Tất cả sản phẩm', href: '/be-gai' },
-      { label: 'Áo bé gái', href: '/be-gai/ao' },
-      { label: 'Quần bé gái', href: '/be-gai/quan' },
-      { label: 'Váy bé gái', href: '/be-gai/vay' },
-      { label: 'Set đồ', href: '/be-gai/set-do' },
+      { label: 'Tất cả sản phẩm', href: '/girls' },
+      { label: 'Áo bé gái', href: '/girls/tops' },
+      { label: 'Quần bé gái', href: '/girls/bottoms' },
+      { label: 'Váy bé gái', href: '/girls/dresses' },
+      { label: 'Set đồ', href: '/girls/sets' },
     ],
   },
   {
     label: 'Bộ Sưu Tập',
-    href: '/bo-suu-tap',
-    badge: 'Mới',
-    badgeColor: 'bg-honey-500',
+    href: '/collections',
     children: [],
   },
   {
@@ -54,14 +52,14 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   },
   {
     label: 'Về Chúng Tôi',
-    href: '/ve-chung-toi',
+    href: '/about',
   },
 ];
 
 export const MOBILE_BOTTOM_NAV: NavItem[] = [
   { label: 'Trang Chủ', href: '/', icon: 'Home' },
-  { label: 'Sản Phẩm', href: '/be-gai', icon: 'Shirt' },
-  { label: 'Bộ Sưu Tập', href: '/bo-suu-tap', icon: 'Sparkles', badge: 'Mới' },
+  { label: 'Sản Phẩm', href: '/girls', icon: 'Shirt' },
+  { label: 'Bộ Sưu Tập', href: '/collections', icon: 'Sparkles' },
   { label: 'Ưu Đãi', href: '/sale', icon: 'Percent', badge: 'Hot' },
-  { label: 'Về Chúng Tôi', href: '/ve-chung-toi', icon: 'Heart' },
+  { label: 'Về Chúng Tôi', href: '/about', icon: 'Heart' },
 ];

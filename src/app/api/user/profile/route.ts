@@ -4,17 +4,18 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
+import { forgetUserSnapshot } from '@/server/auth/user-snapshot';
 
 // GET: Lấy thông tin chi tiết hồ sơ cá nhân và hồ sơ bé của user hiện tại
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email || session.user.status !== 'active') {
+    if (!session?.user?.id || session.user.status !== 'active') {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       select: {
         id: true,
         name: true,
@@ -54,7 +55,7 @@ export async function PATCH(req: Request) {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email || session.user.status !== 'active') {
+    if (!session?.user?.id || session.user.status !== 'active') {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
@@ -66,11 +67,12 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Thông tin hồ sơ không hợp lệ' }, { status: 400 });
       }
     }
+    if (name !== undefined && !name.trim()) return NextResponse.json({ error: 'Tên không được để trống' }, { status: 400 });
     if (babyProfile !== undefined && (!babyProfile || typeof babyProfile !== 'object' || Array.isArray(babyProfile) ||
       (babyProfile.name !== undefined && (typeof babyProfile.name !== 'string' || babyProfile.name.length > 100)) ||
       (babyProfile.birthDate !== undefined && babyProfile.birthDate !== '' &&
         (typeof babyProfile.birthDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(babyProfile.birthDate) || Number.isNaN(Date.parse(babyProfile.birthDate)))) ||
-      (babyProfile.gender !== undefined && babyProfile.gender !== 'be-gai') ||
+      (babyProfile.gender !== undefined && babyProfile.gender !== 'girl') ||
       (babyProfile.recommendedSize !== undefined && (typeof babyProfile.recommendedSize !== 'string' || babyProfile.recommendedSize.length > 100)) ||
       (babyProfile.weight !== undefined && (!Number.isFinite(Number(babyProfile.weight)) || Number(babyProfile.weight) <= 0 || Number(babyProfile.weight) > 100)) ||
       (babyProfile.height !== undefined && (!Number.isFinite(Number(babyProfile.height)) || Number(babyProfile.height) <= 0 || Number(babyProfile.height) > 250)))) {
@@ -95,7 +97,7 @@ export async function PATCH(req: Request) {
     }
 
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       data: updateData,
       select: {
         id: true,
@@ -117,6 +119,7 @@ export async function PATCH(req: Request) {
         updatedAt: true,
       },
     });
+    forgetUserSnapshot(session.user.id);
 
     return NextResponse.json({
       success: true,

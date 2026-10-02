@@ -41,7 +41,10 @@ async function main() {
   const sessionCookie = [cookie(csrf), cookie(login)].filter(Boolean).join('; ');
   const admin = await fetch(new URL('/api/admin/commerce', base), { headers: { cookie: sessionCookie } });
   const config = await admin.json();
-  if (!admin.ok || !config.settings || !config.coupons?.length) throw new Error('Admin commerce settings unavailable');
+  if (!admin.ok || !config.settings) throw new Error('Admin commerce settings unavailable');
+  const couponList = await fetch(new URL('/api/admin/coupons', base), { headers: { cookie: sessionCookie } });
+  const coupons = await couponList.json();
+  if (!couponList.ok || !coupons.items?.length) throw new Error('Admin coupon list unavailable');
   const save = await fetch(new URL('/api/admin/commerce', base), { method: 'PATCH',
     headers: { 'Content-Type': 'application/json', cookie: sessionCookie, origin: base },
     body: JSON.stringify({ kind: 'settings', ...config.settings }) });

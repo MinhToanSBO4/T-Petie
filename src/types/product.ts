@@ -19,7 +19,7 @@ export interface Product {
   slug: string;             // Đường dẫn công khai của sản phẩm
   sku: string;              // Mã sản phẩm (VD: "TP-VG-001")
   name: string;             // Tên sản phẩm
-  category: 'be-gai' | 'phu-kien';
+  category: 'girls' | 'accessories';
   categoryName: string;     // Tên hiển thị danh mục (VD: "Váy Bé Gái")
   subcategory?: ProductSubcategory; // Subcategory: ao, quan, vay, set-do
   subcategoryName?: string;

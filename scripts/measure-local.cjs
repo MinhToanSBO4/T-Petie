@@ -1,4 +1,4 @@
-const routes = ['/', '/api/products?limit=48', '/api/collections', '/bo-suu-tap', '/sale'];
+const routes = ['/', '/api/products?limit=48', '/api/collections', '/collections', '/sale'];
 const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
 async function main() {

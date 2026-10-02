@@ -10,7 +10,7 @@ async function main() {
     body: new URLSearchParams({ csrfToken: (await csrf.json()).csrfToken, email: process.env.ADMIN_USERNAME,
       password: process.env.ADMIN_INITIAL_PASSWORD, callbackUrl: new URL('/admin', base).toString(), json: 'true' }) });
   const sessionCookie = [cookie(csrf), cookie(login)].filter(Boolean).join('; ');
-  for (const path of ['/admin', '/admin/don-hang', '/admin/cau-hinh']) {
+  for (const path of ['/admin', '/admin/orders', '/admin/settings']) {
     const samples = [];
     for (let i = 0; i < 2; i++) {
       const start = performance.now();

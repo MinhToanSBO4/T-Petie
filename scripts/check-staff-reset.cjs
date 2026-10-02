@@ -16,7 +16,7 @@ async function main() {
   const usersResponse = await fetch(new URL('/api/admin/users', base), { headers: { cookie: sessionCookie } });
   if (!usersResponse.ok) throw new Error(`Admin user listing failed: HTTP ${usersResponse.status}`);
   const users = await usersResponse.json();
-  const staff = users.users.find((user) => user.username === process.env.STAFF_USERNAME);
+  const staff = (users.items || users.users || []).find((user) => user.username === process.env.STAFF_USERNAME);
   if (!staff) throw new Error('Sample staff account was not found');
   const staffCsrf = await fetch(new URL('/api/auth/csrf', base));
   const staffLogin = await fetch(new URL('/api/auth/callback/credentials', base), {

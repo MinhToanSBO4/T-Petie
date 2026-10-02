@@ -3,35 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { HomeFeaturesSection } from '@/lib/content/site-content';
 
-const features = [
-  {
-    id: 1,
-    src: '/images/vay-thi-tho-hong.jpg',
-    icon: '🌿',
-    title: '100% Cotton & Đũi Tự Nhiên',
-    description: 'Vải được dệt từ sợi tự nhiên hữu cơ, không sử dụng hóa chất nhuộm độc hại, an toàn với làn da non nớt.',
-    objectPosition: 'center 15%'
-  },
-  {
-    id: 2,
-    src: '/images/set-ao-thanh-yen-phoi-chan-vay-caro-xanh.jpg',
-    icon: '🪡',
-    title: 'Đường May Lộn Ẩn Tinh Tế',
-    description: 'Mọi đường chỉ và cúc bấm đều được xử lý giấu mép kỹ càng, đảm bảo không cọ xát hay làm đau bé khi vận động.',
-    objectPosition: 'center 20%'
-  },
-  {
-    id: 3,
-    src: '/images/set-ao-mut-cam-phoi-quan-sooc-be.jpg',
-    icon: '🧸',
-    title: 'Form Dáng Dễ Mặc',
-    description: 'Thiết kế đũng quần và váy rộng rãi, có cúc bấm đũng tiện lợi cho mẹ thay bỉm cho bé chỉ trong 30 giây.',
-    objectPosition: 'center 10%'
-  }
-];
-
-export function FeatureCarousel() {
+export function FeatureCarousel({ section }: { section: HomeFeaturesSection }) {
+  const features = section.items;
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto slide every 5 seconds
@@ -40,7 +15,9 @@ export function FeatureCarousel() {
       setCurrentIndex((prev) => (prev + 1) % features.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [features.length]);
+
+  useEffect(() => setCurrentIndex((index) => Math.min(index, features.length - 1)), [features.length]);
 
   const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % features.length);
   const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + features.length) % features.length);
@@ -48,12 +25,12 @@ export function FeatureCarousel() {
 
   return (
     <div className="w-full text-center overflow-hidden">
-      <span className="text-xs font-bold text-honey-600 uppercase tracking-wider block mb-2">
-        Chất Lượng Là Danh Dự
-      </span>
-      <h2 className="text-xl sm:text-3xl font-bold font-heading text-charcoal-900 mb-6">
-        Những điều làm nên sự khác biệt của T'Petie
-      </h2>
+      {section.eyebrow && <span className="text-xs font-bold text-honey-600 uppercase tracking-wider block mb-2">
+        {section.eyebrow}
+      </span>}
+      {section.title && <h2 className="text-xl sm:text-3xl font-bold font-heading text-charcoal-900 mb-6">
+        {section.title}
+      </h2>}
 
       <div className="relative w-full aspect-[4/5] sm:aspect-[21/9] md:aspect-[2.5/1] rounded-none sm:rounded-2xl overflow-hidden group bg-cream-50">
         {features.map((feature, index) => (

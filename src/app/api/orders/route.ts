@@ -1,21 +1,16 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/server/auth/options';
-import { prisma } from '@/server/db/client';
+import { getActiveSession } from '@/server/auth/session';
+import { listCustomerOrders } from '@/server/orders/customer-orders';
+import { parseOrderTab } from '@/lib/orders/customer-orders';
 export { POST } from '../checkout/route';
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.status !== 'active') return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
-  const orders = await prisma.order.findMany({
-    where: { userId: session.user.id }, orderBy: { createdAt: 'desc' }, take: 50,
-    include: { items: { include: { product: { include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } } } } } },
-  });
-  return NextResponse.json({ orders: orders.map((order) => ({
-    id: order.orderCode, date: order.createdAt.toISOString(), status: order.orderStatus,
-    total: Number(order.totalAmount), items: order.items.map((item) => ({
-      name: item.productName, size: item.size, qty: item.quantity, price: Number(item.totalPrice),
-      img: item.product.images[0]?.url || '/images/logo.png',
-    })),
-  })) });
+export const dynamic = 'force-dynamic';
+
+/** Đơn mua của khách đang đăng nhập theo tab (kèm số đơn từng tab), dùng cho trang tài khoản. */
+export async function GET(request: Request) {
+  const session = await getActiveSession();
+  if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+  const searchParams = new URL(request.url).searchParams;
+  const result = await listCustomerOrders(session.user.id, parseOrderTab(searchParams.get('tab')), Number(searchParams.get('page')) || 1);
+  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
 }

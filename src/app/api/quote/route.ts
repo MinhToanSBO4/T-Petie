@@ -2,12 +2,19 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/server/auth/options';
 import { quoteOrder } from '@/server/orders/quote-order';
+import { allowAttempt } from '@/server/security/rate-limit';
+import { clientIp } from '@/server/security/client-ip';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
+  // Báo giá là endpoint công khai: giới hạn chung để tránh lạm dụng, và siết chặt hơn khi thử mã giảm giá.
+  const ip = clientIp(request);
+  if (!(await allowAttempt(`quote:${ip}`, 120))) {
+    return NextResponse.json({ error: 'Bạn đã thử quá nhiều lần. Vui lòng chờ 10 phút.' }, { status: 429 });
+  }
   let body: { items?: unknown; couponCode?: unknown };
   try {
     const raw = await request.text();
@@ -20,6 +27,10 @@ export async function POST(request: Request) {
       !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) ||
     (body.couponCode !== undefined && (typeof body.couponCode !== 'string' || body.couponCode.length > 30))) {
     return NextResponse.json({ error: 'Giỏ hàng không hợp lệ' }, { status: 400 });
+  }
+  // Mã giảm giá là thứ dễ bị dò nhất nên đếm riêng, không phụ thuộc số lần báo giá thông thường.
+  if (body.couponCode && !(await allowAttempt(`quote-coupon:${ip}`, 25))) {
+    return NextResponse.json({ error: 'Bạn đã thử quá nhiều mã giảm giá. Vui lòng chờ 10 phút.' }, { status: 429 });
   }
   try {
     const session = body.couponCode ? await getServerSession(authOptions) : null;

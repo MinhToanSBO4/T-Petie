@@ -18,17 +18,20 @@ import {
   Share2,
   Gift,
   AlertTriangle,
+  ImageIcon,
 } from 'lucide-react';
 import { Product, ProductSizeOption } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
+import { ProductReviews } from '@/components/product/ProductReviews';
+import { StarRating } from '@/components/reviews/StarRating';
+import { cartSizeLabel } from '@/lib/orders/variant-match';
 import { ProductCard } from '@/components/product/ProductCard';
 import { trackViewItem, trackEvent } from '@/client/analytics/tracker';
 
-export function ProductDetailClient({ product, allProducts }: { product: Product; allProducts: Product[] }) {
+export function ProductDetailClient({ product, relatedProducts }: { product: Product; relatedProducts: Product[] }) {
   const router = useRouter();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -40,9 +43,9 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
   const [quantity, setQuantity] = useState(1);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
-  const productImages = product.images && product.images.length > 0
+  const productImages = (product.images && product.images.length > 0
     ? product.images
-    : [product.thumbnail || product.image || '/images/hero-banner.jpg'];
+    : [product.thumbnail || product.image]).filter((src): src is string => Boolean(src));
 
   const { addToCart } = useCart();
   const { showToast } = useToast();
@@ -82,7 +85,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
       showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
       return;
     }
-    const formattedSize = `${selectedSize.size} (${selectedSize.weightRange})`;
+    const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
     const buyNowItem = {
       productId: product.id,
       productName: product.name,
@@ -94,7 +97,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
       quantity,
     };
     sessionStorage.setItem('tpetie_buy_now', JSON.stringify(buyNowItem));
-    router.push('/mua-ngay');
+    router.push('/buy-now');
   };
 
   const handleBack = () => {
@@ -102,17 +105,13 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push('/be-gai');
+      router.push('/girls');
     }
   };
 
-  const relatedProducts = allProducts
-    .filter((p) => p.id !== product.id && p.category === product.category)
-    .slice(0, 4);
-
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-8">
-      {/* Top Bar: Nút Quay Lại & Breadcrumb */}
+      {/* Nút quay lại */}
       <div className="flex items-center justify-between">
         <button
           onClick={handleBack}
@@ -123,13 +122,6 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
           <span>Quay lại</span>
         </button>
 
-        <Breadcrumb
-          items={[
-            { label: 'Bé Gái', href: '/be-gai' },
-            { label: product.subcategoryName || 'Sản phẩm', href: `/be-gai/${product.subcategory || ''}` },
-            { label: product.name },
-          ]}
-        />
       </div>
 
       {/* Main Product Section: Gallery + Purchase Actions */}
@@ -141,14 +133,20 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
               layoutId={`product-image-${product.id}`}
               className="w-full h-full relative"
             >
-              <Image
-                src={productImages[selectedImageIndex] || productImages[0]}
-                alt={`${product.name} - Ảnh ${selectedImageIndex + 1}`}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover transition-all duration-300"
-              />
+              {productImages.length > 0 ? (
+                <Image
+                  src={productImages[selectedImageIndex] || productImages[0]}
+                  alt={`${product.name} - Ảnh ${selectedImageIndex + 1}`}
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover transition-all duration-300"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-charcoal-300" aria-hidden="true">
+                  <ImageIcon className="w-14 h-14" />
+                </div>
+              )}
             </motion.div>
 
             {/* Badges */}
@@ -237,6 +235,14 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
             <h1 className="text-xl sm:text-3xl font-extrabold font-heading text-charcoal-900 leading-snug">
               {product.name}
             </h1>
+            {/* Điểm đánh giá của khách đã mua (chỉ tính đánh giá đang hiển thị), bấm để xuống phần đánh giá. */}
+            {product.reviewCount > 0 && (
+              <a href="#reviews" className="mt-2 inline-flex items-center gap-2 text-xs sm:text-sm text-charcoal-700 hover:text-honey-700">
+                <span className="font-bold text-honey-700">{product.rating.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                <StarRating value={product.rating} size="w-4 h-4" />
+                <span className="underline-offset-2 hover:underline">{product.reviewCount} đánh giá</span>
+              </a>
+            )}
           </div>
 
           {/* Khối Giá Tiền Theo Size */}
@@ -371,7 +377,7 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
             </div>
             <div className="flex items-center space-x-2">
               <RefreshCw className="w-4 h-4 text-honey-500 shrink-0" />
-              <span>Hỗ trợ đổi size trong vòng 7 ngày nếu bé mặc không vừa.</span>
+              <span>Hỗ trợ đổi size trong vòng 3 ngày kể từ ngày nhận hàng nếu bé mặc không vừa.</span>
             </div>
             <div className="flex items-center space-x-2">
               <Truck className="w-4 h-4 text-blush-500 shrink-0" />
@@ -440,6 +446,9 @@ export function ProductDetailClient({ product, allProducts }: { product: Product
           <span>Mua Ngay ({formatPriceCompact(selectedSize.price)})</span>
         </button>
       </div>
+
+      {/* Đánh giá sản phẩm từ khách hàng */}
+      <ProductReviews productId={product.id} productName={product.name} />
 
       {/* Sản phẩm liên quan */}
       <div className="pt-8 border-t border-cream-200">

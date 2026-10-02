@@ -1,5 +1,23 @@
 const amount = (value: unknown, max: number) => Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= max;
 
+/** Ngày hiệu lực tùy chọn; trả về null khi để trống. */
+function optionalDate(value: unknown): Date | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') throw new Error('Thông tin mã giảm giá không hợp lệ');
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error('Thông tin mã giảm giá không hợp lệ');
+  return date;
+}
+
+/** Giới hạn lượt dùng tùy chọn; trả về null khi để trống. */
+function optionalUsageLimit(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 1_000_000) {
+    throw new Error('Thông tin mã giảm giá không hợp lệ');
+  }
+  return Number(value);
+}
+
 export function parseCommerceSettings(input: Record<string, unknown>) {
   if (!amount(input.shippingFee, 1_000_000) || !amount(input.freeShippingThreshold, 100_000_000)) {
     throw new Error('Phí vận chuyển hoặc ngưỡng miễn phí không hợp lệ');
@@ -16,6 +34,10 @@ export function parseCouponInput(input: Record<string, unknown>) {
       typeof input.active !== 'boolean' || typeof input.requiresLogin !== 'boolean') {
     throw new Error('Thông tin mã giảm giá không hợp lệ');
   }
+  const startsAt = optionalDate(input.startsAt);
+  const expiresAt = optionalDate(input.expiresAt);
+  if (startsAt && expiresAt && startsAt >= expiresAt) throw new Error('Thời gian hiệu lực của mã giảm giá không hợp lệ');
   return { code, type: input.type, value: Number(input.value), minSubtotal: BigInt(Number(input.minSubtotal)),
-    active: input.active, requiresLogin: input.requiresLogin };
+    active: input.active, requiresLogin: input.requiresLogin,
+    startsAt, expiresAt, usageLimit: optionalUsageLimit(input.usageLimit) };
 }

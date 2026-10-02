@@ -15,7 +15,7 @@ export function CollectionCard({ collection }: { collection: Collection }) {
       className="group relative rounded-3xl overflow-hidden shadow-card hover:shadow-soft border border-cream-200 bg-white flex flex-col justify-between"
     >
       <Link
-        href={`/bo-suu-tap/${collection.id}`}
+        href={`/collections/${collection.id}`}
         data-track="click-collection"
         data-collection-id={collection.id}
         className="block"

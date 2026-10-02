@@ -1,0 +1,235 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
+import { formatPriceCompact } from '@/lib/utils/formatters';
+import { useToast } from '@/context/ToastContext';
+import { trackBeginCheckout } from '@/client/analytics/tracker';
+import { useOrderQuote } from '@/hooks/useOrderQuote';
+
+
+interface BuyNowItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  thumbnail: string;
+  category: string;
+  selectedSize: string;
+  price: number;
+  quantity: number;
+}
+
+export default function BuyNowPage() {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [item, setItem] = useState<BuyNowItem | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+  const { quote, error: quoteError, loading: quoteLoading } = useOrderQuote(item ? [{ productId: item.productId, selectedSize: item.selectedSize, quantity }] : [], appliedCoupon);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem('tpetie_buy_now');
+    if (!raw) {
+      router.replace('/girls');
+      return;
+    }
+    try {
+      const parsed: BuyNowItem = JSON.parse(raw);
+      setItem(parsed);
+      setQuantity(parsed.quantity);
+    } catch {
+      router.replace('/girls');
+    }
+  }, [router]);
+
+  if (!item) return null;
+
+  const applyCoupon = () => {
+    setAppliedCoupon(couponCode.trim().toUpperCase());
+  };
+
+  const handleCheckout = () => {
+    if (!quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info'); return; }
+    trackBeginCheckout(
+      [{ item_id: item.productId, item_name: item.productName, price: item.price, quantity }],
+      quote.total
+    );
+    
+    // Lưu dữ liệu vào session và chuyển hướng sang trang thanh toán
+    sessionStorage.setItem('checkout_data', JSON.stringify({
+      items: [{ ...item, quantity }],
+      subtotal: quote.subtotal,
+      discountAmount: quote.discountAmount,
+      shippingFee: quote.shippingFee,
+      finalTotal: quote.total,
+      couponCode: appliedCoupon
+    }));
+    
+    window.dispatchEvent(new Event('tpetie:navigation-start'));
+    router.push('/checkout');
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-6">
+
+      {/* Tiêu đề */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-charcoal-900">
+          Đặt Hàng Nhanh
+        </h1>
+        <button
+          onClick={() => router.back()}
+          className="flex items-center space-x-1 text-xs text-charcoal-500 hover:text-honey-600 font-medium transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay lại</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Sản phẩm */}
+        <div className="lg:col-span-2 space-y-3">
+          {/* Card sản phẩm */}
+          <div className="bg-white p-4 rounded-2xl border border-honey-400 ring-1 ring-honey-300 shadow-card flex space-x-4 items-center">
+            {/* Ảnh */}
+            <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-cream-100 shrink-0 border border-cream-200">
+              <Image
+                src={item.thumbnail}
+                alt={item.productName}
+                fill
+                sizes="120px"
+                className="object-cover"
+              />
+            </div>
+
+            {/* Thông tin */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-charcoal-900 line-clamp-2">
+                {item.productName}
+              </h3>
+              <p className="text-xs text-sage-700 font-semibold mt-1">
+                Kích cỡ: {item.selectedSize}
+              </p>
+
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-base font-bold text-honey-600 font-heading">
+                  {quote ? formatPriceCompact(quote.items[0].totalPrice) : 'Đang cập nhật…'}
+                </span>
+
+                {/* Số lượng */}
+                <div className="flex items-center border border-cream-300 rounded-lg bg-cream-50">
+                  <button
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className="p-1.5 hover:bg-cream-200 text-charcoal-600 rounded-l-lg"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="px-3 text-xs font-bold text-charcoal-900 min-w-[28px] text-center">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity((q) => q + 1)}
+                    className="p-1.5 hover:bg-cream-200 text-charcoal-600 rounded-r-lg"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Link thêm sản phẩm khác vào giỏ */}
+          <p className="text-xs text-charcoal-400 text-center">
+            Muốn mua thêm sản phẩm khác?{' '}
+            <Link href="/cart" className="text-honey-600 font-semibold hover:underline">
+              Xem Giỏ Hàng →
+            </Link>
+          </p>
+        </div>
+
+        {/* Tóm tắt đơn hàng */}
+        <div className="bg-white p-5 rounded-3xl border border-cream-200 shadow-card space-y-4 h-fit">
+          <h2 className="font-heading font-bold text-base text-charcoal-900 pb-2 border-b border-cream-200">
+            Tóm Tắt Đơn Hàng
+          </h2>
+
+          {/* Mã Khuyến Mãi */}
+          <div className="space-y-1.5">
+            <span className="text-xs font-semibold text-charcoal-700">Mã Khuyến Mãi:</span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nhập mã giảm giá"
+                value={couponCode}
+                onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(''); }}
+                className="flex-1 px-3 py-2 text-xs rounded-xl border border-cream-300 bg-cream-50 focus:outline-none focus:border-honey-500 uppercase"
+              />
+              <button
+                onClick={applyCoupon}
+                className="px-3 py-2 rounded-xl bg-charcoal-900 text-white text-xs font-bold hover:bg-charcoal-800"
+              >
+                Áp Dụng
+              </button>
+            </div>
+          </div>
+          {quoteError && <p role="alert" className="text-xs text-red-600">{quoteError}</p>}
+          {quoteLoading && <p role="status" className="text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
+
+          <div className="space-y-2 text-xs text-charcoal-700 pt-2 border-t border-cream-100">
+            <div className="flex justify-between">
+              <span>Tạm tính (1 sản phẩm):</span>
+              <span className="font-semibold">{quote ? formatPriceCompact(quote.subtotal) : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Phí vận chuyển:</span>
+              <span className="font-semibold">
+                {quote?.shippingFee === 0 ? (
+                  <span className="text-sage-700 font-bold">Miễn Phí</span>
+                ) : (
+                  quote ? formatPriceCompact(quote.shippingFee) : '—'
+                )}
+              </span>
+            </div>
+            {!!quote && quote.shippingFee > 0 && (
+              <p className="text-[11px] text-charcoal-400 bg-cream-50 rounded-lg px-2 py-1.5">
+                💡 Mua thêm{' '}
+                <strong className="text-honey-600">
+                  {formatPriceCompact(quote.freeShippingThreshold - quote.subtotal)}
+                </strong>{' '}
+                để được Freeship!
+              </p>
+            )}
+            {!!quote && quote.discountAmount > 0 && (
+              <div className="flex justify-between text-blush-600 font-semibold">
+                <span>Mã giảm giá:</span>
+                <span>-{formatPriceCompact(quote.discountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm font-bold text-charcoal-900 pt-2 border-t border-cream-200">
+              <span>Tổng thanh toán:</span>
+              <span className="text-lg text-honey-600 font-heading">
+                {quote ? formatPriceCompact(quote.total) : '—'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCheckout}
+            data-track="buy-now-checkout"
+            disabled={!quote || quoteLoading}
+            className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
+          >
+            <span>Đặt Hàng Ngay</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+
+
+        </div>
+      </div>
+    </div>
+  );
+}

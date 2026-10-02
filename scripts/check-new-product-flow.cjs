@@ -17,6 +17,15 @@ async function main() {
   const sessionCookie = [cookie(csrf), cookie(login)].filter(Boolean).join('; ');
   const suffix = randomBytes(5).toString('hex');
   let id;
+  // Dọn sản phẩm kiểm thử còn sót lại do lần chạy trước bị ngắt giữa chừng.
+  const strays = await prisma.product.findMany({ where: { sku: { startsWith: 'TEST-' }, slug: { startsWith: 'test-' } }, select: { id: true } });
+  if (strays.length) {
+    const strayIds = strays.map((row) => row.id);
+    await prisma.productVariant.deleteMany({ where: { productId: { in: strayIds } } });
+    await prisma.productImage.deleteMany({ where: { productId: { in: strayIds } } });
+    await prisma.product.deleteMany({ where: { id: { in: strayIds } } });
+    console.log(`Removed ${strayIds.length} leftover test product(s) from an earlier run`);
+  }
   try {
     const created = await fetch(new URL('/api/admin/products', base), {
       method: 'POST', headers: { 'Content-Type': 'application/json', cookie: sessionCookie, origin: base },
@@ -29,7 +38,7 @@ async function main() {
     const products = (await catalog.json()).products;
     const product = products.find((item) => item.id === id);
     if (!product || product.slug !== `test-${suffix}` || product.id === product.slug) throw new Error('Catalog did not preserve database ID and public slug');
-    const page = await fetch(new URL(`/san-pham/${product.slug}`, base));
+    const page = await fetch(new URL(`/products/${product.slug}`, base));
     if (!page.ok) throw new Error(`Product detail failed: HTTP ${page.status}`);
     const quoted = await fetch(new URL('/api/quote', base), { method: 'POST', headers: { 'Content-Type': 'application/json', origin: base },
       body: JSON.stringify({ items: [{ productId: id, selectedSize: 'Size Test', quantity: 1 }] }) });

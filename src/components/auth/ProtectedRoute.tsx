@@ -4,8 +4,10 @@ import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types/auth';
-import { ShieldAlert, ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { backOfficeHome } from '@/lib/admin/back-office';
+import { Home, Lock, ShieldCheck, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
+import { ErrorScreen, errorButtonClass } from '@/components/error/ErrorScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,9 +21,16 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(`/tai-khoan?returnUrl=${encodeURIComponent(pathname)}`);
+      router.push(`/account?returnUrl=${encodeURIComponent(pathname)}`);
     }
   }, [isLoading, isAuthenticated, router, pathname]);
+
+  // Tài khoản quản trị và nhân viên không dùng khu vực mua hàng của khách.
+  const workspace = backOfficeHome(user?.role);
+  useEffect(() => {
+    if (isLoading || requiredRole !== 'user' || !workspace) return;
+    router.replace(workspace);
+  }, [isLoading, workspace, requiredRole, router]);
 
   // Đang tải phiên đăng nhập
   if (isLoading) {
@@ -58,7 +67,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
           Mẹ vui lòng đăng nhập tài khoản để truy cập vào tính năng này nhé.
         </p>
         <Link
-          href={`/tai-khoan?returnUrl=${encodeURIComponent(pathname)}`}
+          href={`/account?returnUrl=${encodeURIComponent(pathname)}`}
           className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95"
         >
           Đến Trang Đăng Nhập
@@ -67,52 +76,35 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Nếu trang yêu cầu quyền Admin mà tài khoản hiện tại chỉ là User -> 403 Forbidden
-  if (requiredRole === 'admin' && user.role !== 'admin') {
+  // Tài khoản quản trị/nhân viên: hiển thị trong lúc chuyển về khu làm việc.
+  if (requiredRole === 'user' && workspace) {
+    const area = user.role === 'admin' ? 'trang quản trị' : 'trang nhân viên';
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-6">
-        <div className="w-20 h-20 rounded-3xl bg-blush-100 text-blush-600 flex items-center justify-center mx-auto shadow-soft">
-          <ShieldAlert className="w-10 h-10" />
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center space-y-3" role="status">
+        <div className="w-14 h-14 rounded-3xl bg-honey-100 text-honey-700 flex items-center justify-center">
+          <ShieldCheck className="w-7 h-7" />
         </div>
-
-        <div className="space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-blush-600 bg-blush-50 px-3 py-1 rounded-full border border-blush-200 inline-block">
-            Mã lỗi 403 • Truy Cập Bị Từ Chối
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold font-heading text-charcoal-900">
-            Khu Vực Dành Riêng Cho Quản Trị Viên (Admin)
-          </h1>
-          <p className="text-xs sm:text-sm text-charcoal-600 leading-relaxed max-w-md mx-auto">
-            Tài khoản của bạn (<strong>{user.email}</strong>) hiện đang có vai trò <strong>Khách Hàng (User)</strong> và không có quyền truy cập vào cổng quản trị này.
-          </p>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-cream-50 border border-cream-200 text-xs text-charcoal-600 text-left space-y-1.5">
-          <p className="font-bold text-charcoal-800 flex items-center space-x-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-honey-600" />
-            <span>Gợi ý kiểm thử quyền Admin:</span>
-          </p>
-          <p>• Liên hệ quản trị viên để được cấp quyền phù hợp.</p>
-          <p>• Hoặc quay về Dashboard cá nhân của Mẹ.</p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Link
-            href="/dashboard"
-            className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95 flex items-center space-x-1.5"
-          >
-            <span>Về Dashboard Của Mẹ</span>
-          </Link>
-          <Link
-            href="/"
-            className="px-6 py-2.5 rounded-full bg-white hover:bg-cream-100 border border-cream-300 text-charcoal-700 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1.5"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Về Trang Chủ</span>
-          </Link>
-        </div>
+        <h2 className="text-lg font-bold font-heading text-charcoal-900">Đang chuyển về {area}</h2>
+        <p className="text-xs text-charcoal-500 max-w-sm">
+          Tài khoản <strong>{user.name || user.email}</strong> thuộc khu vực nội bộ nên không dùng giao diện mua hàng của khách.
+        </p>
+        <Link href={workspace}
+          className="px-6 py-2.5 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold shadow-md transition-all active:scale-95">
+          Vào {area}
+        </Link>
       </div>
     );
+  }
+
+  // Trang yêu cầu quyền quản trị mà tài khoản không có: báo 403 cùng kiểu với các màn hình lỗi khác.
+  if (requiredRole === 'admin' && user.role !== 'admin') {
+    return <ErrorScreen illustration="lock" code={403} title="Khu vực này dành riêng cho shop"
+      actions={<>
+        <Link href="/dashboard" className={errorButtonClass('primary')}><UserIcon className="size-4" aria-hidden />Về trang cá nhân</Link>
+        <Link href="/" className={errorButtonClass('secondary')}><Home className="size-4" aria-hidden />Về trang chủ</Link>
+      </>}>
+      Tài khoản của mẹ chưa có quyền mở trang này. Mẹ quay về trang cá nhân hoặc tiếp tục mua sắm nhé.
+    </ErrorScreen>;
   }
 
   // Đã xác thực và có đủ quyền

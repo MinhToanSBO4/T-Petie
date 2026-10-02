@@ -4,10 +4,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { CartItem } from '@/types/cart';
 import { Product, ProductSizeOption } from '@/types/product';
 import { trackAddToCart } from '@/client/analytics/tracker';
+import { cartSizeLabel } from '@/lib/orders/variant-match';
 
 interface CartContextType {
   items: CartItem[];
   addToCart: (product: Product, selectedSize: ProductSizeOption, quantity?: number) => void;
+  /** Thêm nhiều món một lần (mua lại đơn cũ): gộp với món cùng size đã có trong giỏ. */
+  addItems: (items: CartItem[]) => void;
   removeFromCart: (productId: string, selectedSize: string) => void;
   updateQuantity: (productId: string, selectedSize: string, delta: number) => void;
   clearCart: () => void;
@@ -53,7 +56,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, isHydrated]);
 
   const addToCart = (product: Product, selectedSize: ProductSizeOption, quantity = 1) => {
-    const formattedSize = `${selectedSize.size} (${selectedSize.weightRange})`;
+    const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
     setItems((prevItems) => {
       const existingIndex = prevItems.findIndex(
         (i) => i.productId === product.id && i.selectedSize === formattedSize
@@ -95,6 +98,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const addItems = (additions: CartItem[]) => {
+    if (additions.length === 0) return;
+    setItems((prevItems) => additions.reduce((next, addition) => {
+      const index = next.findIndex((item) => item.productId === addition.productId && item.selectedSize === addition.selectedSize);
+      if (index === -1) return [...next, addition];
+      const updated = [...next];
+      updated[index] = { ...updated[index], price: addition.price, quantity: updated[index].quantity + addition.quantity };
+      return updated;
+    }, prevItems));
+    setCartBounceTrigger((prev) => prev + 1);
+  };
+
   const removeFromCart = (productId: string, selectedSize: string) => {
     setItems((prev) => prev.filter((i) => !(i.productId === productId && i.selectedSize === selectedSize)));
   };
@@ -125,6 +140,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       value={{
         items,
         addToCart,
+        addItems,
         removeFromCart,
         updateQuantity,
         clearCart,

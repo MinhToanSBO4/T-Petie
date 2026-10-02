@@ -8,11 +8,12 @@ import { prisma } from '@/server/db/client';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
 import { credentialFingerprint } from '@/server/security/password-reset';
+import { readUserSnapshot } from '@/server/auth/user-snapshot';
 import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID || (process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? process.env.OAUTH_CLIENT_SECRET : '');
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || (!process.env.OAUTH_CLIENT_SECRET?.includes('apps.googleusercontent.com') ? (process.env.OAUTH_CLIENT_SECRET || '') : '');
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
 const googleProviders = googleClientId && googleClientSecret
   ? [GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })]
@@ -22,7 +23,7 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
-  pages: { signIn: '/dang-nhap', error: '/dang-nhap' },
+  pages: { signIn: '/login', error: '/login' },
   providers: [
     CredentialsProvider({
       name: 'Email hoặc tên đăng nhập và mật khẩu',
@@ -58,11 +59,24 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) token.id = user.id;
       if (!token.id) return token;
-      const stored = await prisma.user.findUnique({ where: { id: token.id } });
+      let stored: Awaited<ReturnType<typeof readUserSnapshot>>;
+      try {
+        stored = await readUserSnapshot(token.id, { fresh: Boolean(user) });
+      } catch (error) {
+        // Database tạm thời không phản hồi (mất mạng, hết kết nối): giữ quyền đã xác minh ở lần trước. Nếu ném lỗi,
+        // NextAuth xóa cookie phiên và người dùng bị đăng xuất, còn API trả "Không có quyền" dù tài khoản hợp lệ.
+        if (token.role && token.status) {
+          console.warn('Session refresh skipped, database unavailable:', error instanceof Error ? error.message.split('\n')[0] : error);
+          return token;
+        }
+        throw error;
+      }
       token.role = (stored?.role || 'user') as UserRole;
       const currentFingerprint = credentialFingerprint(stored?.password || null, process.env.NEXTAUTH_SECRET || '');
       if (user) token.credentialFingerprint = currentFingerprint;
       token.status = (stored?.status === 'active' && token.credentialFingerprint === currentFingerprint ? 'active' : 'blocked') as UserStatus;
+      // Họ tên/email sửa ở trang tài khoản hiện ngay, không phải chờ đăng nhập lại.
+      if (stored) { token.name = stored.name; token.email = stored.email; }
       token.phone = stored?.phone;
       token.address = stored?.address;
       token.city = stored?.city;

@@ -3,10 +3,11 @@ import { randomBytes } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import { quoteOrder, type QuoteItem } from './quote-order';
+import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 
 export type CheckoutInput = {
   fullName: string; phone: string; address: string; city: string; district: string; ward?: string;
-  note?: string; couponCode?: string; items: QuoteItem[];
+  note?: string; couponCode?: string; source?: string; items: QuoteItem[];
 };
 
 export async function createOrder(input: CheckoutInput, userId: string | undefined, idempotencyKey: string | null) {
@@ -48,6 +49,7 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
         district: input.district,
         ward: input.ward || null,
         orderNote: input.note || null,
+        source: input.source || null,
         subtotal: BigInt(quote.subtotal), shippingFee: BigInt(quote.shippingFee),
         discountAmount: BigInt(quote.discount), totalAmount: BigInt(quote.total),
         couponCode: quote.couponCode,
@@ -61,9 +63,13 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
           unitPrice: BigInt(item.unitPrice),
           totalPrice: BigInt(item.totalPrice),
         })) },
+        // Mốc đầu tiên của dòng thời gian đơn hàng mà khách xem ở mục Đơn mua.
+        statusEvents: { create: { status: 'PENDING' } },
       },
     });
   });
   revalidateTag('products');
+  // Đơn mới làm thay đổi doanh thu, số đơn chờ và tồn kho trên trang Tổng quan.
+  revalidateTag(DASHBOARD_TAG);
   return { orderId: order.orderCode, totalAmount: quote.total };
 }

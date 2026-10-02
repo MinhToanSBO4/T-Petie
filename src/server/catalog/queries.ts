@@ -13,7 +13,7 @@ function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ incl
     slug: row.slug,
     sku: row.sku,
     name: row.name,
-    category: 'be-gai',
+    category: 'girls',
     categoryName: row.categoryName,
     subcategory: row.subcategory as Product['subcategory'],
     subcategoryName: row.subcategoryName || undefined,
@@ -30,7 +30,7 @@ function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ incl
     discountPercent: row.discountPercent,
     saleCampaign: row.saleCampaign as Product['saleCampaign'],
     images,
-    thumbnail: images[0] || '/images/logo.png',
+    thumbnail: images[0] || '',
     colorName: row.colorName || undefined,
     colorHex: row.colorHex || undefined,
     isBestSeller: row.isBestSeller,
@@ -52,12 +52,44 @@ export const getProducts = unstable_cache(async () => {
   return rows.map(toProduct);
 }, ['active-products'], { revalidate: 60, tags: ['products'] });
 
+/**
+ * Một sản phẩm theo slug (chấp nhận cả id và sku để tương thích liên kết cũ).
+ * Truy vấn trực tiếp một bản ghi và có cache, thay vì nạp toàn bộ catalog như trước.
+ */
+export const getProductBySlug = unstable_cache(async (slug: string): Promise<Product | null> => {
+  const row = await prisma.product.findFirst({
+    where: { isActive: true, OR: [{ slug }, { id: slug }, { sku: slug }] },
+    include: productInclude,
+  });
+  return row ? toProduct(row) : null;
+}, ['product-by-slug'], { revalidate: 60, tags: ['products'] });
+
+/** Sản phẩm gợi ý: cùng bộ sưu tập trước, sau đó lấp đầy bằng sản phẩm mới nhất. */
+export const getRelatedProducts = unstable_cache(async (productId: string, collectionSlug: string | null, limit: number): Promise<Product[]> => {
+  const rows = await prisma.product.findMany({
+    where: { isActive: true, id: { not: productId }, ...(collectionSlug ? { collection: { slug: collectionSlug } } : {}) },
+    include: productInclude,
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  if (rows.length >= limit) return rows.map(toProduct);
+  const fill = await prisma.product.findMany({
+    where: { isActive: true, id: { notIn: [productId, ...rows.map((row) => row.id)] } },
+    include: productInclude,
+    orderBy: { createdAt: 'desc' },
+    take: limit - rows.length,
+  });
+  return [...rows, ...fill].map(toProduct);
+}, ['related-products'], { revalidate: 60, tags: ['products'] });
+
 export const getCollections = unstable_cache(async (): Promise<Collection[]> => {
-  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } }, orderBy: { sortOrder: 'asc' } });
+  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   return rows.map((row) => ({
     id: row.slug, title: row.title, subtitle: row.subtitle || '', story: row.story || '',
     bannerImage: row.bannerUrl, lookbookImages: row.lookbookUrls,
     themeColor: row.themeColor || '#FFF8EE', accentColor: row.accentColor || '#D97706',
     season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.id),
+    showInMenu: row.showInMenu, showOnHome: row.showOnHome,
   }));
 }, ['active-collections'], { revalidate: 60, tags: ['collections'] });

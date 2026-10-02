@@ -6,14 +6,22 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 
-export function MiniCart() {
+export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: number | null }) {
   const { items, isMiniCartOpen, closeMiniCart, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
+  const { isAuthenticated, user } = useAuth();
+  // Lối sang đơn đã đặt ngay trong giỏ, để khách không tìm đơn đã mua trong giỏ hàng.
+  const ordersLink = isAuthenticated && user?.role === 'user' && (
+    <Link href="/orders" onClick={closeMiniCart} className="block text-center text-[11px] font-semibold text-sage-700 hover:underline">
+      Tìm đơn đã đặt? Xem Đơn mua →
+    </Link>
+  );
 
-  const freeShippingThreshold = 399000;
-  const progressPercent = Math.min(100, (totalPrice / freeShippingThreshold) * 100);
-  const remainingForFreeShip = Math.max(0, freeShippingThreshold - totalPrice);
+  // Ngưỡng miễn phí vận chuyển lấy từ cấu hình trong database; ẩn thanh tiến độ khi chưa tải được.
+  const progressPercent = freeShippingThreshold ? Math.min(100, (totalPrice / freeShippingThreshold) * 100) : 0;
+  const remainingForFreeShip = freeShippingThreshold ? Math.max(0, freeShippingThreshold - totalPrice) : 0;
 
   return (
     <AnimatePresence>
@@ -41,9 +49,12 @@ export function MiniCart() {
             <div className="p-4 border-b border-cream-200 flex items-center justify-between bg-cream-50">
               <div className="flex items-center space-x-2">
                 <ShoppingBag className="w-5 h-5 text-honey-600" />
-                <h3 className="font-heading font-bold text-base text-charcoal-900">
-                  Giỏ Hàng Của Mẹ ({totalItems})
-                </h3>
+                <div>
+                  <h3 className="font-heading font-bold text-base text-charcoal-900">
+                    Giỏ Hàng Của Mẹ ({totalItems})
+                  </h3>
+                  <p className="text-[11px] text-charcoal-500">Món đang chọn · chưa đặt hàng</p>
+                </div>
               </div>
               <button
                 onClick={closeMiniCart}
@@ -55,7 +66,7 @@ export function MiniCart() {
             </div>
 
             {/* Thanh tiến độ Freeship */}
-            <div className="px-4 py-2.5 bg-honey-50 border-b border-cream-200 text-xs text-honey-700">
+            {freeShippingThreshold !== null && <div className="px-4 py-2.5 bg-honey-50 border-b border-cream-200 text-xs text-honey-700">
               {remainingForFreeShip === 0 ? (
                 <div className="flex items-center space-x-1.5 font-semibold text-sage-700">
                   <Sparkles className="w-4 h-4 text-sage-500" />
@@ -72,7 +83,7 @@ export function MiniCart() {
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-            </div>
+            </div>}
 
             {/* Danh sách món hàng */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-cream-100">
@@ -89,6 +100,7 @@ export function MiniCart() {
                   >
                     Dạo Xem Sản Phẩm
                   </button>
+                  {ordersLink && <div className="mt-4">{ordersLink}</div>}
                 </div>
               ) : (
                 items.map((item) => (
@@ -158,13 +170,14 @@ export function MiniCart() {
                   </span>
                 </div>
                 <Link
-                    href="/gio-hang"
+                    href="/cart"
                     onClick={closeMiniCart}
                     data-track="view-full-cart"
                     className="w-full py-2.5 px-3 rounded-full bg-honey-500 hover:bg-honey-600 text-white text-xs font-bold text-center flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95"
                   >
                     <span>Xem Giỏ Hàng</span>
                   </Link>
+                {ordersLink}
               </div>
             )}
           </motion.div>

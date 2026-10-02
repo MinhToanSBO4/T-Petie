@@ -1,45 +1,39 @@
-import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from '@/server/auth/options';
-import { prisma } from '@/server/db/client';
-import { revalidateTag } from 'next/cache';
+import { requireStaffApi } from '@/server/auth/staff-session';
+import { isSameOrigin } from '@/server/security/origin';
+import { changeOrderStatus, OrderStatusError, undoOrderStatus } from '@/server/orders/order-status';
+import { CANCEL_REASON_MAX, ORDER_STATUSES, type OrderStatus } from '@/lib/orders/status';
 
-const transitions: Record<string, string[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['PROCESSING', 'CANCELLED'],
-  PROCESSING: ['SHIPPING', 'CANCELLED'],
-  SHIPPING: ['COMPLETED'],
-};
+const isStatus = (value: unknown): value is OrderStatus =>
+  typeof value === 'string' && (ORDER_STATUSES as readonly string[]).includes(value);
 
+/**
+ * Quản trị viên hoặc nhân viên chuyển trạng thái đơn: `{ status, note? }` (hủy bắt buộc có lý do),
+ * hoặc hoàn tác bước vừa bấm: `{ undo: <trạng thái hiện tại> }`. Lịch sử đơn ghi rõ ai thao tác.
+ */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'admin' || session.user.status !== 'active') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  }
-  let body: { status?: unknown };
+  const session = await requireStaffApi();
+  if (!session) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
+  let body: { status?: unknown; note?: unknown; undo?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
-  if (typeof body.status !== 'string') return NextResponse.json({ error: 'Thiếu trạng thái' }, { status: 400 });
   try {
-    await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { orderCode: params.id }, include: { items: true } });
-      if (!order || !transitions[order.orderStatus]?.includes(body.status as string)) throw new Error('Chuyển trạng thái không hợp lệ');
-      const updated = await tx.order.updateMany({
-        where: { id: order.id, orderStatus: order.orderStatus },
-        data: { orderStatus: body.status as string },
-      });
-      if (updated.count !== 1) throw new Error('Đơn hàng đã được cập nhật bởi người khác');
-      if (body.status === 'CANCELLED') {
-        for (const item of order.items) {
-          await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
-        }
-        if (order.couponCode) {
-          await tx.coupon.update({ where: { code: order.couponCode }, data: { usedCount: { decrement: 1 } } });
-        }
-      }
-    });
-    if (body.status === 'CANCELLED') revalidateTag('products');
-    return NextResponse.json({ success: true });
+    if (body.undo !== undefined) {
+      if (!isStatus(body.undo)) return NextResponse.json({ error: 'Thiếu trạng thái' }, { status: 400 });
+      const status = await undoOrderStatus(params.id, body.undo);
+      return NextResponse.json({ success: true, status });
+    }
+    if (!isStatus(body.status)) return NextResponse.json({ error: 'Thiếu trạng thái' }, { status: 400 });
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    if (note.length > CANCEL_REASON_MAX) return NextResponse.json({ error: 'Ghi chú quá dài' }, { status: 400 });
+    if (body.status === 'CANCELLED' && !note) return NextResponse.json({ error: 'Vui lòng chọn lý do hủy đơn' }, { status: 400 });
+    await changeOrderStatus(params.id, body.status, { actor: session.user.role === 'admin' ? 'admin' : 'staff', note });
+    return NextResponse.json({ success: true, status: body.status });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể cập nhật đơn' }, { status: 409 });
+    // Chỉ trả về lỗi nghiệp vụ đã biết (409 như trước, kể cả mã đơn không tồn tại);
+    // lỗi hệ thống (Prisma, kết nối) không lộ chi tiết ra trình duyệt.
+    if (error instanceof OrderStatusError) return NextResponse.json({ error: error.message }, { status: 409 });
+    console.error('Order status update failed:', error);
+    return NextResponse.json({ error: 'Không thể cập nhật đơn' }, { status: 500 });
   }
 }

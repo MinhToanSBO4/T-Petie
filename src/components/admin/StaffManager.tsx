@@ -1,90 +1,185 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
+import { normalizePhone } from '@/lib/account/account-input';
 
-type Staff = { id: string; name: string; username: string; email: string; status: 'active' | 'blocked' };
-const inputClass = 'w-full rounded-xl border border-cream-200 bg-white px-4 py-3 outline-none focus:border-honey-500';
+type Staff = {
+  id: string; name: string; username: string; email: string; phone?: string;
+  status: 'active' | 'blocked'; lastLoginAt?: string;
+};
+type View = { mode: 'list' } | { mode: 'create' } | { mode: 'detail'; staff: Staff };
+
+const field = 'w-full rounded-xl border border-cream-200 px-4 py-3';
+const formatDate = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '—';
+
+const STAFF_SORTS = [
+  { value: 'newest', label: 'Mới tạo' }, { value: 'name', label: 'Tên A–Z' }, { value: 'login', label: 'Đăng nhập gần nhất' },
+];
+const STAFF_FILTERS: TableFilter[] = [
+  { key: 'status', label: 'Trạng thái', options: [{ value: 'active', label: 'Đang hoạt động' }, { value: 'blocked', label: 'Đã khóa' }] },
+];
+
+async function fetchStaff(query: TableQuery) {
+  const response = await fetch(`/api/admin/users?${tableParams(query, { filter: 'staff' })}`, { cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Không tải được nhân viên');
+  return { items: data.items as Staff[], total: data.total as number, page: data.page as number, pages: data.pages as number };
+}
 
 export function StaffManager() {
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<View>({ mode: 'list' });
+  const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
+  const back = (text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
+
+  if (view.mode === 'create') return <StaffCreateForm onDone={back} />;
+  if (view.mode === 'detail') return <StaffDetail staff={view.staff} onBack={back} />;
+
+  const columns: Column<Staff>[] = [
+    { key: 'name', header: 'Nhân viên', render: (row) => <div>
+        <p className="font-semibold text-charcoal-900">{row.name}</p>
+        <p className="text-xs text-charcoal-500">{row.email}</p>
+      </div> },
+    { key: 'username', header: 'Tên đăng nhập', render: (row) => row.username || '—' },
+    { key: 'login', header: 'Đăng nhập gần nhất', render: (row) => <span className="text-xs text-charcoal-600">{formatDate(row.lastLoginAt)}</span> },
+    { key: 'status', header: 'Trạng thái', render: (row) => <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${
+      row.status === 'active' ? 'bg-sage-100 text-sage-800' : 'bg-blush-100 text-blush-700'}`}>
+      {row.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</span> },
+    { key: 'action', header: '', render: (row) => <button type="button" onClick={(event) => { event.stopPropagation(); setView({ mode: 'detail', staff: row }); }} className="min-h-9 whitespace-nowrap rounded-lg border border-cream-300 px-3 text-xs font-bold">Chỉnh sửa</button> },
+  ];
+
+  return <div className="space-y-4">
+    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
+    <DataTable columns={columns} fetchPage={fetchStaff} reloadKey={reloadKey}
+      searchPlaceholder="Tìm tên, email, tên đăng nhập"
+      sorts={STAFF_SORTS} filters={STAFF_FILTERS}
+      emptyText="Chưa có nhân viên nào."
+      onRowClick={(row) => setView({ mode: 'detail', staff: row })}
+      toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
+        className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm nhân viên</button>} />
+  </div>;
+}
+
+/** Tạo tài khoản nhân viên mới. */
+function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
   const [draft, setDraft] = useState({ name: '', username: '', email: '', password: '' });
-  const [temporaryPassword, setTemporaryPassword] = useState<{ id: string; value: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  async function reload() {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/admin/users', { cache: 'no-store' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không tải được nhân viên');
-      setStaff((data.users || []).filter((user: { role: string }) => user.role === 'staff'));
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không tải được nhân viên'); }
-    finally { setLoading(false); }
-  }
-
-  useEffect(() => { void reload(); }, []);
-
-  async function create(event: FormEvent) {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setMessage('');
+    setBusy(true); setError('');
     try {
       const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không tạo được tài khoản');
-      setDraft({ name: '', username: '', email: '', password: '' });
-      setMessage('Đã tạo tài khoản nhân viên.');
-      await reload();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không tạo được tài khoản'); }
+      onDone(`Đã tạo tài khoản nhân viên ${draft.name}.`);
+    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
-  }
+  };
 
-  async function update(id: string, body: Record<string, string | boolean>) {
-    setBusy(true); setMessage('');
-    setTemporaryPassword(null);
-    try {
-      const response = await fetch(`/api/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không cập nhật được tài khoản');
-      if (body.resetPassword && data.temporaryPassword) {
-        setTemporaryPassword({ id, value: data.temporaryPassword });
-        setMessage('Đã đặt lại mật khẩu. Các phiên đăng nhập cũ của nhân viên đã hết hiệu lực.');
-      } else setMessage('Đã cập nhật tài khoản nhân viên.');
-      await reload();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không cập nhật được tài khoản'); }
-    finally { setBusy(false); }
-  }
-
-  return <div className="space-y-6">
-    <form onSubmit={create} className="rounded-2xl border border-cream-200 bg-white p-5 sm:p-6 space-y-4">
+  return <form onSubmit={submit} className="space-y-4 rounded-2xl border border-cream-200 bg-white p-5">
+    <header className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-lg font-bold">Thêm nhân viên</h2>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <input className={inputClass} placeholder="Họ và tên" aria-label="Họ và tên" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required minLength={2} />
-        <input className={inputClass} placeholder="Tên đăng nhập" aria-label="Tên đăng nhập" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value.toLowerCase() })} required pattern="[a-z][a-z0-9_]{2,31}" />
-        <input className={inputClass} type="email" placeholder="Email" aria-label="Email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} required />
-        <input className={inputClass} type="password" placeholder="Mật khẩu (từ 12 ký tự)" aria-label="Mật khẩu" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} required minLength={12} autoComplete="new-password" />
+      <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+    </header>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="text-sm font-semibold">Họ tên
+        <input className={`${field} mt-1`} required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Tên đăng nhập
+        <input className={`${field} mt-1`} required value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Email
+        <input className={`${field} mt-1`} type="email" required value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
+      <label className="text-sm font-semibold">Mật khẩu ban đầu (tối thiểu 12 ký tự)
+        <input className={`${field} mt-1`} type="text" required minLength={12} value={draft.password}
+          onChange={(event) => setDraft({ ...draft, password: event.target.value })} /></label>
+    </div>
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    <button disabled={busy} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
+      {busy ? 'Đang tạo…' : 'Tạo tài khoản'}
+    </button>
+  </form>;
+}
+
+/** Chi tiết nhân viên: sửa thông tin liên hệ, khóa/mở tài khoản và đặt lại mật khẩu. */
+function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: (message?: string) => void }) {
+  const [staff, setStaff] = useState(initial);
+  const [draft, setDraft] = useState({ name: initial.name, email: initial.email, phone: initial.phone || '' });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const dirty = draft.name.trim() !== staff.name || draft.email.trim().toLowerCase() !== staff.email.toLowerCase()
+    || draft.phone.trim() !== (staff.phone || '');
+
+  const update = async (body: Record<string, unknown>, okMessage: string) => {
+    setBusy(true); setMessage(''); setError('');
+    try {
+      const response = await fetch(`/api/admin/users/${staff.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Thao tác thất bại');
+      // Hiện ngay trạng thái/thông tin mới thay vì giữ bản đọc từ danh sách.
+      setStaff((current) => ({ ...current, ...data.user, ...(typeof body.phone === 'string' ? { phone: body.phone } : {}) }));
+      setMessage(okMessage);
+      if (data.temporaryPassword) setTemporaryPassword(data.temporaryPassword);
+    } catch (updateError) { setError(updateError instanceof Error ? updateError.message : 'Có lỗi xảy ra'); }
+    finally { setBusy(false); }
+  };
+
+  const saveContact = (event: React.FormEvent) => {
+    event.preventDefault();
+    const phone = draft.phone.trim() ? normalizePhone(draft.phone) : '';
+    if (phone === null) { setMessage(''); setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
+    setDraft({ ...draft, phone });
+    void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đã lưu thông tin nhân viên.');
+  };
+
+  return <div className="space-y-4">
+    <header className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 className="text-lg font-bold">{staff.name}</h2>
+        <p className="text-xs text-charcoal-500">{staff.username} · {staff.email}</p>
       </div>
-      <button disabled={busy} className="rounded-xl bg-honey-600 px-5 py-3 text-white font-semibold disabled:opacity-50">{busy ? 'Đang lưu…' : 'Tạo nhân viên'}</button>
+      <button type="button" onClick={() => onBack()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+    </header>
+    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
+      Mật khẩu tạm thời mới: <strong className="font-mono">{temporaryPassword}</strong> — hãy gửi cho nhân viên và yêu cầu đổi ngay sau khi đăng nhập.
+    </p>}
+
+    <form onSubmit={saveContact} className="space-y-3 rounded-2xl border border-cream-200 bg-white p-5">
+      <h3 className="font-bold">Thông tin liên hệ</h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-sm font-semibold">Họ tên
+          <input className={`${field} mt-1 font-normal`} required minLength={2} maxLength={100} value={draft.name}
+            onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Email đăng nhập
+          <input className={`${field} mt-1 font-normal`} type="email" required maxLength={254} value={draft.email}
+            onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Số điện thoại
+          <input className={`${field} mt-1 font-normal`} type="tel" inputMode="tel" maxLength={20} placeholder="0912 345 678" value={draft.phone}
+            onChange={(event) => setDraft({ ...draft, phone: event.target.value })} /></label>
+      </div>
+      <button disabled={busy || !dirty} className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white disabled:opacity-50">Lưu thông tin</button>
     </form>
 
-    {message && <p role="status" className="rounded-xl bg-cream-100 px-4 py-3 text-sm">{message}</p>}
-    <section className="rounded-2xl border border-cream-200 bg-white p-5 sm:p-6 space-y-4">
-      <h2 className="text-lg font-bold">Danh sách nhân viên</h2>
-      {loading ? <div className="space-y-3" aria-label="Đang tải nhân viên">{[1, 2, 3].map((index) => <div key={index} className="h-16 rounded-xl bg-cream-100 animate-pulse" />)}</div> :
-        staff.length === 0 ? <p className="text-sm text-charcoal-500">Chưa có nhân viên.</p> :
-          staff.map((person) => <div key={person.id} className="border-t border-cream-100 pt-4 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div><p className="font-semibold">{person.name} <span className="text-xs text-charcoal-500">@{person.username}</span></p>
-              <p className="text-sm text-charcoal-500">{person.email} · {person.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</p></div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" disabled={busy} onClick={() => void update(person.id, { status: person.status === 'active' ? 'blocked' : 'active' })} className="rounded-xl border border-cream-200 px-3 py-2 text-sm disabled:opacity-50">{person.status === 'active' ? 'Khóa' : 'Mở khóa'}</button>
-              <button type="button" disabled={busy} onClick={() => void update(person.id, { resetPassword: true })} className="rounded-xl bg-charcoal-900 px-3 py-2 text-sm text-white disabled:opacity-50">{busy ? 'Đang xử lý…' : 'Đặt lại mật khẩu'}</button>
-            </div>
-            {temporaryPassword?.id === person.id && <div role="status" className="lg:col-span-2 rounded-xl bg-honey-50 border border-honey-200 p-4 text-sm">
-              <p className="font-semibold">Mật khẩu tạm cho @{person.username} — chỉ hiển thị lần này. Hãy gửi riêng cho nhân viên.</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2"><code className="break-all select-all">{temporaryPassword.value}</code><button type="button" onClick={() => void navigator.clipboard.writeText(temporaryPassword.value).then(() => setMessage('Đã sao chép mật khẩu tạm.')).catch(() => setMessage('Không sao chép được; hãy chọn và sao chép thủ công.'))} className="rounded-lg border border-honey-300 px-3 py-1">Sao chép</button></div>
-            </div>}
-          </div>)}
+    <section className="grid gap-3 rounded-2xl border border-cream-200 bg-white p-5 sm:grid-cols-2">
+      <div><p className="text-xs font-semibold uppercase tracking-wide text-charcoal-500">Trạng thái</p>
+        <p className="text-sm">{staff.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-wide text-charcoal-500">Đăng nhập gần nhất</p>
+        <p className="text-sm">{formatDate(staff.lastLoginAt)}</p></div>
     </section>
+
+    <div className="flex flex-wrap gap-2">
+      {staff.status === 'active'
+        ? <button type="button" disabled={busy} onClick={() => void update({ status: 'blocked' }, 'Đã khóa tài khoản nhân viên.')}
+            className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Khóa tài khoản</button>
+        : <button type="button" disabled={busy} onClick={() => void update({ status: 'active' }, 'Đã mở lại tài khoản.')}
+            className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Mở khóa</button>}
+      <button type="button" disabled={busy} onClick={() => void update({ resetPassword: true }, 'Đã tạo mật khẩu tạm thời mới.')}
+        className="min-h-11 rounded-xl bg-sage-700 px-5 text-sm font-bold text-white disabled:opacity-50">Đặt lại mật khẩu</button>
+    </div>
   </div>;
 }
