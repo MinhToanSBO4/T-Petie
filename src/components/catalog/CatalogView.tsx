@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { SlidersHorizontal } from 'lucide-react';
-import { FilterBar } from '@/components/filter/FilterBar';
-import { FilterSections, type FilterSectionOptions } from '@/components/filter/FilterSections';
-import type { CatalogPreview } from '@/components/filter/FilterPanel';
+import { FilterBar, type CatalogPreview, type FilterOptions } from '@/components/filter/FilterBar';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Pagination } from '@/components/catalog/Pagination';
 import { activeFilterCount, catalogParams, EMPTY_FILTERS, type CatalogFacets, type CatalogFilters } from '@/lib/catalog/filters';
@@ -18,12 +15,10 @@ export type CatalogViewListing = { items: ProductCardData[]; total: number; page
  * Danh sách sản phẩm có bộ lọc, sắp xếp và phân trang. Máy chủ đã lọc và cắt đúng trang (HTML có sẵn sản phẩm);
  * đổi bộ lọc hay trang chỉ đổi URL, máy chủ dựng lại trang mới trong lúc danh sách cũ mờ đi. Bộ lọc nằm trên URL
  * nên chia sẻ được, F5 hay bấm "Quay lại" vẫn đúng danh sách đang xem.
- * Máy tính: cột lọc bên trái, bấm là áp dụng. Điện thoại: lọc nhanh trên thanh và bảng lọc đầy đủ.
+ * Thanh lọc nằm phía trên lưới sản phẩm: mỗi nhóm lọc mở một dropdown (điện thoại: tấm chọn trượt từ dưới lên).
  */
-export function CatalogView({ listing, filters, scope, basePath, emptyText, layout = 'sidebar' }: {
+export function CatalogView({ listing, filters, scope, basePath, emptyText }: {
   listing: CatalogViewListing; filters: CatalogFilters; scope: CatalogScope; basePath: string; emptyText?: string;
-  /** `compact`: không có cột lọc, nút "Bộ lọc" hiện ở mọi kích thước (trang bộ sưu tập dạng tạp chí). */
-  layout?: 'sidebar' | 'compact';
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -32,7 +27,7 @@ export function CatalogView({ listing, filters, scope, basePath, emptyText, layo
   const defaultSort = defaultSortFor(scope);
   const scopeKey = scopeParam(scope);
   const current = useMemo(() => ({ ...filters, page: listing.page }), [filters, listing.page]);
-  const options: FilterSectionOptions = { showTypes: scope.kind !== 'type', showSale: scope.kind !== 'sale', showCollections: scope.kind !== 'collection' };
+  const options: FilterOptions = { showTypes: scope.kind !== 'type', showSale: scope.kind !== 'sale', showCollections: scope.kind !== 'collection' };
 
   const hrefFor = useCallback((next: CatalogFilters) => {
     const query = catalogParams(next, defaultSort);
@@ -64,27 +59,13 @@ export function CatalogView({ listing, filters, scope, basePath, emptyText, layo
 
   const filtered = activeFilterCount(current) > 0;
 
-  const sidebar = layout === 'sidebar';
-  return <div className={sidebar ? 'lg:grid lg:grid-cols-[236px_minmax(0,1fr)] lg:gap-8' : undefined}>
-    {sidebar && <aside className="hidden lg:block" aria-label="Bộ lọc sản phẩm">
-      <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-6 pr-2">
-        <div className="flex items-center justify-between border-b border-cream-200 pb-3">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-charcoal-900">
-            <SlidersHorizontal className="size-4 text-honey-600" aria-hidden />Bộ lọc
-          </h2>
-          {filtered && <button type="button" onClick={() => navigate({ ...EMPTY_FILTERS, q: current.q, sort: current.sort })}
-            className="text-xs font-bold text-honey-700 hover:underline">Xóa tất cả</button>}
-        </div>
-        <FilterSections layout="list" value={current} facets={listing.facets} options={options} onChange={(next) => navigate(next)} />
-      </div>
-    </aside>}
-
+  return <div>
     <div ref={resultsRef} className="min-w-0 scroll-mt-28">
       {current.q && <div className="mb-5">
         <h1 className="mb-1 font-heading text-2xl font-extrabold text-charcoal-900 sm:text-3xl">{`Kết quả tìm kiếm cho "${current.q}"`}</h1>
         <p className="text-xs text-charcoal-600 sm:text-sm">Tìm thấy {listing.total} sản phẩm phù hợp.</p>
       </div>}
-      <FilterBar filters={current} facets={listing.facets} total={listing.total} options={options} preview={preview} compact={!sidebar}
+      <FilterBar filters={current} facets={listing.facets} total={listing.total} options={options} preview={preview}
         onChange={(next) => navigate(next)} />
 
       <div aria-busy={pending} className={`transition-opacity duration-200 ${pending ? 'pointer-events-none opacity-50' : ''}`}>

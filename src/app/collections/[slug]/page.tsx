@@ -86,7 +86,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
       </div>
       {productsInCollection.length > 0
         ? <CatalogSection scope={{ kind: 'collection', slug: collection.id }} searchParams={searchParams}
-            basePath={`/collections/${collection.id}`} layout="compact" />
+            basePath={`/collections/${collection.id}`} />
         : <p className="rounded-2xl border border-dashed border-cream-300 p-8 text-center text-sm text-charcoal-600">Các thiết kế của bộ sưu tập sẽ sớm được ra mắt.</p>}
     </section>
 
