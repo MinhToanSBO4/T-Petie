@@ -12,8 +12,12 @@ test('SMTP configuration requires credentials, safe origin and TLS mode', () => 
   assert.throws(() => readMailConfig({}), /SMTP_HOST/);
   assert.throws(() => readMailConfig({ ...env, MAIL_SITE_URL: 'javascript:alert(1)' }));
   assert.throws(() => readMailConfig({ ...env, SMTP_SECURE: 'maybe' }));
-  assert.equal(readMailConfig(env).fromName, 'Little & Co · No Reply');
+  assert.equal(readMailConfig(env).fromName, 'Little & Co · No-Reply');
   assert.equal(readMailConfig({ ...env, SMTP_PORT: '587', SMTP_SECURE: 'false' }).secure, false);
+  // Tối thiểu 3 biến: cổng 465/SSL, địa chỉ gửi = SMTP_USER, liên kết theo NEXTAUTH_URL.
+  const minimal = readMailConfig({ SMTP_HOST: 'smtp.gmail.com', SMTP_USER: 'Shop@Gmail.com', SMTP_PASSWORD: 'abcd efgh ijkl mnop', NEXTAUTH_URL: 'https://shop.example.com' });
+  assert.deepEqual([minimal.port, minimal.secure, minimal.fromAddress, minimal.password, minimal.siteUrl],
+    [465, true, 'shop@gmail.com', 'abcdefghijklmnop', 'https://shop.example.com']);
   assert.equal(normalizeEmail(' A@Example.COM '), 'a@example.com');
   assert.equal(normalizeEmail('a@example.com\r\nBcc: x@y.com'), null);
 });
@@ -55,8 +59,9 @@ test('order mail includes VND totals, item sizes and tracking without phone in U
   assert.ok(!result.text.includes('?phone='));
 });
 test('failed emails back off and stop after the fifth attempt', () => {
-  assert.deepEqual(retryEmailJob(1, 0), { status: 'pending', nextAttemptAt: new Date(60000) });
-  assert.deepEqual(retryEmailJob(2, 0), { status: 'pending', nextAttemptAt: new Date(120000) });
+  assert.deepEqual(retryEmailJob(1, 0), { status: 'pending', nextAttemptAt: new Date(30_000) });
+  assert.deepEqual(retryEmailJob(2, 0), { status: 'pending', nextAttemptAt: new Date(120_000) });
+  assert.deepEqual(retryEmailJob(4, 0), { status: 'pending', nextAttemptAt: new Date(3_600_000) });
   assert.equal(retryEmailJob(5, 0).status, 'failed');
 });
 test('rendered Clarity bootstrap skips security pages and still runs on the storefront', () => {

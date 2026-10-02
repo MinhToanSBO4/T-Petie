@@ -24,6 +24,10 @@ async function main() {
     const mails = [];
     transport.sendEmail = async (to, payload) => { mails.push({ to, payload }); };
     const tokens = require('../src/server/auth/email-tokens.ts');
+    // Liên kết mới chỉ được phát hành sau thời gian chờ gửi lại: lùi thời điểm phát hành của liên kết hiện có.
+    const skipCooldown = (purpose, id) => db.verificationToken.updateMany({ where: { identifier: `${purpose}:${id}` },
+      data: { expires: new Date(Date.now() + tokens.TOKEN_TTL_MINUTES[purpose] * 60_000 - (tokens.RESEND_COOLDOWN_SECONDS + 1) * 1000) } });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
     const { tokenDigest } = require('../src/lib/email/tokens.ts');
     const { credentialFingerprint } = require('../src/server/security/password-reset.ts');
     const outbox = require('../src/server/email/outbox.ts');
@@ -32,11 +36,14 @@ async function main() {
     const { createOrder } = require('../src/server/orders/create-order.ts');
     const bcrypt = require('bcryptjs');
     const user = await db.user.create({ data: { email: 'customer@example.invalid', role: 'user', password: await bcrypt.hash('old-password-123', 12), emailVerificationRequired: true } });
-    await tokens.issueAccountEmail(user.email, 'verify');
+    assert.deepEqual(await tokens.issueAccountEmail({ email: user.email }, 'verify'), { status: 'queued' });
     const first = mails.at(-1).payload.token;
     const stored = await db.verificationToken.findUnique({ where: { token: tokenDigest(first) } });
     assert.ok(stored); assert.notEqual(stored.token, first);
-    await tokens.issueAccountEmail(user.email, 'verify');
+    const blockedByCooldown = await tokens.issueAccountEmail({ email: user.email }, 'verify');
+    assert.equal(blockedByCooldown.status, 'cooldown'); assert.ok(blockedByCooldown.retryAfter > 0 && blockedByCooldown.retryAfter <= 60);
+    await skipCooldown('verify', user.id);
+    await tokens.issueAccountEmail({ id: user.id }, 'verify');
     const replacement = mails.at(-1).payload.token;
     await assert.rejects(tokens.consumeAccountToken(first, 'verify'), tokens.InvalidAccountToken);
     await assert.rejects(tokens.consumeAccountToken(replacement, 'reset', 'new-password-123'), tokens.InvalidAccountToken);
@@ -44,13 +51,14 @@ async function main() {
     assert.equal(race.filter((r) => r.status === 'fulfilled').length, 1);
     assert.ok((await db.user.findUnique({ where: { id: user.id } })).emailVerified);
     await assert.rejects(tokens.consumeAccountToken(replacement, 'verify'), tokens.InvalidAccountToken);
-    console.log('PASS: hashed token storage, replacement, purpose isolation, concurrent consumption and reuse');
+    console.log('PASS: hashed token storage, resend cooldown, replacement, purpose isolation, concurrent consumption and reuse');
 
-    await tokens.issueAccountEmail(user.email, 'reset');
+    await tokens.issueAccountEmail({ email: user.email }, 'reset');
     let reset = mails.at(-1).payload.token;
     await db.verificationToken.update({ where: { token: tokenDigest(reset) }, data: { expires: new Date(0) } });
     await assert.rejects(tokens.consumeAccountToken(reset, 'reset', 'new-password-123'), tokens.InvalidAccountToken);
-    await tokens.issueAccountEmail(user.email, 'reset'); reset = mails.at(-1).payload.token;
+    await skipCooldown('reset', user.id);
+    await tokens.issueAccountEmail({ email: user.email }, 'reset'); reset = mails.at(-1).payload.token;
     const before = credentialFingerprint(user.password, 'test-secret');
     await tokens.consumeAccountToken(reset, 'reset', 'new-password-123');
     const updated = await db.user.findUnique({ where: { id: user.id } });
@@ -59,9 +67,9 @@ async function main() {
     await assert.rejects(tokens.consumeAccountToken(reset, 'reset', 'new-password-123'), tokens.InvalidAccountToken);
     const staff = await db.user.create({ data: { email: 'staff@example.invalid', role: 'admin' } });
     const blocked = await db.user.create({ data: { email: 'blocked@example.invalid', status: 'blocked' } });
-    assert.equal(await tokens.issueAccountEmail(staff.email, 'reset'), false);
-    assert.equal(await tokens.issueAccountEmail(blocked.email, 'reset'), false);
-    assert.equal(await tokens.issueAccountEmail('unknown@example.invalid', 'reset'), false);
+    assert.deepEqual(await tokens.issueAccountEmail({ email: staff.email }, 'reset'), { status: 'skipped' });
+    assert.deepEqual(await tokens.issueAccountEmail({ email: blocked.email }, 'reset'), { status: 'skipped' });
+    assert.deepEqual(await tokens.issueAccountEmail({ email: 'unknown@example.invalid' }, 'reset'), { status: 'skipped' });
     console.log('PASS: expiry, password reset/session invalidation and privileged/blocked restrictions');
 
     const { POST } = require('../src/app/api/auth/email/[action]/route.ts');
@@ -70,8 +78,9 @@ async function main() {
     assert.equal(known.status, unknown.status); assert.equal(known.status, privileged.status);
     assert.deepEqual(await known.json(), await unknown.json());
     assert.equal((await request(user.email, 'forgot', 'https://evil.example')).status, 403);
-    await request(user.email); await request(user.email);
-    assert.equal((await request(user.email)).status, 429);
+    for (let i = 0; i < 4; i++) await request(user.email);
+    const limited = await request(user.email);
+    assert.equal(limited.status, 429); assert.ok((await limited.json()).retryAfter > 0);
     console.log('PASS: indistinguishable public recovery response, origin and per-email rate limits');
 
     const authorize = require('../src/server/auth/options.ts').authOptions.providers.find((p) => p.id === 'credentials').options.authorize;
@@ -80,21 +89,29 @@ async function main() {
     const signup = (email) => register(new Request('http://localhost:3000/api/auth/register', { method: 'POST', headers: { origin: 'http://localhost:3000', 'content-type': 'application/json' }, body: JSON.stringify({ name: 'New customer', email, password: 'strong-password-123' }) }));
     assert.equal((await signup('bad<@example.com')).status, 400);
     transport.sendEmail = async () => { throw Object.assign(new Error('Fake SMTP outage'), { code: 'EAUTH' }); };
+    const started = Date.now();
     const registration = await signup('new@example.invalid');
-    assert.equal(registration.status, 201); assert.equal((await registration.json()).emailSent, false);
-    await assert.rejects(login('new@example.invalid', 'strong-password-123'), /EmailVerificationRequired/);
-    assert.equal(await login('new@example.invalid', 'wrong-password'), null);
-    transport.sendEmail = async (to, payload) => { mails.push({ to, payload }); };
-    await tokens.issueAccountEmail('new@example.invalid', 'verify');
-    await tokens.consumeAccountToken(mails.at(-1).payload.token, 'verify');
+    assert.equal(registration.status, 201);
+    assert.ok(Date.now() - started < 5000, 'Registration must not wait for SMTP');
+    await settle();
+    const newcomer = await db.user.findUnique({ where: { email: 'new@example.invalid' } });
+    // Gửi thất bại hẳn (EAUTH không thử lại): liên kết bị hủy nên khách bấm gửi lại được ngay, không phải chờ.
+    assert.equal(await db.verificationToken.count({ where: { identifier: `verify:${newcomer.id}` } }), 0);
+    // Chưa xác thực vẫn đăng nhập được; đặt hàng bị chặn ở api/checkout.
     assert.ok(await login('new@example.invalid', 'strong-password-123'));
+    assert.equal(await login('new@example.invalid', 'wrong-password'), null);
+    assert.deepEqual(await tokens.emailVerificationState(newcomer.id), { email: 'new@example.invalid', verified: false });
+    transport.sendEmail = async (to, payload) => { mails.push({ to, payload }); };
+    assert.deepEqual(await tokens.issueAccountEmail({ email: 'new@example.invalid' }, 'verify'), { status: 'queued' });
+    await tokens.consumeAccountToken(mails.at(-1).payload.token, 'verify');
+    assert.equal((await tokens.emailVerificationState(newcomer.id)).verified, true);
     const legacy = await db.user.create({ data: { email: 'legacy@example.invalid', password: await bcrypt.hash('legacy-password-123', 12) } });
     assert.ok(await login(legacy.email, 'legacy-password-123'));
     const googleOnly = await db.user.create({ data: { email: 'google@example.invalid', emailVerified: new Date() } });
-    await tokens.issueAccountEmail(googleOnly.email, 'reset');
+    await tokens.issueAccountEmail({ email: googleOnly.email }, 'reset');
     await tokens.consumeAccountToken(mails.at(-1).payload.token, 'reset', 'google-password-123');
     assert.ok(await login(googleOnly.email, 'google-password-123'));
-    console.log('PASS: SMTP outage leaves pending account/resend, verification login gate, legacy access and Google-only password setup');
+    console.log('PASS: registration never waits for SMTP, failed link is released, unverified login allowed, legacy access and Google-only password setup');
 
     const product = await db.product.create({ data: { sku: 'SMTP-TEST', slug: 'smtp-test', name: 'Áo <test>', basePrice: 100000n,
       variants: { create: { sku: 'SMTP-TEST-2', size: '2', price: 100000n, stock: 10 } } }, include: { variants: true } });
@@ -170,6 +187,18 @@ async function main() {
     const exhausted = await db.emailJob.findUnique({ where: { id: exhaust.id } });
     assert.equal(exhausted.status, 'failed'); assert.equal(exhausted.attempts, 5);
     console.log('PASS: auto-completion enqueue and maximum five delivery attempts');
+
+    assert.deepEqual((await db.emailJob.findFirst({ where: { status: 'sent' } })).payload, {});
+    assert.deepEqual(exhausted.payload, {});
+    const queued = await db.emailJob.create({ data: { eventKey: 'forget-me', orderId: order.id, recipient: user.email, kind: 'status', payload: { status: 'SHIPPING' } } });
+    await db.$transaction((tx) => outbox.forgetUserEmailJobs(tx, user.id));
+    const forgotten = await db.emailJob.findUnique({ where: { id: queued.id } });
+    assert.equal(forgotten.status, 'cancelled'); assert.equal(forgotten.recipient, 'redacted'); assert.deepEqual(forgotten.payload, {});
+    assert.equal(await db.emailJob.count({ where: { orderId: order.id, recipient: { not: 'redacted' } } }), 0);
+    await db.emailJob.update({ where: { id: queued.id }, data: { status: 'pending', createdAt: new Date(Date.now() - 4 * 86400000) } });
+    assert.equal((await outbox.purgeEmailJobs()).expired, 1);
+    assert.equal((await db.emailJob.findUnique({ where: { id: queued.id } })).errorCode, 'EXPIRED');
+    console.log('PASS: payload cleared after delivery, deleted-account redaction and stale-job expiry');
     console.log('Email flow checks passed. No real emails sent.');
   } finally {
     await db?.$disconnect();

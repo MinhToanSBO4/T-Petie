@@ -7,8 +7,10 @@ import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { createTemporaryPassword } from '@/server/security/password-reset';
+import { passwordProblem, PASSWORD_MIN } from '@/lib/account/account-input';
 import { isSameOrigin } from '@/server/security/origin';
 import { forgetUserSnapshot } from '@/server/auth/user-snapshot';
+import { forgetUserEmailJobs } from '@/server/email/outbox';
 
 interface RouteContext {
   params: {
@@ -151,10 +153,10 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     }
     const temporaryPassword = resetPassword ? createTemporaryPassword() : undefined;
     if (password !== undefined || temporaryPassword) {
-      if (!temporaryPassword && (targetUser.role !== 'staff' || typeof password !== 'string' || password.length < 12 || password.length > 128)) {
-        return NextResponse.json({ error: 'Mật khẩu nhân viên cần 12–128 ký tự' }, { status: 400 });
+      if (!temporaryPassword && (targetUser.role !== 'staff' || passwordProblem(password))) {
+        return NextResponse.json({ error: `Mật khẩu nhân viên cần ít nhất ${PASSWORD_MIN} ký tự` }, { status: 400 });
       }
-      // Nhánh trên đã bảo đảm password là chuỗi 12–128 ký tự khi không dùng mật khẩu tạm.
+      // Nhánh trên đã bảo đảm password là chuỗi hợp lệ khi không dùng mật khẩu tạm.
       updateData.password = await bcrypt.hash(temporaryPassword || (password as string), 12);
     }
     if (name !== undefined) {
@@ -260,6 +262,8 @@ export async function DELETE(req: Request, { params }: RouteContext) {
     await prisma.$transaction(async (tx) => {
       await tx.account.deleteMany({ where: { userId: targetUserId } });
       await tx.session.deleteMany({ where: { userId: targetUserId } });
+      await tx.verificationToken.deleteMany({ where: { identifier: { in: [`verify:${targetUserId}`, `reset:${targetUserId}`] } } });
+      await forgetUserEmailJobs(tx, targetUserId);
       await tx.user.update({ where: { id: targetUserId }, data: {
         status: 'blocked', deletedAt: new Date(), email: null, username: null, password: null,
         phone: null, address: null, city: null, image: null, name: 'Tài khoản đã xóa',

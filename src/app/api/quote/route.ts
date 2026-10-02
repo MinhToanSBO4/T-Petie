@@ -4,10 +4,14 @@ import { authOptions } from '@/server/auth/options';
 import { quoteOrder } from '@/server/orders/quote-order';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { clientIp } from '@/server/security/client-ip';
+import { kickEmailOutbox } from '@/server/email/outbox';
 
 export const dynamic = 'force-dynamic';
+// Gửi thư còn tồn trong hàng đợi sau phản hồi (tối đa một lần mỗi 2 phút mỗi máy chủ); cần đủ thời gian cho một lần gửi.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  kickEmailOutbox();
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   // Báo giá là endpoint công khai: giới hạn chung để tránh lạm dụng, và siết chặt hơn khi thử mã giảm giá.

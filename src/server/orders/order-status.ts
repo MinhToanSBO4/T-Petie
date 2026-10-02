@@ -36,9 +36,9 @@ type ChangeOptions = {
 };
 
 /**
- * Tiến đơn qua các bước `path` trong một câu lệnh SQL (một lượt gọi database): cập nhật có điều kiện theo trạng thái
- * đang đọc được (hai người bấm cùng lúc thì chỉ một người thành công), ghi lịch sử từng bước, ghi mốc hoàn tất để tính
- * hạn đánh giá và ghi nhận đã thu tiền với đơn COD. Trước đây là một transaction 5 lượt gọi giữ kết nối suốt thời gian chạy.
+ * Tiến đơn qua các bước `path`: một câu lệnh SQL cập nhật có điều kiện theo trạng thái đang đọc được (hai người bấm
+ * cùng lúc thì chỉ một người thành công), ghi lịch sử từng bước, ghi mốc hoàn tất để tính hạn đánh giá và ghi nhận đã
+ * thu tiền với đơn COD; cùng transaction đó xếp thư báo trạng thái vào hàng đợi để thư không gửi cho thay đổi bị hủy.
  */
 async function moveForward(order: OrderHead, path: OrderStatus[], actor: StatusActor | null, note: string | null) {
   const target = path[path.length - 1];
@@ -63,7 +63,10 @@ async function moveForward(order: OrderHead, path: OrderStatus[], actor: StatusA
     FROM moved, unnest(${ids}::text[], ${path}::text[], ${times}::timestamp[]) AS step(id, status, at)`;
   if (inserted !== path.length) throw new OrderStatusError(CONCURRENT_UPDATE);
   const eventId = ids[ids.length - 1];
-  await enqueueOrderEmail(tx, order.id, `status:${eventId}`, 'status', target, note, isShopActor(actor) ? UNDO_WINDOW_MS + 1000 : 0, eventId);
+  // Khách tự bấm "Đã nhận hàng" thì không cần thư báo lại chính thao tác đó.
+  if (actor !== 'customer') {
+    await enqueueOrderEmail(tx, order.id, `status:${eventId}`, 'status', target, note, isShopActor(actor) ? UNDO_WINDOW_MS + 1000 : 0, eventId);
+  }
   });
 }
 
@@ -272,6 +275,7 @@ export async function autoCompleteShippedOrders(now = new Date(), { force = fals
       }
     }
     if (completed) {
+      scheduleEmailDispatch();
       // Bước quét có thể chạy trong lúc dựng trang, nơi Next.js không cho làm mới cache; khi đó số liệu
       // tổng quan chỉ cập nhật ở lần làm mới kế tiếp, đơn hàng vẫn đã được hoàn tất.
       try { revalidateTag(DASHBOARD_TAG); } catch { /* bỏ qua */ }

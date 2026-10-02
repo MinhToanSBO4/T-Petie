@@ -44,8 +44,10 @@ export async function sendEmail(to: string, payload: EmailPayload, messageId?: s
   try {
     const result = await Promise.race([
       transport.sendMail({ from: { name: config.fromName, address: config.fromAddress },
-        to, replyTo: config.replyTo || undefined, ...renderEmail(config, payload), messageId }),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => { cancel(); reject(Object.assign(new Error('SMTP_TIMEOUT'), { code: 'ETIMEDOUT' })); }, 20000); }),
+        to, replyTo: config.replyTo || undefined, ...renderEmail(config, payload), messageId,
+        // Thư tự động: hộp thư không gửi trả lời tự động (vắng mặt, chuyển tiếp) về địa chỉ no-reply.
+        headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' } }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { cancel(); reject(Object.assign(new Error('SMTP_TIMEOUT'), { code: 'ETIMEDOUT' })); }, 15000); }),
     ]);
     if (!result.accepted?.length) throw new Error('SMTP_REJECTED');
   } finally { clearTimeout(timer); cancel(); }
