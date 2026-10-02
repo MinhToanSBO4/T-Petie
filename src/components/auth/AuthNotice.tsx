@@ -28,7 +28,7 @@ function show(kind: AuthNoticeKind) {
       break;
     case 'google-linked':
       toast.success('Đã liên kết Google với tài khoản của Mẹ', {
-        description: 'Lần sau Mẹ chỉ cần bấm "Đăng nhập với Google".',
+        description: 'Email đã được xác thực, Mẹ đặt hàng được ngay. Lần sau chỉ cần bấm "Đăng nhập với Google".',
       });
       break;
     case 'google-linked-password-removed':

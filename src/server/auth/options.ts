@@ -12,7 +12,7 @@ import { parseLoginIdentifier } from '@/lib/auth-identity';
 import { requiresEmailVerification } from '@/lib/email/tokens';
 import { AUTH_NOTICE_TTL_MS, googleNoticeKind, googleSignInVerdict } from '@/lib/auth-google';
 import { credentialFingerprint } from '@/server/security/password-reset';
-import { linkOAuthAccount } from '@/server/auth/google-link';
+import { linkOAuthAccount, verifyByGoogleSignIn } from '@/server/auth/google-link';
 import { readUserSnapshot } from '@/server/auth/user-snapshot';
 import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
@@ -94,6 +94,17 @@ export const authOptions: NextAuthOptions = {
       });
       if (verdict === 'deny') return false;
       if (verdict === 'staff-password-only') return '/login?error=GoogleStaffAccount';
+      if (verdict === 'allow' && stored && stored.id === user.id && stored.role === 'user') {
+        // Tài khoản đã liên kết Google từ trước: Google vừa xác minh email nên tài khoản cũng được xác thực luôn.
+        try {
+          const verified = await verifyByGoogleSignIn(stored.id, account.id_token);
+          // Chỉ báo riêng khi mật khẩu cũ bị gỡ; còn lại là một lần đăng nhập Google bình thường.
+          if (verified?.passwordRemoved) googleLinks.set(account, verified);
+        } catch (error) {
+          // Không chặn đăng nhập chỉ vì chưa ghi được dấu xác thực; lần đăng nhập sau sẽ ghi lại.
+          console.warn('Google email verification not recorded:', error instanceof Error ? error.message.split('\n')[0] : error);
+        }
+      }
       if (verdict === 'link' && stored) {
         // Khách đã đăng ký bằng email + mật khẩu: gắn Google vào tài khoản đó ngay sau các bước kiểm tra trên, NextAuth
         // tìm thấy tài khoản qua liên kết vừa tạo thay vì báo OAuthAccountNotLinked. Không bật cơ chế tự gắn theo email
