@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@/server/db/client';
-import { uploadRawFileToCloudinary } from '@/server/media/cloudinary';
+import { deleteCloudinaryRaw, uploadRawFileToCloudinary } from '@/server/media/cloudinary';
 import { buildExportWorkbook } from '@/lib/export/workbook';
 import { ORDER_STATUS_LABELS } from '@/lib/orders/status';
 
@@ -26,6 +26,27 @@ export async function failStaleExportJobs(now = new Date()) {
     data: { status: 'failed', error: 'Tiến trình bị gián đoạn, vui lòng chạy lại.', completedAt: now },
   });
   return count;
+}
+
+/** File xuất chứa thông tin mọi khách hàng: chỉ giữ trên Cloudinary chừng này ngày rồi xóa. */
+export const EXPORT_RETENTION_DAYS = 7;
+
+/**
+ * Xóa khỏi Cloudinary các file xuất quá hạn và bỏ đường dẫn trong database; trả về số file đã xóa.
+ * Đường dẫn Cloudinary của file raw là công khai, nên không để file dữ liệu khách nằm đó vô thời hạn.
+ */
+export async function purgeExpiredExports(now = new Date()) {
+  const due = await prisma.exportJob.findMany({
+    where: { fileUrl: { not: null }, completedAt: { lt: new Date(now.getTime() - EXPORT_RETENTION_DAYS * 86_400_000) } },
+    select: { id: true, fileUrl: true }, take: 50,
+  });
+  let purged = 0;
+  for (const job of due) {
+    if (!(await deleteCloudinaryRaw(job.fileUrl!).catch(() => false))) continue;
+    await prisma.exportJob.update({ where: { id: job.id }, data: { fileUrl: null } });
+    purged += 1;
+  }
+  return purged;
 }
 
 /**

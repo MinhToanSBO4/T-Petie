@@ -172,7 +172,7 @@ function LoginForm() {
             </Link>
             <button
               type="button"
-              onClick={() => setErrorMessage('Khôi phục mật khẩu qua email chưa được triển khai. Vui lòng liên hệ quản trị viên để được hỗ trợ.')}
+              onClick={() => setErrorMessage('Mẹ nhắn shop qua Zalo/Messenger (nút chat góc màn hình) kèm email đã đăng ký: shop sẽ gửi mật khẩu tạm để mẹ đăng nhập rồi đổi trong mục Tài khoản → Mật khẩu. Nếu mẹ từng đăng nhập bằng Google, chỉ cần bấm "Đăng nhập với Google".')}
               className="font-medium text-charcoal-900 hover:text-honey-600 transition-colors underline underline-offset-4"
             >
               Quên mật khẩu?
