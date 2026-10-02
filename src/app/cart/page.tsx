@@ -45,8 +45,11 @@ export default function CartPage() {
   );
   const previousKeys = useRef<string[]>([]);
   useEffect(() => {
-    setSelectedKeys((current) => reconcileCartSelection(previousKeys.current, allKeys, current));
+    // Đọc danh sách cũ ngay tại đây: hàm cập nhật chạy trễ hơn, lúc đó ref đã trỏ sang danh sách mới và món vừa nạp
+    // từ localStorage (mở thẳng /cart hoặc tải lại trang) bị coi là "đã bỏ chọn".
+    const previous = previousKeys.current;
     previousKeys.current = allKeys;
+    setSelectedKeys((current) => reconcileCartSelection(previous, allKeys, current));
   }, [allKeys]);
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selectedKeys.has(k));
   const someSelected = allKeys.some((k) => selectedKeys.has(k));
