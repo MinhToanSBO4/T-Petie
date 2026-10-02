@@ -100,6 +100,11 @@ function checkDeployEnvironment(env, { production = false, vercel = false } = {}
 
   if (has('GOOGLE_CLIENT_ID') !== has('GOOGLE_CLIENT_SECRET')) {
     warnings.push('Đăng nhập Google cần đủ cả GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET.');
+  } else if (production && !has('GOOGLE_CLIENT_ID')) {
+    warnings.push('Chưa có GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET: nút "Đăng nhập với Google" bị ẩn. Thêm trong Vercel → Settings → Environment Variables rồi deploy lại.');
+  }
+  if (has('GOOGLE_CLIENT_ID') && !/\.apps\.googleusercontent\.com$/.test(env.GOOGLE_CLIENT_ID)) {
+    warnings.push('GOOGLE_CLIENT_ID phải có dạng ….apps.googleusercontent.com (Google Cloud → Clients → Client ID).');
   }
   return { errors, warnings };
 }

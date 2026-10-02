@@ -11,6 +11,7 @@ const production = {
   CLOUDINARY_CLOUD_NAME: 'demo', CLOUDINARY_API_KEY: 'key', CLOUDINARY_API_SECRET: 'secret',
   CRON_SECRET: 'c'.repeat(32),
   NEXT_PUBLIC_GA4_ID: 'G-ABC123XYZ9',
+  GOOGLE_CLIENT_ID: '123-abc.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
 };
 const check = (env, options = { production: true, vercel: true }) => checkDeployEnvironment(env, options);
 
@@ -48,4 +49,10 @@ test('an invalid GA4 measurement ID only warns', () => {
   assert.equal(check({ ...production, NEXT_PUBLIC_GA4_ID: 'UA-12345-1' }).warnings.length, 1);
   const { NEXT_PUBLIC_GA4_ID, ...withoutAnalytics } = production;
   assert.deepEqual(check(withoutAnalytics), { errors: [], warnings: [] });
+});
+
+test('a production build without Google sign-in warns that the Google button is hidden', () => {
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ...withoutGoogle } = production;
+  assert.match(check(withoutGoogle).warnings.join(' '), /Google/);
+  assert.match(check({ ...production, GOOGLE_CLIENT_ID: 'abc' }).warnings.join(' '), /googleusercontent/);
 });
