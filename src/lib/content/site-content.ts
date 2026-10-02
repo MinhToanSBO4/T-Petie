@@ -62,47 +62,56 @@ export const CATEGORY_PAGE_LABELS: Record<(typeof CATEGORY_PAGE_IDS)[number], { 
   sets: { label: 'Set đồ', href: '/girls/sets', breadcrumb: 'Set Bộ Phối Sẵn' },
 };
 
+/** Lỗi nhập liệu nội dung trang: thông báo nói rõ ô nào sai để hiện nguyên văn cho người sửa. */
+export class SiteContentError extends Error {}
+
 function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid site content');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SiteContentError('Dữ liệu nội dung không đúng cấu trúc');
   return value as Record<string, unknown>;
 }
 
-function contentText(value: unknown, max: number): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error('Invalid site content text');
+function contentText(value: unknown, max: number, label = 'Một ô bắt buộc'): string {
+  if (typeof value !== 'string' || !value.trim()) throw new SiteContentError(`${label} đang để trống`);
+  if (value.length > max) throw new SiteContentError(`${label} dài quá ${max} ký tự`);
   return value;
 }
 
 /** Trường văn bản được phép để trống (ví dụ: khối chưa cấu hình thì ẩn đi). */
-function optionalText(value: unknown, max: number): string {
+function optionalText(value: unknown, max: number, label = 'Một ô'): string {
   if (value === undefined || value === null) return '';
-  if (typeof value !== 'string' || value.length > max) throw new Error('Invalid site content text');
+  if (typeof value !== 'string') throw new SiteContentError(`${label} không hợp lệ`);
+  if (value.length > max) throw new SiteContentError(`${label} dài quá ${max} ký tự`);
   return value.trim();
 }
 
-/** Liên kết nội bộ hoặc https; chặn mọi scheme nguy hiểm. */
-function contentHref(value: unknown, max = 300): string {
-  const href = contentText(value, max);
-  if (href.startsWith('/') && !href.startsWith('//')) return href;
+/**
+ * Liên kết nội bộ hoặc https; chặn mọi scheme nguy hiểm. "/\\evil.com" bị chặn vì trình duyệt coi "/\\" như "//"
+ * (liên kết ra trang ngoài trá hình liên kết nội bộ).
+ */
+function contentHref(value: unknown, max = 300, label = 'Liên kết'): string {
+  const href = contentText(value, max, label).trim();
+  if (href.startsWith('/') && !/^\/[\\/]/.test(href) && !/[\s\\]/.test(href)) return href;
   try {
     const url = new URL(href);
     if (url.protocol === 'https:') return url.toString();
   } catch { /* invalid URL */ }
-  throw new Error('Invalid site content link');
+  throw new SiteContentError(`${label} phải bắt đầu bằng "/" (trang trong shop) hoặc "https://"`);
 }
 
 /** Ảnh phải nằm trong thư viện media trên Cloudinary; không chấp nhận đường dẫn tĩnh. */
-function imageUrl(value: unknown): string {
-  const src = contentText(value, 500);
+function imageUrl(value: unknown, label = 'Ảnh'): string {
+  if (typeof value !== 'string' || !value.trim()) throw new SiteContentError(`${label} chưa có ảnh: tải ảnh lên hoặc bỏ mục này`);
+  const src = contentText(value, 500, label);
   try {
     const url = new URL(src);
     if (url.protocol === 'https:' && url.hostname === 'res.cloudinary.com') return url.toString();
   } catch { /* invalid URL */ }
-  throw new Error('Invalid site content image');
+  throw new SiteContentError(`${label} phải là ảnh trong thư viện media`);
 }
 
-function optionalImageUrl(value: unknown): string {
+function optionalImageUrl(value: unknown, label = 'Ảnh'): string {
   if (value === undefined || value === null || value === '') return '';
-  return imageUrl(value);
+  return imageUrl(value, label);
 }
 
 function linkSection(value: unknown, titleMax = 120): LinkSection {
@@ -121,18 +130,20 @@ function contentIds(value: unknown, max = 12): string[] {
 }
 
 export function parseHomeFeatures(value: unknown): HomeFeature[] {
-  if (!Array.isArray(value) || value.length > 12) throw new Error('Invalid home features');
-  const features = value.map((item): HomeFeature => {
+  if (!Array.isArray(value)) throw new SiteContentError('Danh sách ảnh chủ đề không hợp lệ');
+  if (value.length > 12) throw new SiteContentError('Tối đa 12 ảnh chủ đề');
+  const features = value.map((item, index): HomeFeature => {
     const row = record(item);
-    const objectPosition = contentText(row.objectPosition, 40);
+    const label = `Ảnh chủ đề ${index + 1}`;
+    const objectPosition = contentText(row.objectPosition, 40, `${label}: vị trí ảnh`);
     if (!/^(?:left|center|right|\d{1,3}%)(?: (?:top|center|bottom|\d{1,3}%))?$/.test(objectPosition)) {
-      throw new Error('Invalid feature image position');
+      throw new SiteContentError(`${label}: vị trí ảnh không hợp lệ`);
     }
-    return { id: contentText(row.id, 60), src: imageUrl(row.src),
-      icon: contentText(row.icon, 12), title: contentText(row.title, 100),
-      description: contentText(row.description, 500), objectPosition };
+    return { id: contentText(row.id, 60, label), src: imageUrl(row.src, label),
+      icon: contentText(row.icon, 12, `${label}: biểu tượng`), title: contentText(row.title, 100, `${label}: tiêu đề`),
+      description: contentText(row.description, 500, `${label}: mô tả`), objectPosition };
   });
-  if (new Set(features.map((item) => item.id)).size !== features.length) throw new Error('Duplicate feature id');
+  if (new Set(features.map((item) => item.id)).size !== features.length) throw new SiteContentError('Có hai ảnh chủ đề trùng mã');
   return features;
 }
 
@@ -149,13 +160,14 @@ export function parseHomeHero(value: unknown): HomeHero {
   const rawSlides = (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).slides))
     ? (value as Record<string, unknown>).slides as unknown[] : [];
   const slides = rawSlides
-    ? rawSlides.map((item): HomeHeroSlide => {
+    ? rawSlides.map((item, index): HomeHeroSlide => {
       const slide = record(item);
-      return { id: contentText(slide.id, 80), imageUrl: imageUrl(slide.imageUrl), imageAlt: optionalText(slide.imageAlt, 200),
+      return { id: contentText(slide.id, 80), imageUrl: imageUrl(slide.imageUrl, `Ảnh Hero ${index + 1}`), imageAlt: optionalText(slide.imageAlt, 200),
         icon: optionalText(slide.icon, 12), title: optionalText(slide.title, 160), description: optionalText(slide.description, 500),
         badge: optionalText(slide.badge, 60), href: slide.href ? contentHref(slide.href) : '', objectPosition: optionalText(slide.objectPosition, 40) || 'center center' };
     }) : [];
-  if (slides.length > 12 || new Set(slides.map((slide) => slide.id)).size !== slides.length) throw new Error('Invalid hero slides');
+  if (slides.length > 12) throw new SiteContentError('Tối đa 12 ảnh Hero');
+  if (new Set(slides.map((slide) => slide.id)).size !== slides.length) throw new SiteContentError('Có hai ảnh Hero trùng mã');
   return {
     shopLabel: optionalText(row.shopLabel, 60), shopHref: row.shopHref ? contentHref(row.shopHref) : '',
     lookbookLabel: optionalText(row.lookbookLabel, 60), lookbookHref: row.lookbookHref ? contentHref(row.lookbookHref) : '',
@@ -195,7 +207,7 @@ export function parseContactInfo(value: unknown): ContactInfo {
   const row = record(value);
   const hotline = optionalText(row.hotline, 20);
   // Chỉ nhận số, khoảng trắng, dấu chấm/gạch và dấu + đầu số để tạo được liên kết gọi điện.
-  if (hotline && !/^\+?\d[\d .-]{5,18}$/.test(hotline)) throw new Error('Invalid site content phone');
+  if (hotline && !/^\+?\d[\d .-]{5,18}$/.test(hotline)) throw new SiteContentError('Số hotline chỉ gồm chữ số, khoảng trắng, dấu chấm hoặc gạch');
   return { hotline, hotlineHours: optionalText(row.hotlineHours, 60),
     zaloUrl: optionalHref(row.zaloUrl), zaloLabel: optionalText(row.zaloLabel, 80),
     messengerUrl: optionalHref(row.messengerUrl), facebookUrl: optionalHref(row.facebookUrl),
@@ -249,17 +261,18 @@ export function parseTestimonialsSection(value: unknown): TestimonialsSectionCon
 
 export function parseSizeGuide(value: unknown): SizeGuide {
   const data = record(value);
-  const rows = (input: unknown): SizeGuideRow[] => {
-    if (!Array.isArray(input) || input.length > 30) throw new Error('Invalid size guide rows');
-    return input.map((item) => {
+  const rows = (input: unknown, table: string): SizeGuideRow[] => {
+    if (!Array.isArray(input) || input.length > 30) throw new SiteContentError(`${table}: tối đa 30 dòng`);
+    return input.map((item, index) => {
       const row = record(item);
-      return { size: contentText(row.size, 50), age: contentText(row.age, 100),
-        weight: contentText(row.weight, 100), height: contentText(row.height, 100) };
+      const label = `${table}, dòng ${index + 1}`;
+      return { size: contentText(row.size, 100, `${label}: size`), age: contentText(row.age, 100, `${label}: độ tuổi`),
+        weight: contentText(row.weight, 100, `${label}: cân nặng`), height: contentText(row.height, 100, `${label}: chiều cao`) };
     });
   };
-  if (!Array.isArray(data.tips) || data.tips.length > 20) throw new Error('Invalid size guide tips');
-  return { baby: rows(data.baby), kids: rows(data.kids),
-    tips: data.tips.map((tip) => contentText(tip, 500)) };
+  if (!Array.isArray(data.tips) || data.tips.length > 20) throw new SiteContentError('Tối đa 20 lời khuyên chọn size');
+  return { baby: rows(data.baby, 'Bảng size sơ sinh'), kids: rows(data.kids, 'Bảng size bé lớn'),
+    tips: data.tips.map((tip, index) => contentText(tip, 500, `Lời khuyên ${index + 1}`)) };
 }
 
 /** Bảng parser theo từng khóa nội dung, dùng chung cho API quản trị và lớp đọc dữ liệu. */

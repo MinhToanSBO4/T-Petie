@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { markAdminPagesStale } from '@/client/admin-freshness';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
@@ -162,17 +163,19 @@ function EditableSection({ label, active, onEdit, children, style }: {
 }
 
 /** Khối không nằm trên trang chủ: giữ bản xem trước gọn và nút Sửa. */
-function SectionShell({ title, hint, editing, onToggle, preview, children }: {
+function SectionShell({ title, hint, editing, onToggle, preview, children, lockedReason }: {
   title: string; hint: string; editing: boolean; onToggle: () => void;
   preview: React.ReactNode; children: React.ReactNode;
+  /** Có giá trị thì khối chỉ xem, không có nút sửa (ví dụ nhân viên với thông tin liên hệ). */
+  lockedReason?: string;
 }) {
   return <section className={`rounded-2xl border bg-white p-5 sm:p-6 ${editing ? 'border-honey-500 ring-2 ring-honey-200' : 'border-cream-200'}`}>
     <header className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-lg font-bold">{title}</h2><p className="text-xs text-charcoal-500">{hint}</p></div>
-      <button type="button" onClick={onToggle}
+      <div><h2 className="text-lg font-bold">{title}</h2><p className="text-xs text-charcoal-500">{lockedReason || hint}</p></div>
+      {!lockedReason && <button type="button" onClick={onToggle}
         className={`min-h-11 rounded-xl px-4 text-sm font-bold ${editing ? 'border border-cream-300' : 'bg-honey-600 text-white'}`}>
         {editing ? 'Đóng' : 'Sửa'}
-      </button>
+      </button>}
     </header>
     <div className="mt-4 rounded-xl border border-dashed border-cream-300 bg-cream-50 p-3">{preview}</div>
     {editing && <div className="mt-4 space-y-4">{children}</div>}
@@ -209,7 +212,9 @@ function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: 
   </section>;
 }
 
-export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal }: {
+export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal, canEditContact = true }: {
+  /** Hotline, Zalo, Messenger: chỉ quản trị viên được đổi (đổi sang tài khoản lạ là lừa được khách). */
+  canEditContact?: boolean;
   initialContent: Record<string, unknown>;
   collections: Collection[];
   products: ProductOption[];
@@ -242,6 +247,7 @@ export function SiteContentManager({ initialContent, collections, products, best
     setDirty((current) => current.includes(key) ? current : [...current, key]);
   };
   const toggle = (key: ContentKey) => setEditing((current) => current === key ? null : key);
+  useUnsavedChangesGuard(dirty.length > 0 || saving);
 
   const saveAll = async () => {
     if (dirty.length === 0) return;
@@ -478,7 +484,8 @@ export function SiteContentManager({ initialContent, collections, products, best
       </SectionShell>
 
       <SectionShell title="Liên hệ & mạng xã hội" hint="Hiển thị ở chân trang, nút chat Messenger và trang chính sách. Để trống mục nào thì mục đó được ẩn."
-        editing={editing === 'contact_info'} onToggle={() => toggle('contact_info')}
+        editing={canEditContact && editing === 'contact_info'} onToggle={() => toggle('contact_info')}
+        lockedReason={canEditContact ? undefined : 'Chỉ quản trị viên được sửa hotline và các kênh liên hệ.'}
         preview={<div className="space-y-1 text-sm text-charcoal-700">
           <p>Hotline: <strong>{draft.contact_info.hotline || 'chưa có'}</strong>{draft.contact_info.hotlineHours ? ` (${draft.contact_info.hotlineHours})` : ''}</p>
           <p className="text-xs text-charcoal-500">{[draft.contact_info.zaloUrl && 'Zalo', draft.contact_info.messengerUrl && 'Messenger',

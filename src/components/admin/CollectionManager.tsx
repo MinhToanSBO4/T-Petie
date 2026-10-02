@@ -7,6 +7,8 @@ import { ColorPicker } from '@/components/admin/ColorPicker';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { ACCENT_COLOR_PRESETS, THEME_COLOR_PRESETS } from '@/lib/content/collection-colors';
 import type { AdminCollection } from '@/types/admin-content';
+import { readJson } from '@/client/http';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; collection: AdminCollection };
 
@@ -77,6 +79,13 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [initialDraft] = useState(draft);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initialDraft);
+  useUnsavedChangesGuard(dirty && !busy);
+  const leave = () => {
+    if (dirty && !window.confirm('Có thay đổi chưa lưu. Rời trang và bỏ các thay đổi đó?')) return;
+    onDone();
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -86,7 +95,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
         method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...draft, sortOrder: Number(draft.sortOrder) }),
       });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được bộ sưu tập');
       onDone(editing ? 'Đã lưu bộ sưu tập.' : `Đã tạo bộ sưu tập ${draft.title}.`);
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
@@ -96,7 +105,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
   return <form onSubmit={submit} className="space-y-5 rounded-2xl border border-cream-200 bg-white p-5">
     <header className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-lg font-bold">{editing ? 'Sửa bộ sưu tập' : 'Thêm bộ sưu tập mới'}</h2>
-      <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+      <button type="button" onClick={leave} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 

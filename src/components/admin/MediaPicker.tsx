@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { BANNER_PHOTO_OPTIONS } from '@/client/image-compress';
+import { uploadMedia } from '@/client/media-upload';
 
 export type MediaAssetRow = {
   id: string; url: string; publicId: string | null; altText: string | null;
   width: number | null; height: number | null; createdAt: string;
 };
 
-/** Tải một tệp ảnh lên thư viện media, trả về URL để lưu vào cấu hình. */
+/** Nén (ảnh lớn) rồi tải một tệp lên thư viện media, trả về URL để lưu vào cấu hình. */
 async function uploadMediaFile(file: File, altText: string): Promise<string> {
-  const body = new FormData();
-  body.set('file', file);
-  if (altText) body.set('altText', altText);
-  const response = await fetch('/api/admin/media', { method: 'POST', body });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Tải ảnh thất bại');
-  return data.asset.url as string;
+  return (await uploadMedia(file, BANNER_PHOTO_OPTIONS, altText)).url;
 }
 
 type MediaPickerProps = {
@@ -42,13 +38,17 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
   const [error, setError] = useState('');
 
   const fail = useCallback((message: string) => { setError(message); onError?.(message); }, [onError]);
+  // Bên gọi dựng onChange từ form ở lần render hiện tại. Ảnh tải mất vài giây: gọi onChange cũ sẽ ghi đè những gì
+  // người dùng gõ trong lúc chờ (tiêu đề, mô tả…). Luôn gọi onChange của lần render mới nhất.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const upload = useCallback(async (file: File) => {
     setBusy(true); setError('');
-    try { onChange(await uploadMediaFile(file, altText || label)); }
+    try { const url = await uploadMediaFile(file, altText || label); onChangeRef.current(url); }
     catch (uploadError) { fail(uploadError instanceof Error ? uploadError.message : 'Tải ảnh thất bại'); }
     finally { setBusy(false); }
-  }, [altText, fail, label, onChange]);
+  }, [altText, fail, label]);
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -96,10 +96,10 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
             <button type="button" onClick={() => setLibraryOpen((open) => !open)}
               className="min-h-11 rounded-xl border border-cream-300 bg-white px-4 text-sm font-semibold">Chọn từ thư viện</button>
           </div>
-          <p className="text-xs text-charcoal-500">JPEG, PNG, WebP, AVIF · tối đa 5 MB</p>
+          <p className="text-xs text-charcoal-500">JPEG, PNG, WebP · ảnh lớn được tự nén</p>
         </div>
       )}
-      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden"
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" className="hidden"
         onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
     </div>
     {busy && value && <p className="text-xs text-charcoal-500">Đang tải ảnh…</p>}

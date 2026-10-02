@@ -58,3 +58,13 @@ test('home block image fields only accept images from the managed media library'
   }).bestSellers.imageUrl, imageUrl);
   assert.throws(() => parseHomeHero({ shopLabel: '', shopHref: '', lookbookLabel: '', lookbookHref: '', defaultBadge: '', imageUrl: 'https://example.test/image.jpg', imageAlt: '' }));
 });
+
+test('links that browsers read as off-site are rejected, and errors name the field', () => {
+  const base = { shopLabel: '', shopHref: '', lookbookLabel: '', lookbookHref: '', defaultBadge: '', imageUrl: '', imageAlt: '' };
+  assert.equal(parseHomeHero({ ...base, shopHref: '/girls' }).shopHref, '/girls');
+  assert.throws(() => parseHomeHero({ ...base, shopHref: '/\\evil.example' }), /Liên kết/);
+  assert.throws(() => parseHomeHero({ ...base, shopHref: '//evil.example' }), /Liên kết/);
+  assert.throws(() => parseHomeHero({ ...base, slides: [{ id: 'a', imageUrl: '' }] }), /Ảnh Hero 1 chưa có ảnh/);
+  const row = { size: 'Size 90', age: '1 tuổi', weight: '10kg', height: '' };
+  assert.throws(() => parseSizeGuide({ baby: [], kids: [row], tips: [] }), /Bảng size bé lớn, dòng 1: chiều cao đang để trống/);
+});

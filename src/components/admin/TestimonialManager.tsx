@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronsUp, GripVertical, ImagePlus, Images, ListOrdered, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { MediaPicker, type MediaAssetRow } from '@/components/admin/MediaPicker';
-import { compressImage, SCREENSHOT_OPTIONS } from '@/client/image-compress';
+import { SCREENSHOT_OPTIONS } from '@/client/image-compress';
+import { uploadMedia } from '@/client/media-upload';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { FEEDBACK_BATCH_MAX, FEEDBACK_CAPTION_MAX, HOME_FEEDBACK_LIMIT as HOME_STORY_COUNT } from '@/lib/content/testimonial-input';
 import type { AdminTestimonial } from '@/types/admin-content';
@@ -33,14 +34,7 @@ async function fetchTestimonials(query: TableQuery) {
 
 /** Tải một ảnh chụp màn hình lên thư viện media (đã nén nếu ảnh quá nặng), trả về URL. */
 async function uploadScreenshot(file: File) {
-  const prepared = await compressImage(file, SCREENSHOT_OPTIONS).catch(() => file);
-  const body = new FormData();
-  body.set('file', prepared);
-  body.set('altText', 'Feedback khách hàng');
-  const response = await fetch('/api/admin/media', { method: 'POST', body });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Tải ảnh thất bại');
-  return data.asset.url as string;
+  return (await uploadMedia(file, SCREENSHOT_OPTIONS, 'Feedback khách hàng')).url;
 }
 
 export function TestimonialManager({ products }: { products: FeedbackProductOption[] }) {
@@ -223,7 +217,7 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
     // Tải lần lượt từng ảnh: mỗi request nhỏ, có tiến độ, một ảnh lỗi không làm hỏng cả loạt.
     for (const [index, file] of accepted.entries()) {
       try { addUrls([await uploadScreenshot(file)]); }
-      catch (uploadError) { failures.push(`${file.name}: ${uploadError instanceof Error ? uploadError.message : 'lỗi'}`); }
+      catch (uploadError) { failures.push(uploadError instanceof Error ? uploadError.message : `${file.name}: lỗi`); }
       setProgress({ done: index + 1, total: accepted.length });
     }
     setProgress(null);

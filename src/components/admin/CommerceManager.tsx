@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
+import { readJson } from '@/client/http';
 import { markAdminPagesStale } from '@/client/admin-freshness';
 
 type Settings = { shippingFee: number; freeShippingThreshold: number };
@@ -26,6 +27,13 @@ const toDateInput = (value: string | null) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
+/** Giá trị ô datetime-local (giờ của trình duyệt) thành mốc ISO có múi giờ, để máy chủ chạy UTC không đọc lệch. */
+const toIsoDate = (value: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+};
+
 const emptyDraft = (): CouponDraft => ({ code: '', type: 'FIXED', value: '10000', minSubtotal: '0',
   active: true, requiresLogin: false, usageLimit: '', startsAt: '', expiresAt: '' });
 
@@ -42,7 +50,7 @@ const COUPON_FILTERS: TableFilter[] = [
 
 async function fetchCoupons(query: TableQuery) {
   const response = await fetch(`/api/admin/coupons?${tableParams(query)}`, { cache: 'no-store' });
-  const data = await response.json();
+  const data = await readJson(response);
   if (!response.ok) throw new Error(data.error || 'Không tải được mã giảm giá');
   // Mã giảm giá dùng chính mã làm khóa dòng cho bảng.
   const items = (data.items as Omit<Coupon, 'id'>[]).map((coupon) => ({ ...coupon, id: coupon.code }));
@@ -63,7 +71,7 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
     try {
       const response = await fetch('/api/admin/commerce', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'settings', ...settings }) });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được cấu hình');
       setMessage('Đã lưu phí giao hàng.');
       setConfigured(true);
@@ -78,11 +86,11 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
     setBusy(true); setMessage(''); setError('');
     try {
       const response = await fetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: draft.code, type: draft.type, value: Number(draft.value),
+        body: JSON.stringify({ mode: isNew ? 'create' : 'update', code: draft.code, type: draft.type, value: Number(draft.value),
           minSubtotal: Number(draft.minSubtotal), active: draft.active, requiresLogin: draft.requiresLogin,
           usageLimit: draft.usageLimit === '' ? null : Number(draft.usageLimit),
-          startsAt: draft.startsAt || null, expiresAt: draft.expiresAt || null }) });
-      const data = await response.json();
+          startsAt: toIsoDate(draft.startsAt), expiresAt: toIsoDate(draft.expiresAt) }) });
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được mã giảm giá');
       setMessage(isNew ? `Đã thêm mã ${draft.code}.` : `Đã lưu mã ${draft.code}.`);
       setEditing(null);
@@ -96,7 +104,7 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
     setBusy(true); setMessage(''); setError('');
     try {
       const response = await fetch(`/api/admin/coupons?code=${encodeURIComponent(code)}`, { method: 'DELETE' });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không xóa được mã giảm giá');
       setMessage(data.archived ? 'Mã đã được dùng cho đơn hàng nên chuyển sang ngừng hoạt động.' : 'Đã xóa mã giảm giá.');
       setEditing(null);
