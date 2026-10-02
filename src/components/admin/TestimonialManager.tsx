@@ -1,18 +1,17 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ImagePlus, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, ChevronsUp, GripVertical, ImagePlus, Images, ListOrdered, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
-import { MediaPicker } from '@/components/admin/MediaPicker';
+import { MediaPicker, type MediaAssetRow } from '@/components/admin/MediaPicker';
 import { compressImage, SCREENSHOT_OPTIONS } from '@/client/image-compress';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
-import { FEEDBACK_BATCH_MAX, FEEDBACK_CAPTION_MAX } from '@/lib/content/testimonial-input';
+import { FEEDBACK_BATCH_MAX, FEEDBACK_CAPTION_MAX, HOME_FEEDBACK_LIMIT as HOME_STORY_COUNT } from '@/lib/content/testimonial-input';
 import type { AdminTestimonial } from '@/types/admin-content';
 
 export type FeedbackProductOption = { id: string; name: string; thumbnail: string };
-type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; testimonial: AdminTestimonial };
+type View = { mode: 'list' } | { mode: 'create' } | { mode: 'order' } | { mode: 'edit'; testimonial: AdminTestimonial };
 type Draft = { key: string; imageUrl: string; caption: string; productId: string };
-
 const field = 'mt-1 block w-full rounded-xl border p-3';
 const normalize = (text: string) => text.toLocaleLowerCase('vi-VN').normalize('NFD')
   .replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
@@ -20,7 +19,7 @@ const normalize = (text: string) => text.toLocaleLowerCase('vi-VN').normalize('N
 async function fetchTestimonials(query: TableQuery) {
   const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
   const response = await fetch(`/api/admin/testimonials?${params}`, { cache: 'no-store' });
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Không tải được feedback');
   return { items: data.items as AdminTestimonial[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
@@ -44,6 +43,7 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
   const back = (text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); };
 
   if (view.mode === 'create') return <FeedbackUploader products={products} onDone={back} />;
+  if (view.mode === 'order') return <FeedbackOrderEditor onDone={back} />;
   if (view.mode === 'edit') return <FeedbackEditor testimonial={view.testimonial} products={products} onDone={back} />;
 
   const columns: Column<AdminTestimonial>[] = [
@@ -53,7 +53,6 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
         <p className="line-clamp-2 text-sm font-semibold text-charcoal-900">{row.caption || '—'}</p>
         {row.productName && <p className="truncate text-xs text-charcoal-500">Sản phẩm: {row.productName}</p>}
       </div> },
-    { key: 'order', header: 'Thứ tự', render: (row) => row.sortOrder },
     { key: 'consent', header: 'Đồng ý công bố', render: (row) => <span className={`rounded-full px-3 py-1 text-xs font-bold ${
       row.consentConfirmed ? 'bg-sage-100 text-sage-800' : 'bg-cream-200 text-charcoal-600'}`}>
       {row.consentConfirmed ? 'Đã xác nhận' : 'Chưa xác nhận'}</span> },
@@ -69,12 +68,17 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
       filters={[{ value: 'published', label: 'Đang công bố' }, { value: 'draft', label: 'Bản nháp' }]}
       emptyText="Chưa có feedback nào. Bấm “Thêm feedback” để tải ảnh feedback của khách."
       onRowClick={(row) => setView({ mode: 'edit', testimonial: row })}
-      toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
-        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">
-        <ImagePlus className="size-4" aria-hidden />Thêm feedback</button>} />
+      toolbar={<>
+        <button type="button" onClick={() => setView({ mode: 'order' })}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-honey-300 bg-white px-4 text-sm font-semibold text-honey-800 hover:bg-honey-50">
+          <ListOrdered className="size-4" aria-hidden />Sắp xếp hiển thị</button>
+        <button type="button" onClick={() => setView({ mode: 'create' })}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">
+          <ImagePlus className="size-4" aria-hidden />Thêm feedback</button>
+      </>} />
     <p className="text-xs text-charcoal-500">
-      Feedback là ảnh khách khen shop (ảnh chụp màn hình, ảnh khách gửi...). Trang chủ hiện 12 ảnh đầu dạng story, trang /feedback hiện toàn bộ
-      dạng album. Chỉ ảnh đã xác nhận khách đồng ý và bật công bố mới hiển thị.
+      Danh sách xếp đúng thứ tự trên website. Trang chủ hiện {HOME_STORY_COUNT} ảnh đầu dạng story, trang /feedback hiện toàn bộ dạng album.
+      Feedback mới thêm hiện trước; bấm “Sắp xếp hiển thị” để kéo-thả đổi vị trí. Chỉ ảnh đã xác nhận khách đồng ý và bật công bố mới hiển thị.
     </p>
   </div>;
 }
@@ -88,7 +92,7 @@ function ProductPicker({ products, value, onChange }: {
   const selected = products.find((product) => product.id === value);
   if (selected && !open) {
     return <div className="mt-1 flex items-center gap-2 rounded-xl border border-cream-300 p-2">
-      {selected.thumbnail && <img src={selected.thumbnail} alt="" className="size-9 rounded-lg object-cover" />}
+      {selected.thumbnail && <img src={cloudinaryImage(selected.thumbnail, { width: 72 })} alt="" className="size-9 rounded-lg object-cover" />}
       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{selected.name}</span>
       <button type="button" onClick={() => setOpen(true)} className="min-h-9 rounded-lg px-2 text-xs font-semibold text-honey-700">Đổi</button>
       <button type="button" onClick={() => onChange('')} aria-label="Bỏ sản phẩm liên quan" className="grid size-9 place-items-center rounded-lg text-charcoal-500 hover:text-red-700">
@@ -105,7 +109,7 @@ function ProductPicker({ products, value, onChange }: {
         <button type="button" onMouseDown={(event) => event.preventDefault()}
           onClick={() => { onChange(product.id); setOpen(false); setQuery(''); }}
           className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-cream-50">
-          {product.thumbnail && <img src={product.thumbnail} alt="" className="size-9 rounded-lg object-cover" />}
+          {product.thumbnail && <img src={cloudinaryImage(product.thumbnail, { width: 72 })} alt="" className="size-9 rounded-lg object-cover" />}
           <span className="truncate text-sm">{product.name}</span>
         </button>
       </li>)}
@@ -114,9 +118,9 @@ function ProductPicker({ products, value, onChange }: {
   </div>;
 }
 
-function PublishSettings({ consent, publish, sortOrder, onChange }: {
-  consent: boolean; publish: boolean; sortOrder: string;
-  onChange: (next: { consent?: boolean; publish?: boolean; sortOrder?: string }) => void;
+function PublishSettings({ consent, publish, onChange }: {
+  consent: boolean; publish: boolean;
+  onChange: (next: { consent?: boolean; publish?: boolean }) => void;
 }) {
   return <div className="space-y-3 rounded-2xl border border-cream-200 bg-cream-50 p-4">
     <p className="flex items-start gap-2 text-xs text-charcoal-700">
@@ -135,22 +139,68 @@ function PublishSettings({ consent, publish, sortOrder, onChange }: {
           onChange={(event) => onChange({ publish: event.target.checked })} />
         Công bố trên website
       </label>
-      <label className="flex items-center gap-2">Thứ tự hiển thị
-        <input type="number" min="0" max="999" value={sortOrder} onChange={(event) => onChange({ sortOrder: event.target.value })}
-          className="w-24 rounded-xl border p-2" />
-      </label>
     </div>
-    <p className="text-xs text-charcoal-500">Số nhỏ hiện trước; cùng thứ tự thì ảnh mới thêm hiện trước.</p>
   </div>;
 }
 
-/** Thêm nhiều ảnh feedback một lần: kéo-thả cả loạt ảnh chụp màn hình, ghi chú từng ảnh rồi lưu. */
+/** Chọn nhiều ảnh có sẵn trong thư viện media cùng lúc. */
+function LibraryPicker({ room, exclude, onPick, onClose }: {
+  room: number; exclude: string[]; onPick: (urls: string[]) => void; onClose: () => void;
+}) {
+  const [assets, setAssets] = useState<MediaAssetRow[] | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/media', { cache: 'no-store', signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được thư viện ảnh')))
+      .then((data) => setAssets(data.assets || []))
+      .catch((libraryError) => { if (libraryError.name !== 'AbortError') setError(libraryError.message); });
+    return () => controller.abort();
+  }, []);
+  const available = (assets || []).filter((asset) => !exclude.includes(asset.url));
+  const toggle = (url: string) => setPicked((current) => current.includes(url)
+    ? current.filter((item) => item !== url) : current.length < room ? [...current, url] : current);
+
+  return <div className="w-full space-y-3 rounded-2xl border border-cream-200 bg-white p-3 text-left">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm font-semibold text-charcoal-800">Chọn ảnh trong thư viện <span className="font-normal text-charcoal-500">· tối đa {room} ảnh</span></p>
+      <button type="button" onClick={onClose} aria-label="Đóng thư viện" className="grid size-9 place-items-center rounded-lg text-charcoal-500 hover:bg-cream-100">
+        <X className="size-4" /></button>
+    </div>
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {!assets && !error && <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">{Array.from({ length: 6 }, (_, index) =>
+      <div key={index} className="aspect-[3/4] rounded-lg shimmer" />)}</div>}
+    {assets && available.length === 0 && <p className="p-3 text-sm text-charcoal-500">Thư viện chưa có ảnh nào khác để chọn.</p>}
+    <div className="grid max-h-80 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
+      {available.map((asset) => {
+        const order = picked.indexOf(asset.url);
+        return <button key={asset.id} type="button" onClick={() => toggle(asset.url)} aria-pressed={order >= 0}
+          title={asset.altText || asset.publicId || ''}
+          className={`relative overflow-hidden rounded-lg border-2 ${order >= 0 ? 'border-honey-500' : 'border-transparent hover:border-honey-200'}`}>
+          <img src={cloudinaryImage(asset.url, { width: 200 })} alt={asset.altText || 'Ảnh thư viện'} className="aspect-[3/4] w-full bg-cream-100 object-cover object-top" />
+          {order >= 0 && <span className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-honey-600 text-xs font-bold text-white">{order + 1}</span>}
+        </button>;
+      })}
+    </div>
+    <div className="flex justify-end gap-2">
+      <button type="button" onClick={onClose} className="min-h-10 rounded-xl px-3 text-sm font-semibold text-charcoal-600 hover:bg-cream-100">Hủy</button>
+      <button type="button" disabled={!picked.length} onClick={() => onPick(picked)}
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-honey-600 px-4 text-sm font-bold text-white disabled:opacity-50">
+        <Check className="size-4" aria-hidden />Thêm {picked.length || ''} ảnh
+      </button>
+    </div>
+  </div>;
+}
+
+/** Thêm nhiều ảnh feedback một lần: kéo-thả cả loạt ảnh chụp màn hình (hoặc chọn trong thư viện), ghi chú từng ảnh rồi lưu. */
 function FeedbackUploader({ products, onDone }: { products: FeedbackProductOption[]; onDone: (message?: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [settings, setSettings] = useState({ consent: false, publish: false, sortOrder: '0' });
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [settings, setSettings] = useState({ consent: false, publish: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const room = FEEDBACK_BATCH_MAX - drafts.length;
@@ -191,11 +241,11 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
     setBusy(true); setError('');
     try {
       const response = await fetch('/api/admin/testimonials', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consentConfirmed: settings.consent, isPublished: settings.publish, sortOrder: Number(settings.sortOrder) || 0,
+        body: JSON.stringify({ consentConfirmed: settings.consent, isPublished: settings.publish,
           items: drafts.map(({ imageUrl, caption, productId }) => ({ imageUrl, caption, productId })) }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Không lưu được feedback');
-      onDone(`Đã thêm ${data.count} feedback${settings.publish ? ' và công bố trên website' : ' (bản nháp)'}.`);
+      onDone(`Đã thêm ${data.count} feedback${settings.publish ? ' và công bố trên website (hiện ở đầu danh sách)' : ' (bản nháp)'}.`);
     } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
@@ -216,16 +266,21 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
         dragging ? 'border-honey-500 bg-honey-50' : 'border-cream-300 bg-cream-50'}`}>
       <Upload className="size-8 text-honey-600" aria-hidden />
       <p className="text-sm text-charcoal-700">Kéo-thả nhiều ảnh vào đây, hoặc</p>
-      <button type="button" disabled={Boolean(progress)} onClick={() => inputRef.current?.click()}
-        className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white disabled:opacity-50">
-        {progress ? `Đang tải ${progress.done}/${progress.total}…` : 'Chọn ảnh từ máy'}
-      </button>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button type="button" disabled={Boolean(progress)} onClick={() => inputRef.current?.click()}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white disabled:opacity-50">
+          <Upload className="size-4" aria-hidden />{progress ? `Đang tải ${progress.done}/${progress.total}…` : 'Chọn ảnh từ máy'}
+        </button>
+        <button type="button" disabled={Boolean(progress)} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cream-300 bg-white px-5 text-sm font-semibold text-charcoal-800 disabled:opacity-50">
+          <Images className="size-4" aria-hidden />Chọn từ thư viện
+        </button>
+      </div>
+      <p className="text-xs text-charcoal-500">JPEG, PNG, WebP, AVIF · ảnh lớn được nén trước khi tải lên</p>
       <input ref={inputRef} type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" className="hidden"
         onChange={(event) => { if (event.target.files) void upload(event.target.files); event.target.value = ''; }} />
-      <div className="w-full max-w-sm text-left">
-        <MediaPicker label="Hoặc chọn một ảnh có sẵn trong thư viện" value="" aspect="square" onError={setError}
-          onChange={(url) => { if (url) addUrls([url]); }} />
-      </div>
+      {libraryOpen && <LibraryPicker room={room} exclude={drafts.map((draft) => draft.imageUrl)}
+        onClose={() => setLibraryOpen(false)} onPick={(urls) => { addUrls(urls); setLibraryOpen(false); }} />}
     </div>}
 
     {drafts.length > 0 && <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -256,8 +311,9 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
     </ol>}
 
     {drafts.length > 0 && <>
-      <PublishSettings consent={settings.consent} publish={settings.publish} sortOrder={settings.sortOrder}
+      <PublishSettings consent={settings.consent} publish={settings.publish}
         onChange={(next) => setSettings((current) => ({ ...current, ...next }))} />
+      <p className="text-xs text-charcoal-500">Các ảnh được thêm vào đầu danh sách theo đúng thứ tự trên (ảnh 1 hiện trước).</p>
       <button type="button" disabled={busy || Boolean(progress)} onClick={() => void save()}
         className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
         {busy ? 'Đang lưu…' : `Lưu ${drafts.length} feedback`}
@@ -266,13 +322,100 @@ function FeedbackUploader({ products, onDone }: { products: FeedbackProductOptio
   </div>;
 }
 
-/** Sửa một feedback: đổi ảnh, chú thích, sản phẩm liên quan, thứ tự, trạng thái công bố hoặc xóa. */
+type OrderItem = { id: string; imageUrl: string; caption: string | null };
+
+/**
+ * Sắp xếp feedback đang công bố bằng kéo-thả (máy tính) hoặc nút mũi tên (điện thoại): thấy đúng thứ tự khách nhìn thấy,
+ * 12 ảnh đầu được đánh dấu "Trang chủ". Lưu một lần cho cả danh sách.
+ */
+function FeedbackOrderEditor({ onDone }: { onDone: (message?: string) => void }) {
+  const [items, setItems] = useState<OrderItem[] | null>(null);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [changed, setChanged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/testimonials/order', { cache: 'no-store', signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được danh sách feedback')))
+      .then((data) => setItems(data.items || []))
+      .catch((loadError) => { if (loadError.name !== 'AbortError') setError(loadError.message); });
+    return () => controller.abort();
+  }, []);
+
+  const moveTo = (from: number, to: number) => {
+    if (!items || from === to || to < 0 || to >= items.length) return;
+    const next = [...items];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setItems(next);
+    setChanged(true);
+  };
+
+  const save = async () => {
+    if (!items) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/admin/testimonials/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: items.map((item) => item.id) }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Không lưu được thứ tự');
+      onDone('Đã lưu thứ tự hiển thị feedback.');
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); setBusy(false); }
+  };
+
+  return <div className="space-y-5 rounded-2xl border border-cream-200 bg-white p-5">
+    <header className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 className="text-lg font-bold">Sắp xếp hiển thị</h2>
+        <p className="text-xs text-charcoal-500">Kéo-thả ảnh (hoặc bấm mũi tên) để đổi vị trí. Ảnh 1 hiện đầu tiên; {HOME_STORY_COUNT} ảnh đầu hiện ở trang chủ.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => onDone()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+        <button type="button" disabled={!changed || busy} onClick={() => void save()}
+          className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang lưu…' : 'Lưu thứ tự'}</button>
+      </div>
+    </header>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {!items && !error && <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 6 }, (_, index) =>
+      <div key={index} className="aspect-[9/16] rounded-xl shimmer" />)}</div>}
+    {items && items.length === 0 && <p className="text-sm text-charcoal-500">Chưa có feedback nào đang công bố.</p>}
+    {items && items.length > 0 && <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      {items.map((item, index) => <li key={item.id} draggable
+        onDragStart={(event) => { setDragged(index); event.dataTransfer.effectAllowed = 'move'; }}
+        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+        onDrop={(event) => { event.preventDefault(); if (dragged !== null) moveTo(dragged, index); setDragged(null); }}
+        onDragEnd={() => setDragged(null)}
+        className={`space-y-2 rounded-2xl border p-2 transition-opacity ${dragged === index ? 'opacity-40' : ''} ${
+          index < HOME_STORY_COUNT ? 'border-honey-300 bg-honey-50/40' : 'border-cream-200 bg-white'}`}>
+        <div className="relative cursor-grab active:cursor-grabbing">
+          <img src={cloudinaryImage(item.imageUrl, { width: 240 })} alt={item.caption || `Feedback ${index + 1}`} draggable={false}
+            className="aspect-[9/16] w-full rounded-xl border border-cream-200 bg-cream-100 object-cover object-top" />
+          <span className="absolute left-1.5 top-1.5 grid min-w-7 place-items-center rounded-full bg-charcoal-900/80 px-1.5 py-0.5 text-xs font-bold text-white">{index + 1}</span>
+          {index < HOME_STORY_COUNT && <span className="absolute right-1.5 top-1.5 rounded-full bg-honey-600 px-2 py-0.5 text-[10px] font-bold text-white">Trang chủ</span>}
+          <GripVertical className="absolute bottom-1.5 right-1.5 size-5 rounded bg-white/80 text-charcoal-600" aria-hidden />
+        </div>
+        <p className="line-clamp-1 text-xs text-charcoal-600">{item.caption || '—'}</p>
+        <div className="flex justify-between gap-1">
+          <button type="button" onClick={() => moveTo(index, 0)} disabled={index === 0} aria-label={`Đưa ảnh ${index + 1} lên đầu`}
+            className="grid size-9 place-items-center rounded-lg border border-cream-300 disabled:opacity-40"><ChevronsUp className="size-4" /></button>
+          <button type="button" onClick={() => moveTo(index, index - 1)} disabled={index === 0} aria-label={`Đưa ảnh ${index + 1} lên trước`}
+            className="grid size-9 place-items-center rounded-lg border border-cream-300 disabled:opacity-40"><ArrowLeft className="size-4" /></button>
+          <button type="button" onClick={() => moveTo(index, index + 1)} disabled={index === items.length - 1} aria-label={`Đưa ảnh ${index + 1} ra sau`}
+            className="grid size-9 place-items-center rounded-lg border border-cream-300 disabled:opacity-40"><ArrowRight className="size-4" /></button>
+        </div>
+      </li>)}
+    </ol>}
+  </div>;
+}
+
+/** Sửa một feedback: đổi ảnh, chú thích, sản phẩm liên quan, trạng thái công bố hoặc xóa (vị trí hiển thị giữ nguyên). */
 function FeedbackEditor({ testimonial, products, onDone }: {
   testimonial: AdminTestimonial; products: FeedbackProductOption[]; onDone: (message?: string) => void;
 }) {
   const [draft, setDraft] = useState({ imageUrl: testimonial.imageUrl, caption: testimonial.caption || '',
-    productId: testimonial.productId || '', consent: testimonial.consentConfirmed, publish: testimonial.isPublished,
-    sortOrder: String(testimonial.sortOrder) });
+    productId: testimonial.productId || '', consent: testimonial.consentConfirmed, publish: testimonial.isPublished });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -283,7 +426,7 @@ function FeedbackEditor({ testimonial, products, onDone }: {
     try {
       const response = await fetch(`/api/admin/testimonials/${testimonial.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl: draft.imageUrl, caption: draft.caption, productId: draft.productId,
-          consentConfirmed: draft.consent, isPublished: draft.publish, sortOrder: Number(draft.sortOrder) || 0 }) });
+          consentConfirmed: draft.consent, isPublished: draft.publish }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Không lưu được feedback');
       onDone('Đã lưu feedback.');
@@ -323,8 +466,9 @@ function FeedbackEditor({ testimonial, products, onDone }: {
         <div className="text-sm font-semibold">Sản phẩm được khen
           <ProductPicker products={products} value={draft.productId} onChange={(productId) => setDraft({ ...draft, productId })} />
         </div>
-        <PublishSettings consent={draft.consent} publish={draft.publish} sortOrder={draft.sortOrder}
+        <PublishSettings consent={draft.consent} publish={draft.publish}
           onChange={(next) => setDraft((current) => ({ ...current, ...next }))} />
+        <p className="text-xs text-charcoal-500">Muốn đổi vị trí hiển thị, dùng “Sắp xếp hiển thị” ở danh sách feedback.</p>
         <div className="flex flex-wrap gap-3">
           <button disabled={busy} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
             {busy ? 'Đang lưu…' : 'Lưu feedback'}

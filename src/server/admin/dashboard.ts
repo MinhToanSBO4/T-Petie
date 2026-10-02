@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { prisma } from '@/server/db/client';
+import { table } from '@/server/db/sql';
 import { resolvePeriod, type DashboardRangeKey } from '@/lib/admin/dashboard-range';
 
 /** Ngưỡng tồn kho được coi là sắp hết, giữ đúng quy ước cũ của trang tổng quan. */
@@ -32,7 +33,7 @@ async function loadDashboard(range: DashboardRangeKey): Promise<DashboardData> {
   const period = resolvePeriod(range);
   const format = period.unit === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD';
 
-  // Runtime chỉ có 1 kết nối database, nên gộp số liệu vào ít truy vấn nhất có thể.
+  // Mỗi lượt gọi database tốn thời gian mạng, nên gộp số liệu vào ít truy vấn nhất có thể và chạy song song.
   const [buckets, statusRows, topProducts, sources, lowStockItems, lowStockTotal, recentOrders, pendingNow] = await Promise.all([
     prisma.$queryRaw<{ bucket: string; revenue: bigint; completed: bigint; orders: bigint; cancelled: bigint; is_current: boolean }[]>`
       SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh', ${format}) AS bucket,
@@ -41,7 +42,7 @@ async function loadDashboard(range: DashboardRangeKey): Promise<DashboardData> {
         COUNT(*) FILTER (WHERE "orderStatus" = 'COMPLETED')::bigint AS completed,
         COUNT(*) FILTER (WHERE "orderStatus" <> 'CANCELLED')::bigint AS orders,
         COUNT(*) FILTER (WHERE "orderStatus" = 'CANCELLED')::bigint AS cancelled
-      FROM "orders"
+      FROM ${table('orders')}
       WHERE "createdAt" >= ${iso(period.prevFrom)}::timestamp AND "createdAt" < ${iso(period.to)}::timestamp
         AND ("createdAt" >= ${iso(period.from)}::timestamp OR "createdAt" < ${iso(period.prevTo)}::timestamp)
       GROUP BY 1, 2`,
@@ -49,7 +50,7 @@ async function loadDashboard(range: DashboardRangeKey): Promise<DashboardData> {
       where: { createdAt: { gte: period.from, lt: period.to } } }),
     prisma.$queryRaw<{ productId: string; name: string; quantity: bigint; revenue: bigint }[]>`
       SELECT i."productId", MAX(i."productName") AS name, SUM(i."quantity")::bigint AS quantity, SUM(i."totalPrice")::bigint AS revenue
-      FROM "order_items" i JOIN "orders" o ON o."id" = i."orderId"
+      FROM ${table('order_items')} i JOIN ${table('orders')} o ON o."id" = i."orderId"
       WHERE o."orderStatus" <> 'CANCELLED'
         AND o."createdAt" >= ${iso(period.from)}::timestamp AND o."createdAt" < ${iso(period.to)}::timestamp
       GROUP BY i."productId" ORDER BY revenue DESC LIMIT 5`,

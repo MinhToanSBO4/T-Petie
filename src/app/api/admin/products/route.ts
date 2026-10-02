@@ -2,23 +2,46 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { getStaffSession, requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
+import type { Prisma } from '@prisma/client';
 import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
+import { normalizeText } from '@/lib/catalog/filters';
 import { prisma } from '@/server/db/client';
+import { LOW_STOCK_THRESHOLD } from '@/server/admin/dashboard';
 
 export const dynamic = 'force-dynamic';
+
+/** Bộ lọc của bảng sản phẩm quản trị (truy soát nhanh hàng sắp hết, hết hàng, thiếu ảnh...). */
+const FILTERS: Record<string, Prisma.ProductWhereInput> = {
+  active: { isActive: true },
+  hidden: { isActive: false },
+  'low-stock': { variants: { some: { isActive: true, stock: { gt: 0, lte: LOW_STOCK_THRESHOLD } } } },
+  'out-of-stock': { variants: { none: { isActive: true, stock: { gt: 0 } } } },
+  sale: { isSale: true },
+  'best-seller': { isBestSeller: true },
+  new: { isNewArrival: true },
+  'no-image': { images: { none: {} } },
+};
+
+/**
+ * Mã các sản phẩm khớp từ khóa, không phân biệt dấu ("ao so mi" tìm được "Áo Sơ Mi"). Catalog chỉ vài trăm sản phẩm nên
+ * so khớp trên danh sách tên/mã gọn nhẹ thay vì ILIKE của database (ILIKE vẫn phân biệt dấu).
+ */
+async function matchingProductIds(search: string) {
+  const tokens = normalizeText(search).split(' ').filter(Boolean);
+  const rows = await prisma.product.findMany({ select: { id: true, name: true, sku: true, slug: true } });
+  return rows.filter((row) => {
+    const text = normalizeText(`${row.name} ${row.sku} ${row.slug}`);
+    return tokens.every((token) => text.includes(token));
+  }).map((row) => row.id);
+}
 
 export async function GET(request: Request) {
   if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
   const search = parseSearch(searchParams);
-  const status = searchParams.get('filter') || '';
-  const where = {
-    ...(search ? { OR: [{ name: { contains: search, mode: 'insensitive' as const } },
-      { sku: { contains: search, mode: 'insensitive' as const } },
-      { slug: { contains: search, mode: 'insensitive' as const } }] } : {}),
-    ...(status === 'active' ? { isActive: true } : status === 'hidden' ? { isActive: false } : {}),
-  };
+  const filter = FILTERS[searchParams.get('filter') || ''] ?? {};
+  const where: Prisma.ProductWhereInput = { AND: [filter, ...(search ? [{ id: { in: await matchingProductIds(search) } }] : [])] };
   const [rows, total, collections] = await Promise.all([
     prisma.product.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take,
       include: { images: { orderBy: { sortOrder: 'asc' } }, variants: { orderBy: { size: 'asc' } } } }),

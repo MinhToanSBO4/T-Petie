@@ -32,6 +32,7 @@ import { CustomerStatusBadge } from '@/components/orders/CustomerStatusBadge';
 import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
 import { UserAvatar } from '@/components/layout/UserAvatar';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 export default function UserDashboardPage() {
   return (
@@ -431,7 +432,7 @@ function DashboardContent() {
                   <Link key={order.code} href={`/orders/${order.code}`}
                     className="flex items-center gap-3 rounded-2xl border border-cream-200 p-3 hover:border-honey-300 transition-all">
                     {order.items[0]?.thumbnail
-                      ? <img src={order.items[0].thumbnail} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-200 shrink-0" />
+                      ? <img src={cloudinaryImage(order.items[0].thumbnail, { width: 96 })} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-200 shrink-0" />
                       : <span className="w-12 h-12 rounded-xl bg-cream-100 shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-charcoal-900 truncate">Đơn {order.code}</p>

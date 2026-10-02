@@ -14,12 +14,13 @@ export async function GET(request: Request) {
   const { page, limit, skip, take } = parsePagination(searchParams, 12, 48);
   const search = parseSearch(searchParams);
   const status = searchParams.get('filter') || '';
-  const where = {
-    ...(search ? { OR: [{ caption: { contains: search, mode: 'insensitive' as const } },
-      { product: { name: { contains: search, mode: 'insensitive' as const } } }] } : {}),
-    ...(status === 'published' ? { isPublished: true, consentConfirmed: true }
-      : status === 'draft' ? { OR: [{ isPublished: false }, { consentConfirmed: false }] } : {}),
-  };
+  // Hai điều kiện đều có thể là OR (tìm kiếm, bản nháp) nên ghép bằng AND, không trộn chung một object.
+  const where = { AND: [
+    search ? { OR: [{ caption: { contains: search, mode: 'insensitive' as const } },
+      { product: { name: { contains: search, mode: 'insensitive' as const } } }] } : {},
+    status === 'published' ? { isPublished: true, consentConfirmed: true }
+      : status === 'draft' ? { OR: [{ isPublished: false }, { consentConfirmed: false }] } : {},
+  ] };
   const [rows, total] = await Promise.all([
     prisma.customerTestimonial.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }], skip, take,
       include: { product: { select: { name: true } } } }),
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       batch.items.flatMap((item) => item.productId ? [item.productId] : []));
     // Danh sách sắp mới nhất trước khi cùng thứ tự hiển thị, nên ảnh chọn đầu tiên nhận mốc thời gian muộn nhất.
     const base = Date.now();
+    // Thứ tự 0 = hiện trước các ảnh đã sắp xếp (vị trí 1, 2, 3...), nên feedback mới luôn lên đầu.
     const created = await prisma.customerTestimonial.createMany({ data: batch.items.map((item, index) => ({
       ...item, ...sizes.get(item.imageUrl), sortOrder: batch.sortOrder, consentConfirmed: batch.consentConfirmed,
       isPublished: batch.isPublished, createdById: session.user.id, createdAt: new Date(base + batch.items.length - index),

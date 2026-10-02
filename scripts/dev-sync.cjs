@@ -8,10 +8,14 @@
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadEnvConfig } = require('@next/env');
 
 const root = path.join(__dirname, '..');
+loadEnvConfig(root);
+// Migration dùng DIRECT_URL (schema.prisma). Chạy local với session pooler thì dùng chung chuỗi kết nối của ứng dụng.
+const env = { ...process.env, DIRECT_URL: process.env.DIRECT_URL || process.env.CONNECTION_STRING };
 // Lệnh cố định trong script này (không nhận tham số từ ngoài) nên chạy qua shell để tìm được npx trên Windows.
-const run = (args) => spawnSync(`npx prisma ${args.join(' ')}`, { cwd: root, stdio: 'inherit', shell: true }).status === 0;
+const run = (args) => spawnSync(`npx prisma ${args.join(' ')}`, { cwd: root, stdio: 'inherit', shell: true, env }).status === 0;
 const normalize = (file) => fs.readFileSync(file, 'utf8').replace(/\s+/g, '');
 
 function clientMatchesSchema() {

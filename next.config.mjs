@@ -31,7 +31,10 @@ const nextConfig = {
     return config;
   },
   images: {
-    // Ảnh nội dung nằm trên Cloudinary; avatar đăng nhập Google dùng host của Google.
+    // Ảnh nội dung nằm trên Cloudinary: Cloudinary cắt ảnh theo kích thước hiển thị (f_auto, q_auto), không dùng
+    // bộ tối ưu ảnh của Vercel. Avatar đăng nhập Google dùng thẻ <img> thường.
+    loader: 'custom',
+    loaderFile: './src/lib/media/next-image-loader.ts',
     remotePatterns: [
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'res.cloudinary.com' },

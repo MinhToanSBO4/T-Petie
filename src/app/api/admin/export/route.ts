@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import { isSameOrigin } from '@/server/security/origin';
-import { EXPORT_JOB_FIELDS, runOrderExportJob } from '@/server/orders/export-orders';
+import { EXPORT_JOB_FIELDS, failStaleExportJobs, runOrderExportJob } from '@/server/orders/export-orders';
 
 export const dynamic = 'force-dynamic';
-
-/** Tiến trình chạy quá lâu coi như bị gián đoạn (ví dụ máy chủ dừng giữa chừng) để còn chạy lại. */
-const STALE_JOB_MS = 2 * 60 * 1000;
+/** Thời gian tối đa của function trên Vercel, gồm cả phần dựng file chạy nền sau khi đã trả phản hồi. */
+export const maxDuration = 120;
 
 /** Danh sách các lần xuất dữ liệu gần đây để giao diện theo dõi tiến trình. */
 export async function GET() {
   if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  await prisma.exportJob.updateMany({
-    where: { status: { in: ['pending', 'processing'] }, createdAt: { lt: new Date(Date.now() - STALE_JOB_MS) } },
-    data: { status: 'failed', error: 'Tiến trình bị gián đoạn, vui lòng chạy lại.', completedAt: new Date() },
-  });
+  await failStaleExportJobs();
   const jobs = await prisma.exportJob.findMany({ orderBy: { createdAt: 'desc' }, take: 20, select: EXPORT_JOB_FIELDS });
   return NextResponse.json({ jobs }, { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -34,7 +31,8 @@ export async function POST(request: Request) {
   }
   const job = await prisma.exportJob.create({ data: { requestedById: session.user.id, status: 'pending' },
     select: EXPORT_JOB_FIELDS });
-  // Chạy nền, không chặn phản hồi; trạng thái được theo dõi qua bảng export_jobs.
-  void runOrderExportJob(job.id);
+  // Chạy nền, không chặn phản hồi; trạng thái được theo dõi qua bảng export_jobs. Trên Vercel, waitUntil giữ function
+  // sống tới khi file dựng xong (tới maxDuration); máy chủ tự vận hành vẫn chạy tiếp như bình thường.
+  waitUntil(runOrderExportJob(job.id));
   return NextResponse.json({ job }, { status: 202 });
 }

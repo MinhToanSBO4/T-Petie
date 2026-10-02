@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
+import { forgetUserSnapshot } from '@/server/auth/user-snapshot';
 
 // GET: Lấy thông tin chi tiết hồ sơ cá nhân và hồ sơ bé của user hiện tại
 export async function GET() {
@@ -118,6 +119,7 @@ export async function PATCH(req: Request) {
         updatedAt: true,
       },
     });
+    forgetUserSnapshot(session.user.id);
 
     return NextResponse.json({
       success: true,

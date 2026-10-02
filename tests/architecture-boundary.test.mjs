@@ -31,6 +31,7 @@ test('backend database entrypoints are marked server-only', () => {
     'db/client.ts', 'auth/options.ts', 'auth/session.ts', 'catalog/queries.ts',
     'security/rate-limit.ts', 'orders/create-order.ts', 'orders/quote-order.ts',
     'orders/customer-orders.ts', 'orders/order-status.ts', 'reviews/submit-review.ts', 'reviews/review-request.ts',
+    'auth/user-snapshot.ts', 'db/sql.ts',
   ]) {
     const source = readFileSync(join(root, 'server', filename), 'utf8');
     assert.match(source, /^import 'server-only';/, `${filename} must stay on the server`);

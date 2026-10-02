@@ -5,9 +5,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// CONNECTION_STRING: kết nối của ứng dụng lúc chạy (Vercel: transaction pooler cổng 6543 + pgbouncer=true).
+// DIRECT_URL: kết nối cho Prisma CLI (migrate deploy/status) — session pooler cổng 5432 hoặc kết nối trực tiếp,
+// vì transaction pooler không hỗ trợ khóa và prepared statement mà migration cần. Chạy local có thể dùng cùng một giá trị.
 datasource db {
   provider  = "postgresql"
   url       = env("CONNECTION_STRING")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -308,6 +312,7 @@ model Order {
   updatedAt DateTime @updatedAt
   @@index([userId, createdAt])
   @@index([orderStatus, createdAt])
+  @@index([couponCode])
   @@map("orders")
 }
 
@@ -343,6 +348,7 @@ model OrderItem {
   review ProductReview?
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
   @@map("order_items")
 }
 

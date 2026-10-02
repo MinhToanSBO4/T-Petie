@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { markAdminPagesStale } from '@/client/admin-freshness';
 
 export type Column<T> = {
   key: string;
@@ -61,7 +62,6 @@ export function DataTable<T extends { id: string }>({
   alwaysRevalidate?: boolean;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const key = stateKey || pathname;
   const saved = snapshots.get(key);
   const [page, setPage] = useState(saved?.page ?? 1);
@@ -128,12 +128,13 @@ export function DataTable<T extends { id: string }>({
     if (reloadKey !== handledReload.current) {
       handledReload.current = reloadKey;
       refresh();
-      // Vừa sửa dữ liệu: trang dựng từ máy chủ đang lưu trong trình duyệt (ví dụ Tổng quan) cũng đã cũ.
-      router.refresh();
+      // Vừa sửa dữ liệu: trang dựng từ máy chủ đang lưu trong trình duyệt (ví dụ Tổng quan) cũng đã cũ và sẽ được
+      // làm mới khi mở. Không gọi router.refresh() ở đây vì lệnh đó dựng lại trang đang xem (mất nút "Hoàn tác").
+      markAdminPagesStale();
       return;
     }
     void load(false);
-  }, [load, reloadKey, refresh, router]);
+  }, [load, reloadKey, refresh]);
   useEffect(() => { snapshots.set(key, { page, query: debouncedQuery, filter, reloadKey }); }, [key, page, debouncedQuery, filter, reloadKey]);
   const onDataRef = useRef(onData);
   onDataRef.current = onData;

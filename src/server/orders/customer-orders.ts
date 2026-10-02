@@ -83,14 +83,15 @@ export async function listCustomerOrders(userId: string, tab: CustomerOrderTab, 
   const now = new Date();
   const page = Math.min(MAX_PAGE, Math.max(1, Math.floor(requestedPage) || 1));
   const where = tabWhere(userId, tab, now);
-  const [orders, total, byStatus, toReview] = await Promise.all([
+  const [orders, byStatus, toReview] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * ORDERS_PER_PAGE,
       take: ORDERS_PER_PAGE, include: orderInclude }),
-    prisma.order.count({ where }),
     prisma.order.groupBy({ by: ['orderStatus'], where: { userId }, _count: { _all: true } }),
     prisma.order.count({ where: tabWhere(userId, 'to-review', now) }),
   ]);
   const counts = countOrderTabs(Object.fromEntries(byStatus.map((row) => [row.orderStatus, row._count._all])), toReview);
+  // Số đơn của tab đang xem có sẵn trong số đếm từng tab, không cần thêm truy vấn count.
+  const total = counts[tab];
   return { orders: orders.map((order) => toSummary(order, now)), counts, tab, page,
     pages: Math.max(1, Math.ceil(total / ORDERS_PER_PAGE)) };
 }

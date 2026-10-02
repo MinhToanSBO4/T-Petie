@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 type BrandAssets = { logoUrl: string; logoAlt: string };
 
@@ -21,5 +22,5 @@ export function BrandLogo({ className }: { className?: string }) {
   if (!brand?.logoUrl) {
     return <span className="font-heading font-bold text-xl hover:text-honey-600 transition-colors">T&apos;Petie</span>;
   }
-  return <img src={brand.logoUrl} alt={brand.logoAlt || "T'Petie"} className={className} />;
+  return <img src={cloudinaryImage(brand.logoUrl, { width: 400 })} alt={brand.logoAlt || "T'Petie"} className={className} />;
 }

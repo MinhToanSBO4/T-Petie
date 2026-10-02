@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from './options';
 
 /**
- * Mỗi lần đọc phiên, callback jwt truy vấn lại database để cập nhật vai trò/trạng thái.
+ * Mỗi lần đọc phiên, callback jwt kiểm tra lại vai trò/trạng thái tài khoản (qua `readUserSnapshot`: các request
+ * cùng lúc dùng chung một truy vấn, giữ 15 giây và thu hồi ngay khi tài khoản bị sửa).
  * Layout, trang và các thành phần cùng request dùng chung một lần đọc.
  */
 export const currentSession = cache(() => getServerSession(authOptions));

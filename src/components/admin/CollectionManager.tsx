@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 import { MediaPicker, MediaListPicker } from '@/components/admin/MediaPicker';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import type { AdminCollection } from '@/types/admin-content';
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; collection: AdminCollection };
@@ -27,7 +28,7 @@ export function CollectionManager() {
 
   const columns: Column<AdminCollection>[] = [
     { key: 'banner', header: 'Banner', className: 'w-24', render: (row) => row.bannerUrl
-      ? <img src={row.bannerUrl} alt={row.title} className="h-12 w-20 rounded-lg object-cover" />
+      ? <img src={cloudinaryImage(row.bannerUrl, { width: 160 })} alt={row.title} loading="lazy" className="h-12 w-20 rounded-lg object-cover" />
       : <span className="text-xs text-charcoal-400">—</span> },
     { key: 'title', header: 'Bộ sưu tập', render: (row) => <div>
         <p className="font-semibold text-charcoal-900">{row.title}</p>

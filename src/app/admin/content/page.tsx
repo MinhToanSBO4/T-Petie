@@ -4,6 +4,7 @@ import { prisma } from '@/server/db/client';
 import { SITE_CONTENT_KEYS } from '@/lib/content/site-content';
 import { getProducts, getCollections } from '@/server/catalog/queries';
 import { getPublishedFeedback } from '@/server/content/testimonials';
+import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function AdminSiteContentPage() {
     products={products.map(({ id, name, thumbnail, basePrice }) => ({ id, name, thumbnail, basePrice }))}
     bestSellers={products.filter((product) => product.isBestSeller).slice(0, 4)}
     saleProducts={products.filter((product) => product.isSale).slice(0, 4)}
-    feedback={feedback.slice(0, 12)}
+    feedback={feedback.slice(0, HOME_FEEDBACK_LIMIT)}
     feedbackTotal={feedback.length}
   />;
 }

@@ -41,7 +41,7 @@ async function main() {
         Number(stored.totalAmount) !== result.totalAmount || stockAfter.stock !== variant.stock - 1 ||
         couponAfter.usedCount !== couponBefore.usedCount + 1) throw new Error('Order, stock, or coupon usage was not persisted correctly');
     const cancel = await fetch(new URL(`/api/admin/orders/${orderId}`, base), { method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', cookie: await adminCookie(), origin: base }, body: JSON.stringify({ status: 'CANCELLED' }) });
+      headers: { 'Content-Type': 'application/json', cookie: await adminCookie(), origin: base }, body: JSON.stringify({ status: 'CANCELLED', note: 'Kiểm thử tự động' }) });
     if (!cancel.ok) throw new Error(`Admin cancel failed: HTTP ${cancel.status} ${(await cancel.json()).error || ''}`);
     const restored = await prisma.productVariant.findUnique({ where: { id: variant.id } });
     const couponRestored = await prisma.coupon.findUnique({ where: { code: 'TPETIE20' } });

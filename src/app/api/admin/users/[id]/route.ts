@@ -7,6 +7,7 @@ import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { createTemporaryPassword } from '@/server/security/password-reset';
 import { isSameOrigin } from '@/server/security/origin';
+import { forgetUserSnapshot } from '@/server/auth/user-snapshot';
 
 interface RouteContext {
   params: {
@@ -177,6 +178,8 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       data: updateData,
       select: { id: true, name: true, email: true, role: true, status: true },
     });
+    // Khóa tài khoản / đổi vai trò / đặt lại mật khẩu có hiệu lực ngay ở request kế tiếp của người đó.
+    forgetUserSnapshot(targetUserId);
 
     return NextResponse.json({
       success: true,
@@ -247,6 +250,7 @@ export async function DELETE(req: Request, { params }: RouteContext) {
         phone: null, address: null, city: null, image: null, name: 'Tài khoản đã xóa',
       } });
     });
+    forgetUserSnapshot(targetUserId);
 
     return NextResponse.json({
       success: true,

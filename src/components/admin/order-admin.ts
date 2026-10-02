@@ -29,19 +29,21 @@ export function autoCompleteDate(order: AdminOrder): Date | null {
   return shipped ? new Date(new Date(shipped).getTime() + AUTO_COMPLETE_DAYS * 86_400_000) : null;
 }
 
-/** Lỗi từ API đơn hàng; `conflict` = đơn đã đổi ở nơi khác (khách vừa xác nhận, người khác vừa xử lý...). */
-export class OrderRequestError extends Error {
-  constructor(message: string, readonly conflict: boolean) { super(message); }
-}
+/** Kết quả từng đơn; `conflict` = đơn đã đổi ở nơi khác (khách vừa xác nhận, người khác vừa xử lý...). */
+export type BulkResult = { code: string; ok: boolean; status?: OrderStatus; error?: string; conflict?: boolean };
+export type BulkRequest =
+  | { action: 'advance'; codes: string[]; to: OrderStatus }
+  | { action: 'cancel'; codes: string[]; note: string }
+  | { action: 'undo'; items: { code: string; current: OrderStatus; to: OrderStatus }[] };
 
-/** Gọi API đổi trạng thái (hoặc hoàn tác) một đơn; ném lỗi kèm thông báo của máy chủ. */
-export async function patchOrder(code: string, body: { status: OrderStatus; note?: string } | { undo: OrderStatus }) {
-  const response = await fetch(`/api/admin/orders/${encodeURIComponent(code)}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+/** Xử lý một hoặc nhiều đơn trong một request; trả kết quả từng đơn (đơn lỗi không làm hỏng các đơn khác). */
+export async function bulkOrders(body: BulkRequest): Promise<BulkResult[]> {
+  const response = await fetch('/api/admin/orders/bulk', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new OrderRequestError(result.error || 'Cập nhật thất bại', response.status === 409);
-  return result.status as OrderStatus;
+  if (!response.ok) throw new Error(result.error || 'Không cập nhật được đơn hàng, vui lòng thử lại');
+  return result.results as BulkResult[];
 }
 
 /** Đọc lại một đơn mới nhất từ máy chủ (dùng khi trạng thái trên màn hình đã cũ). */

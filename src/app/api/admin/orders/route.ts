@@ -25,27 +25,34 @@ export async function GET(request: Request) {
     { customerName: { contains: search, mode: 'insensitive' as const } },
     { customerPhone: { contains: search, mode: 'insensitive' as const } },
   ] } : {};
-  const statusCounts = async () => Object.fromEntries((await prisma.order.groupBy({ by: ['orderStatus'], where: searchWhere,
-    _count: { _all: true } })).map((row) => [row.orderStatus, row._count._all]));
-  // Mốc thay đổi gần nhất của toàn bộ đơn: trang quản trị so sánh để biết có cần tải lại danh sách không.
-  const dataVersion = async () => String((await prisma.order.aggregate({ _max: { updatedAt: true } }))._max.updatedAt?.getTime() ?? 0);
+  // Một truy vấn gộp cho cả số đơn từng tab lẫn mốc thay đổi gần nhất (trang quản trị so mốc này để biết có cần tải lại).
+  const summarize = async (where: typeof searchWhere) => {
+    const rows = await prisma.order.groupBy({ by: ['orderStatus'], where, _count: { _all: true }, _max: { updatedAt: true } });
+    return {
+      counts: Object.fromEntries(rows.map((row) => [row.orderStatus, row._count._all])) as Record<string, number>,
+      version: String(Math.max(0, ...rows.map((row) => row._max.updatedAt?.getTime() ?? 0))),
+    };
+  };
   if (searchParams.get('summary') === '1') {
-    // Kiểm tra định kỳ: chỉ hai truy vấn gộp, không đọc đơn và sản phẩm.
-    const [counts, version] = await Promise.all([statusCounts(), dataVersion()]);
-    return NextResponse.json({ counts, version }, { headers: { 'Cache-Control': 'no-store' } });
+    // Kiểm tra định kỳ: một truy vấn gộp, không đọc đơn và sản phẩm.
+    return NextResponse.json(await summarize({}), { headers: { 'Cache-Control': 'no-store' } });
   }
   const where = { ...searchWhere, ...(status ? { orderStatus: status } : {}) };
   // Đơn chờ xử lý: cũ nhất lên đầu để xử lý theo thứ tự đặt; các tab khác mới nhất lên đầu.
   const oldestFirst = status === 'PENDING' || status === 'CONFIRMED' || status === 'PROCESSING';
-  const [orders, total, counts, version] = await Promise.all([
+  const [orders, filtered, overall] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: oldestFirst ? 'asc' : 'desc' }, skip, take, include: {
-      items: true,
+      items: { select: { productName: true, size: true, quantity: true, totalPrice: true } },
       statusEvents: { orderBy: { createdAt: 'asc' }, select: { status: true, actor: true, note: true, createdAt: true } },
     } }),
-    prisma.order.count({ where }),
-    statusCounts(),
-    dataVersion(),
+    summarize(searchWhere),
+    // Khi đang tìm kiếm, số đếm theo từ khóa còn mốc thay đổi phải tính trên toàn bộ đơn.
+    search ? summarize({}) : null,
   ]);
+  const { counts } = filtered;
+  const version = (overall ?? filtered).version;
+  // Tổng số dòng của tab đang xem lấy luôn từ số đếm, không cần thêm truy vấn count.
+  const total = status ? counts[status] ?? 0 : Object.values(counts).reduce((sum, value) => sum + value, 0);
   return NextResponse.json({ ...paginated(orders.map((order) => ({
     id: order.id, orderCode: order.orderCode, customerName: order.customerName,
     customerPhone: order.customerPhone, customerEmail: order.customerEmail,

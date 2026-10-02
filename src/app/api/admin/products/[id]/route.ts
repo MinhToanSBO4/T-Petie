@@ -4,6 +4,7 @@ import { getStaffSession } from '@/server/auth/staff-session';
 import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
+import { table } from '@/server/db/sql';
 import { parseProductPatch, parseVariantInput, parseVariantPatch } from '@/lib/content/product-input';
 
 export const dynamic = 'force-dynamic';
@@ -70,16 +71,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         // Xóa ảnh không còn trong danh sách mới.
         const removed = current.filter((image) => !images!.includes(image.url)).map((image) => image.id);
         if (removed.length > 0) await tx.productImage.deleteMany({ where: { id: { in: removed } } });
-        // Cập nhật thứ tự và thêm ảnh mới theo đúng thứ tự gửi lên.
-        for (const [index, url] of images.entries()) {
-          const existing = current.find((image) => image.url === url);
-          if (existing) {
-            await tx.productImage.update({ where: { id: existing.id }, data: { sortOrder: index, isPrimary: index === 0 } });
-          } else {
-            await tx.productImage.create({ data: { productId: product.id, url, altText: product.name,
-              sortOrder: index, isPrimary: index === 0 } });
-          }
+        // Cập nhật thứ tự ảnh cũ bằng một câu lệnh và thêm ảnh mới một lần, theo đúng thứ tự gửi lên
+        // (trước đây mỗi ảnh một lượt gọi database trong transaction).
+        const byUrl = new Map(current.map((image) => [image.url, image.id]));
+        const kept = images.flatMap((url, index) => byUrl.has(url) ? [{ id: byUrl.get(url)!, index }] : []);
+        if (kept.length > 0) {
+          await tx.$executeRaw`
+            UPDATE ${table('product_images')} AS image SET "sortOrder" = data.position, "isPrimary" = (data.position = 0)
+            FROM unnest(${kept.map((item) => item.id)}::text[], ${kept.map((item) => item.index)}::int[]) AS data(id, position)
+            WHERE image."id" = data.id`;
         }
+        const added = images.flatMap((url, index) => byUrl.has(url) ? [] : [{ productId: product.id, url,
+          altText: product.name, sortOrder: index, isPrimary: index === 0 }]);
+        if (added.length > 0) await tx.productImage.createMany({ data: added });
       }
     });
 

@@ -1,78 +1,8 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { FilterBar } from '@/components/filter/FilterBar';
-import { ProductGrid } from '@/components/product/ProductGrid';
-import { ProductGridSkeleton } from '@/components/product/ProductGridSkeleton';
-import { useCatalogProducts } from '@/hooks/useCatalogProducts';
+import { CatalogBrowser } from '@/components/catalog/CatalogBrowser';
 
-function Catalog() {
-  const { products: allProducts, loading, error } = useCatalogProducts();
-  const searchParams = useSearchParams();
-  const searchQuery = searchParams.get('q')?.toLowerCase() || '';
-
-  const [sortBy, setSortBy] = useState('newest');
-  const [priceRange, setPriceRange] = useState('all');
-
-  const filteredProducts = useMemo(() => {
-    let list = allProducts.filter((p) => p.category === 'girls');
-
-    if (searchQuery) {
-      list = allProducts.filter((p) =>
-        p.name.toLowerCase().includes(searchQuery) ||
-        (p.description && p.description.toLowerCase().includes(searchQuery))
-      );
-    }
-
-    if (priceRange === 'under-200') {
-      list = list.filter((p) => p.basePrice < 200000);
-    } else if (priceRange === '200-300') {
-      list = list.filter((p) => p.basePrice >= 200000 && p.basePrice <= 300000);
-    } else if (priceRange === 'above-300') {
-      list = list.filter((p) => p.basePrice > 300000);
-    }
-
-    if (sortBy === 'best-seller') {
-      list.sort((a, b) => (b.isBestSeller ? 1 : 0) - (a.isBestSeller ? 1 : 0));
-    } else if (sortBy === 'price-asc') {
-      list.sort((a, b) => a.basePrice - b.basePrice);
-    } else if (sortBy === 'price-desc') {
-      list.sort((a, b) => b.basePrice - a.basePrice);
-    }
-
-    return list;
-  }, [allProducts, sortBy, priceRange, searchQuery]);
-
-  return <>
-    {searchQuery && <div className="mb-6">
-      <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-charcoal-900 mb-2">
-        {`Kết quả tìm kiếm cho "${searchParams.get('q')}"`}
-      </h1>
-      <p className="text-xs sm:text-sm text-charcoal-600 max-w-2xl leading-relaxed">
-        {`Tìm thấy ${filteredProducts.length} sản phẩm phù hợp với tìm kiếm của bạn.`}
-      </p>
-    </div>}
-    <FilterBar
-      activeSubcategory="all"
-      sortBy={sortBy}
-      onSortChange={setSortBy}
-      selectedPriceRange={priceRange}
-      onPriceChange={setPriceRange}
-      totalResults={filteredProducts.length}
-    />
-    {loading ? <ProductGridSkeleton /> : error ? <p role="alert" className="py-12 text-center text-red-700">{error}</p> : <ProductGrid products={filteredProducts} />}
-  </>;
-}
-
-/** Danh sách sản phẩm bé gái kèm ô tìm kiếm; tiêu đề trang do server render từ cấu hình. */
+/** Danh sách sản phẩm bé gái kèm tìm kiếm và bộ lọc; tiêu đề trang do server render từ cấu hình. */
 export function GirlsCatalog() {
-  return <Suspense fallback={
-    <div className="space-y-6 animate-fade-in">
-      <div className="h-5 w-full rounded-lg shimmer" />
-      <ProductGridSkeleton />
-    </div>
-  }>
-    <Catalog />
-  </Suspense>;
+  return <CatalogBrowser />;
 }

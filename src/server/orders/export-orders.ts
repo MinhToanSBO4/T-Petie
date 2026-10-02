@@ -13,13 +13,28 @@ export const EXPORT_JOB_FIELDS = { id: true, status: true, fileName: true, order
 
 const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MAX_ROWS = 10000;
+/**
+ * Tiến trình chạy quá thời gian này coi như bị gián đoạn (máy chủ dừng giữa chừng) để còn chạy lại. Dài hơn
+ * maxDuration của API xuất (120 giây) để không đánh dấu nhầm tiến trình còn đang chạy trên Vercel.
+ */
+const STALE_JOB_MS = 3 * 60 * 1000;
+
+/** Đánh dấu thất bại các tiến trình xuất bị treo; trả về số tiến trình đã đánh dấu. */
+export async function failStaleExportJobs(now = new Date()) {
+  const { count } = await prisma.exportJob.updateMany({
+    where: { status: { in: ['pending', 'processing'] }, createdAt: { lt: new Date(now.getTime() - STALE_JOB_MS) } },
+    data: { status: 'failed', error: 'Tiến trình bị gián đoạn, vui lòng chạy lại.', completedAt: now },
+  });
+  return count;
+}
 
 /**
  * Gom toàn bộ dữ liệu quản trị cho file Excel: đơn hàng, chi tiết sản phẩm, thanh toán,
  * khách hàng, nhân sự, tồn kho, mã giảm giá, đánh giá. Chỉ chọn trường cần xuất (không lấy mật khẩu).
  */
 export async function buildAdminWorkbook(): Promise<{ buffer: Buffer; orderCount: number }> {
-  // Runtime chỉ có 1 kết nối database nên các truy vấn chạy lần lượt; mỗi truy vấn đều có giới hạn.
+  // Chạy lần lượt (mỗi truy vấn đều có giới hạn số dòng) để tiến trình chạy nền không chiếm hết kết nối database
+  // của các request đang phục vụ khách trong lúc dựng file.
   const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: MAX_ROWS,
     include: { items: true, user: { select: { username: true, email: true } } } });
   const users = await prisma.user.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: MAX_ROWS,

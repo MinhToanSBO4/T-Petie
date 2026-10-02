@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/db/client';
+import { table } from '@/server/db/sql';
 import { getStaffSession } from '@/server/auth/staff-session';
 import { deleteCloudinaryImage } from '@/server/media/cloudinary';
 
@@ -38,7 +39,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   const [productUses, collectionUses, contentUses, feedbackUses] = await Promise.all([
     prisma.productImage.count({ where: { url: asset.url } }),
     prisma.collection.count({ where: { OR: [{ bannerUrl: asset.url }, { lookbookUrls: { has: asset.url } }] } }),
-    prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM "site_content" WHERE strpos("data"::text, ${asset.url}) > 0`,
+    prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM ${table('site_content')} WHERE strpos("data"::text, ${asset.url}) > 0`,
     prisma.customerTestimonial.count({ where: { imageUrl: asset.url } }),
   ]);
   const usedIn = [productUses && `${productUses} sản phẩm`, collectionUses && `${collectionUses} bộ sưu tập`,

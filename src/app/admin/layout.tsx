@@ -1,6 +1,7 @@
 import { requireStaffPage } from '@/server/auth/staff-session';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminSidebar, type AdminNavItem } from '@/components/admin/AdminSidebar';
+import { AdminFreshness } from '@/components/admin/AdminFreshness';
 import { getSiteContent } from '@/server/content/site-content';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const userName = session.user.name || session.user.email || 'Tài khoản quản trị';
 
   return <div className="admin-theme min-h-screen bg-cream-50">
+    <AdminFreshness />
     <AdminHeader logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt}
       userName={userName} userRole={session.user.role} />
     <div className="flex w-full items-start gap-3 px-3 py-6 sm:gap-4 sm:px-6 lg:gap-8">

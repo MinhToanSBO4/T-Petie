@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   Search,
   Heart,
-  X,
   User as UserIcon,
   LogOut,
   ChevronDown,
@@ -19,6 +18,8 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
 import { UserAvatar } from '@/components/layout/UserAvatar';
+import { SearchDialog } from '@/components/layout/SearchDialog';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   logoUrl?: string; logoAlt?: string; collectionNav?: SubNavItem[];
@@ -29,7 +30,6 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredNavIndex, setHoveredNavIndex] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections'
     ? { ...item, children: collectionNav } : item);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,7 +72,7 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
           <Link href="/" className="flex items-center group py-1">
             {logoUrl ? (
               <img
-                src={logoUrl}
+                src={cloudinaryImage(logoUrl, { width: 400 })}
                 alt={logoAlt || "T'Petie - Made for little souls"}
                 className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
               />
@@ -291,67 +291,8 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
         </div>
       </header>
 
-      {/* Modal Tìm Kiếm Nhanh */}
-      {isSearchOpen && (
-        <div className="fixed inset-0 z-50 bg-charcoal-900/40 backdrop-blur-sm flex items-start justify-center pt-16 px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full max-w-lg bg-white rounded-3xl p-5 shadow-2xl border border-cream-200"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-cream-200">
-              <h3 className="font-heading font-bold text-charcoal-900 text-sm">Tìm Kiếm Đồ Cho Bé Yêu</h3>
-              <button
-                onClick={() => setIsSearchOpen(false)}
-                className="p-1 rounded-full hover:bg-cream-100 text-charcoal-400"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchQuery.trim()) {
-                  setIsSearchOpen(false);
-                  window.location.href = `/girls?q=${encodeURIComponent(searchQuery.trim())}`;
-                }
-              }}
-              className="mt-4 relative"
-            >
-              <input
-                type="text"
-                placeholder="Nhập tên váy, áo sơ mi, chất vải organic..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoFocus
-                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-cream-50 border border-cream-300 text-sm focus:outline-none focus:border-honey-500"
-              />
-              <button type="submit" aria-label="Thực hiện tìm kiếm" className="absolute left-3.5 top-3.5 hover:text-honey-600 transition-colors">
-                <Search className="w-4 h-4 text-charcoal-400 hover:text-honey-600" />
-              </button>
-            </form>
-            <div className="mt-4">
-              <span className="text-xs font-semibold text-charcoal-600 block mb-2">Gợi ý tìm kiếm phổ biến:</span>
-              <div className="flex flex-wrap gap-2">
-                {['Váy công chúa', 'Áo cổ sen', 'Quần bloomer', 'Thô đũi organic', 'Đồ sơ sinh'].map((keyword) => (
-                  <button
-                    key={keyword}
-                    onClick={() => {
-                      setSearchQuery(keyword);
-                      setIsSearchOpen(false);
-                      window.location.href = `/girls?q=${encodeURIComponent(keyword)}`;
-                    }}
-                    className="text-xs px-3 py-1.5 rounded-full bg-cream-100 hover:bg-honey-100 text-charcoal-700 font-medium transition-colors"
-                  >
-                    🔍 {keyword}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      {/* Tìm kiếm nhanh có gợi ý sản phẩm ngay khi gõ */}
+      {isSearchOpen && <SearchDialog onClose={() => setIsSearchOpen(false)} />}
     </>
   );
 }

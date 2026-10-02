@@ -10,12 +10,11 @@ import { FeatureCarousel } from '@/components/home/FeatureCarousel';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { getSiteContent } from '@/server/content/site-content';
+import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
 import type { Product } from '@/types/product';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 export const revalidate = 60;
-
-/** Số feedback hiện trên dải story trang chủ; phần còn lại xem ở trang album /feedback. */
-const HOME_FEEDBACK_LIMIT = 12;
 
 export default async function HomePage() {
   const [products, collections, feedback, content] = await Promise.all([
@@ -25,12 +24,13 @@ export default async function HomePage() {
   const homepageCollections = collections.filter((collection) => collection.showOnHome);
   const sections = content.home_sections;
   const features = content.home_features;
+  const byId = new Map(products.map((product) => [product.id, product]));
   const selectedProducts = (ids: string[] | undefined, fallback: Product[]) => ids?.length
-    ? ids.map((id) => products.find((product) => product.id === id)).filter((product): product is Product => Boolean(product))
+    ? ids.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product))
     : fallback;
   const bestSellers = selectedProducts(sections?.bestSellers.productIds, products.filter((product) => product.isBestSeller)).slice(0, 12);
   const flashSaleProducts = selectedProducts(sections?.sale.productIds, products.filter((product) => product.isSale)).slice(0, 12);
-  const blockImage = (image?: BlockImage) => image?.imageUrl && <img src={image.imageUrl} alt={image.imageAlt || ''}
+  const blockImage = (image?: BlockImage) => image?.imageUrl && <img src={cloudinaryImage(image.imageUrl, { width: 1600 })} alt={image.imageAlt || ''}
     className="mb-5 h-40 w-full rounded-3xl object-cover sm:h-56" />;
   const blocks: Record<HomeBlockId, React.ReactNode> = {
     hero: (homepageCollections.length > 0 || content.home_hero?.imageUrl || content.home_hero?.slides.length) && <section className="relative w-full px-4 pt-4 sm:px-6"><div className="mx-auto max-w-6xl"><HeroCarousel collections={homepageCollections} hero={content.home_hero} /></div></section>,

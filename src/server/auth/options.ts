@@ -8,6 +8,7 @@ import { prisma } from '@/server/db/client';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
 import { credentialFingerprint } from '@/server/security/password-reset';
+import { readUserSnapshot } from '@/server/auth/user-snapshot';
 import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
 
@@ -58,7 +59,18 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) token.id = user.id;
       if (!token.id) return token;
-      const stored = await prisma.user.findUnique({ where: { id: token.id } });
+      let stored: Awaited<ReturnType<typeof readUserSnapshot>>;
+      try {
+        stored = await readUserSnapshot(token.id, { fresh: Boolean(user) });
+      } catch (error) {
+        // Database tạm thời không phản hồi (mất mạng, hết kết nối): giữ quyền đã xác minh ở lần trước. Nếu ném lỗi,
+        // NextAuth xóa cookie phiên và người dùng bị đăng xuất, còn API trả "Không có quyền" dù tài khoản hợp lệ.
+        if (token.role && token.status) {
+          console.warn('Session refresh skipped, database unavailable:', error instanceof Error ? error.message.split('\n')[0] : error);
+          return token;
+        }
+        throw error;
+      }
       token.role = (stored?.role || 'user') as UserRole;
       const currentFingerprint = credentialFingerprint(stored?.password || null, process.env.NEXTAUTH_SECRET || '');
       if (user) token.credentialFingerprint = currentFingerprint;

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 import { ChevronDown, LogOut, User as UserIcon } from 'lucide-react';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 /**
  * Header của khu quản trị: chỉ gồm tên thương hiệu và nút tài khoản.
@@ -33,7 +34,7 @@ export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
     <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
       <Link href="/admin" className="flex items-center gap-2">
         {logoUrl
-          ? <img src={logoUrl} alt={logoAlt || "T'Petie"} className="h-9 w-auto object-contain" />
+          ? <img src={cloudinaryImage(logoUrl, { width: 300 })} alt={logoAlt || "T'Petie"} className="h-9 w-auto object-contain" />
           : <span className="font-heading text-lg font-bold text-honey-700">T&apos;Petie</span>}
       </Link>
 

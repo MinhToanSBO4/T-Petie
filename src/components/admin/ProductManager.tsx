@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Trash2, Upload } from 'lucide-react';
 import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
 import { ReviewModerationPanel } from '@/components/admin/ReviewModerationPanel';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 type VariantRow = { id: string; size: string; stock: number; price: number; weightRange: string; ageRange: string };
 type ProductRow = { id: string; slug: string; sku: string; name: string; active: boolean; price: number;
@@ -42,7 +43,7 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
 
   const columns: Column<ProductRow>[] = [
     { key: 'image', header: 'Ảnh', className: 'w-20', render: (row) => row.images[0]
-      ? <img src={row.images[0].url} alt={row.name} className="h-12 w-12 rounded-lg object-cover" />
+      ? <img src={cloudinaryImage(row.images[0].url, { width: 96 })} alt={row.name} loading="lazy" className="h-12 w-12 rounded-lg object-cover" />
       : <span className="text-xs text-charcoal-400">—</span> },
     { key: 'name', header: 'Sản phẩm', render: (row) => <div>
         <p className="font-semibold text-charcoal-900">{row.name}</p>
@@ -59,8 +60,11 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchProducts} reloadKey={reloadKey}
-      searchPlaceholder="Tìm theo tên, SKU hoặc slug"
-      filters={[{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Đang ẩn' }]}
+      searchPlaceholder="Tìm theo tên, SKU hoặc slug (không cần dấu)"
+      filters={[{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Đang ẩn' },
+        { value: 'low-stock', label: 'Sắp hết hàng (còn ≤ 5)' }, { value: 'out-of-stock', label: 'Hết hàng' },
+        { value: 'sale', label: 'Đang giảm giá' }, { value: 'best-seller', label: 'Bán chạy' },
+        { value: 'new', label: 'Hàng mới' }, { value: 'no-image', label: 'Chưa có ảnh' }]}
       emptyText="Chưa có sản phẩm nào."
       onRowClick={(row) => setView({ mode: 'edit', product: row })}
       toolbar={canCreateProduct
@@ -305,7 +309,7 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: (me
       </p>
       {images.length > 0 && <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {images.map((url, index) => <div key={`${url}-${index}`} className="space-y-2 rounded-xl border border-cream-200 p-3">
-          <img src={url} alt={`Ảnh ${index + 1}`} className="h-28 w-full rounded-lg object-cover" />
+          <img src={cloudinaryImage(url, { width: 400 })} alt={`Ảnh ${index + 1}`} className="h-28 w-full rounded-lg object-cover" />
           <p className="text-xs font-semibold text-charcoal-700">{index === 0 ? 'Ảnh chính' : `Ảnh ${index + 1}`}</p>
           <div className="flex items-center gap-1">
             <button type="button" aria-label="Đưa lên" disabled={index === 0} onClick={() => moveImage(index, -1)}

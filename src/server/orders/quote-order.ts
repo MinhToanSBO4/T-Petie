@@ -19,7 +19,9 @@ export async function quoteOrder(items: QuoteItem[], couponCode: string | undefi
     normalizedCode ? prisma.coupon.findUnique({ where: { code: normalizedCode } }) : Promise.resolve(null),
     prisma.productVariant.findMany({
       where: { productId: { in: [...new Set(items.map((item) => item.productId))] }, isActive: true, product: { isActive: true } },
-      include: { product: true },
+      // Chỉ lấy đúng trường cần để tính giá, không kéo theo mô tả/thông số dài của sản phẩm.
+      select: { id: true, productId: true, sku: true, size: true, price: true, stock: true, isActive: true,
+        product: { select: { name: true, isActive: true } } },
     }),
   ]);
   if (!settings) throw new Error('Chưa cấu hình phí giao hàng');

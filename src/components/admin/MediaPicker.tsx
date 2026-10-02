@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 export type MediaAssetRow = {
   id: string; url: string; publicId: string | null; altText: string | null;
@@ -73,7 +74,7 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
     >
       {value ? (
         <div className={aspect === 'banner' ? 'space-y-2' : 'flex items-center gap-3'}>
-          <img src={value} alt={altText || label} className={aspect === 'banner'
+          <img src={cloudinaryImage(value, { width: aspect === 'banner' ? 960 : 160 })} alt={altText || label} className={aspect === 'banner'
             ? 'w-full max-h-56 rounded-lg object-cover bg-white' : 'size-16 rounded-lg object-cover bg-white'} />
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
@@ -109,7 +110,7 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
         {assets.map((asset) => <button key={asset.id} type="button" title={asset.altText || asset.publicId || ''}
           onClick={() => { onChange(asset.url); setLibraryOpen(false); }}
           className="overflow-hidden rounded-lg border border-cream-200 hover:border-honey-500">
-          <img src={asset.url} alt={asset.altText || 'Ảnh thư viện'} className="h-20 w-full object-cover" />
+          <img src={cloudinaryImage(asset.url, { width: 200 })} alt={asset.altText || 'Ảnh thư viện'} loading="lazy" className="h-20 w-full object-cover" />
         </button>)}
       </div>
     </div>}

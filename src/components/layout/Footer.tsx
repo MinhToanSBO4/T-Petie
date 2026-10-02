@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Heart, Phone, MessageCircle } from 'lucide-react';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 import { telHref, type ContactInfo } from '@/lib/content/site-content';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 /** Thông tin liên hệ lấy từ nội dung quản trị (khóa contact_info); mục nào để trống thì ẩn. */
 export function Footer({ logoUrl, logoAlt, contact }: { logoUrl?: string; logoAlt?: string; contact?: ContactInfo | null } = {}) {
@@ -24,7 +25,7 @@ export function Footer({ logoUrl, logoAlt, contact }: { logoUrl?: string; logoAl
           <Link href="/" className="inline-block group">
             {logoUrl ? (
               <img
-                src={logoUrl}
+                src={cloudinaryImage(logoUrl, { width: 400 })}
                 alt={logoAlt || "T'Petie - Made for little souls"}
                 className="h-11 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
               />

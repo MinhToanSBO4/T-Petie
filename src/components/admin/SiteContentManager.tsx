@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { markAdminPagesStale } from '@/client/admin-freshness';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
@@ -118,8 +119,8 @@ function ProductSelector({ products, selected, onChange }: { products: ProductOp
   const chosen = selected.map((id) => products.find((product) => product.id === id)).filter((product): product is ProductOption => Boolean(product));
   return <div className="space-y-3 rounded-xl border border-cream-200 p-3"><div className="flex items-center justify-between"><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}</p></div>
     <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm sản phẩm theo tên…" className="w-full rounded-lg border p-2 text-sm" />
-    {query && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...selected, product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={product.thumbnail} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
-    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={product.thumbnail} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(selected.filter((id) => id !== product.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
+    {query && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...selected, product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={cloudinaryImage(product.thumbnail, { width: 96 })} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
+    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={cloudinaryImage(product.thumbnail, { width: 80 })} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(selected.filter((id) => id !== product.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
   </div>;
 }
 
@@ -179,7 +180,7 @@ function SectionShell({ title, hint, editing, onToggle, preview, children }: {
 }
 
 const previewImage = (url: string, label: string) => url
-  ? <img src={url} alt={label} className="h-24 w-full rounded-lg object-cover" />
+  ? <img src={cloudinaryImage(url, { width: 640 })} alt={label} className="h-24 w-full rounded-lg object-cover" />
   : <p className="text-xs text-charcoal-500">Chưa cấu hình ảnh</p>;
 
 const HOME_BLOCK_LABELS: Record<HomeBlockId, string> = {
@@ -218,7 +219,6 @@ export function SiteContentManager({ initialContent, collections, products, best
   feedbackTotal: number;
 }) {
   const [draft, setDraft] = useState<ContentDraft>(() => toDraft(initialContent));
-  const router = useRouter();
   const [dirty, setDirty] = useState<ContentKey[]>([]);
   const [editing, setEditing] = useState<ContentKey | null>(null);
   const [saving, setSaving] = useState(false);
@@ -263,8 +263,9 @@ export function SiteContentManager({ initialContent, collections, products, best
           ? `Đã lưu ${keysToSave.length} khối. Bạn còn thay đổi mới chưa được lưu.`
           : `Đã lưu ${keysToSave.length} khối nội dung. Website sẽ hiển thị nội dung mới trong ít phút.`);
         if (!changedDuringSave) setDirty([]);
-        // Trang này dựng từ dữ liệu máy chủ: xóa bản đã lưu trong trình duyệt để lần mở sau thấy nội dung mới.
-        router.refresh();
+        // Trang này dựng từ dữ liệu máy chủ: lần mở sau được làm mới để thấy nội dung mới. Không làm mới ngay vì
+        // sẽ dựng lại trang đang sửa và mất thông báo vừa lưu.
+        markAdminPagesStale();
       } else {
         if (revisionRef.current === savedRevision) setDirty(failed);
       }
@@ -305,7 +306,7 @@ export function SiteContentManager({ initialContent, collections, products, best
 
       {bestSellers.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('bestSellers') }} label="Sản phẩm bán chạy" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
-          {sections.bestSellers.imageUrl && <img src={sections.bestSellers.imageUrl} alt={sections.bestSellers.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
+          {sections.bestSellers.imageUrl && <img src={cloudinaryImage(sections.bestSellers.imageUrl, { width: 1200 })} alt={sections.bestSellers.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.bestSellers.title || 'Sản phẩm bán chạy'}</h2>
             {sections.bestSellers.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.bestSellers.linkLabel} →</span>}
@@ -316,7 +317,7 @@ export function SiteContentManager({ initialContent, collections, products, best
 
       {saleProducts.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('sale') }} label="Sản phẩm ưu đãi" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
-          {sections.sale.imageUrl && <img src={sections.sale.imageUrl} alt={sections.sale.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
+          {sections.sale.imageUrl && <img src={cloudinaryImage(sections.sale.imageUrl, { width: 1200 })} alt={sections.sale.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.sale.title || 'Sản phẩm ưu đãi'}</h2>
             {sections.sale.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.sale.linkLabel}</span>}
@@ -327,7 +328,7 @@ export function SiteContentManager({ initialContent, collections, products, best
 
       {collections.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('collections') }} label="Bộ sưu tập nổi bật" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
         <div className="px-1">
-          {sections.collections.imageUrl && <img src={sections.collections.imageUrl} alt={sections.collections.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
+          {sections.collections.imageUrl && <img src={cloudinaryImage(sections.collections.imageUrl, { width: 1200 })} alt={sections.collections.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
           <div className="mb-4 flex items-center justify-between">
             <div>
               {sections.collections.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-600">{sections.collections.eyebrow}</p>}
@@ -466,7 +467,7 @@ export function SiteContentManager({ initialContent, collections, products, best
         editing={editing === 'brand_assets'} onToggle={() => toggle('brand_assets')}
         preview={<div className="flex items-center gap-3">
           {draft.brand_assets.logoUrl
-            ? <img src={draft.brand_assets.logoUrl} alt={draft.brand_assets.logoAlt} className="h-12 rounded-lg object-contain" />
+            ? <img src={cloudinaryImage(draft.brand_assets.logoUrl, { width: 400 })} alt={draft.brand_assets.logoAlt} className="h-12 rounded-lg object-contain" />
             : <span className="font-heading text-lg font-bold text-honey-700">T&apos;Petie</span>}
           <span className="text-xs text-charcoal-600">{draft.brand_assets.logoAlt || 'Chưa có mô tả'}</span>
         </div>}>

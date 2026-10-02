@@ -3,6 +3,7 @@ import { MessageCircleHeart } from 'lucide-react';
 import type { TestimonialsSectionContent } from '@/lib/content/site-content';
 import { FeedbackStoryRail } from '@/components/feedback/FeedbackStoryRail';
 import type { PublicFeedback } from '@/types/testimonial';
+import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 /**
  * Khối "Khách hàng nói gì" ở trang chủ: feedback ảnh dạng story. Đánh giá sản phẩm của khách đã mua
@@ -15,7 +16,7 @@ export function TestimonialsSection({ feedback, feedbackTotal, section }: {
   if (feedback.length === 0) return null;
 
   return <section aria-labelledby="customer-feedback-title" className="mx-auto w-full max-w-6xl px-4 pb-12 sm:px-6 sm:pb-16">
-    {section?.imageUrl && <img src={section.imageUrl} alt={section.imageAlt || ''}
+    {section?.imageUrl && <img src={cloudinaryImage(section.imageUrl, { width: 1600 })} alt={section.imageAlt || ''}
       className="mb-6 h-40 w-full rounded-3xl object-cover sm:h-56" />}
     <div className="mb-6 flex flex-col items-center text-center">
       {section?.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-700">{section.eyebrow}</p>}

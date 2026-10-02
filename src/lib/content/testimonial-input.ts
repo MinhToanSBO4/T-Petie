@@ -3,9 +3,15 @@ export const FEEDBACK_CAPTION_MAX = 120;
 /** Số ảnh tối đa trong một lần thêm, khớp giới hạn tải nhiều ảnh của thư viện media. */
 export const FEEDBACK_BATCH_MAX = 12;
 
+/** Số feedback tối đa trong màn hình sắp xếp (bằng giới hạn của trang album). */
+export const FEEDBACK_ORDER_MAX = 200;
+/** Số ảnh đầu tiên hiện ở dải story trang chủ. */
+export const HOME_FEEDBACK_LIMIT = 12;
+
 export type TestimonialImageInput = { imageUrl: string; caption: string | null; productId: string | null };
 type PublishSettings = { sortOrder: number; consentConfirmed: boolean; isPublished: boolean };
-export type TestimonialInput = TestimonialImageInput & PublishSettings;
+/** Khi sửa một feedback, không gửi `sortOrder` thì giữ nguyên vị trí đã sắp xếp. */
+export type TestimonialInput = TestimonialImageInput & Omit<PublishSettings, 'sortOrder'> & { sortOrder?: number };
 export type TestimonialBatchInput = PublishSettings & { items: TestimonialImageInput[] };
 
 function record(raw: unknown): Record<string, unknown> {
@@ -57,7 +63,19 @@ function publishSettings(input: Record<string, unknown>): PublishSettings {
 /** Một feedback khi chỉnh sửa. Công bố bắt buộc đã xác nhận khách đồng ý. */
 export function parseTestimonialInput(raw: unknown): TestimonialInput {
   const input = record(raw);
-  return { ...imageInput(input), ...publishSettings(input) };
+  const { sortOrder, ...settings } = publishSettings(input);
+  return { ...imageInput(input), ...settings, ...(input.sortOrder === undefined ? {} : { sortOrder }) };
+}
+
+/** Thứ tự hiển thị mới: danh sách mã feedback không trùng, ảnh đầu tiên hiện trước. */
+export function parseFeedbackOrder(raw: unknown): string[] {
+  const ids = record(raw).ids;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > FEEDBACK_ORDER_MAX
+    || !ids.every((id) => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id))
+    || new Set(ids).size !== ids.length) {
+    throw new Error('Thứ tự feedback không hợp lệ');
+  }
+  return ids as string[];
 }
 
 /** Thêm nhiều ảnh cùng lúc với chung thiết lập công bố; mỗi ảnh có chú thích và sản phẩm riêng. */

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, Copy, Loader2, Phone, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, FastForward, Loader2, Phone, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
-import { ADMIN_NEXT_STEP, orderStatusLabel } from '@/lib/orders/status';
+import { ADMIN_NEXT_STEP, ADMIN_TARGET_LABELS, MAIN_FLOW, orderStatusLabel, type OrderStatus } from '@/lib/orders/status';
 import {
   autoCompleteDate, formatDateTime, formatPrice, fullAddress, reachedAt, type AdminOrder,
 } from '@/components/admin/order-admin';
@@ -29,11 +29,13 @@ const STEP_HINT: Record<string, string> = {
 
 /**
  * Chi tiết đơn dạng ngăn kéo bên phải: danh sách phía sau vẫn giữ nguyên chỗ đang xem.
- * Gồm tiến trình xử lý, thao tác cho bước kế tiếp, thông tin giao hàng sao chép được, tiền và lịch sử.
+ * Gồm tiến trình xử lý, thao tác cho bước kế tiếp, chuyển nhanh nhiều bước (đơn đã gọi xác nhận và giao luôn),
+ * thông tin giao hàng sao chép được, tiền, lịch sử và nút sang đơn trước/sau để xử lý liên tục không phải đóng mở.
  */
-export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
+export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose, onPrevious, onNext }: {
   order: AdminOrder; busy: boolean;
-  onAdvance: () => void; onCancel: () => void; onClose: () => void;
+  onAdvance: (to: OrderStatus) => void; onCancel: () => void; onClose: () => void;
+  onPrevious?: () => void; onNext?: () => void;
 }) {
   const { showToast } = useToast();
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -42,6 +44,9 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
   const currentIndex = STEPS.findIndex((step) => step.status === order.orderStatus);
   const autoComplete = autoCompleteDate(order);
   const cancelEvent = cancelled ? order.events.findLast((event) => event.status === 'CANCELLED') : undefined;
+  // Các bước xa hơn bước kế tiếp, ví dụ đơn chờ xác nhận có thể chuyển thẳng tới Đang giao hoặc Giao thành công.
+  const flowIndex = MAIN_FLOW.indexOf(order.orderStatus);
+  const jumpTargets = next && flowIndex >= 0 ? MAIN_FLOW.slice(flowIndex + 2) : [];
 
   useEffect(() => {
     closeButton.current?.focus();
@@ -72,10 +77,20 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
           </div>
           <p className="text-xs text-charcoal-500">Đặt lúc {formatDateTime(order.createdAt)}</p>
         </div>
-        <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng"
-          className="grid size-10 shrink-0 place-items-center rounded-xl border border-cream-300 bg-white text-charcoal-600 hover:bg-cream-100">
-          <X className="h-5 w-5" aria-hidden />
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button type="button" onClick={onPrevious} disabled={!onPrevious} aria-label="Đơn trước" title="Đơn trước"
+            className="grid size-10 place-items-center rounded-xl border border-cream-300 bg-white text-charcoal-600 hover:bg-cream-100 disabled:opacity-40">
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </button>
+          <button type="button" onClick={onNext} disabled={!onNext} aria-label="Đơn tiếp theo" title="Đơn tiếp theo"
+            className="grid size-10 place-items-center rounded-xl border border-cream-300 bg-white text-charcoal-600 hover:bg-cream-100 disabled:opacity-40">
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </button>
+          <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng"
+            className="grid size-10 place-items-center rounded-xl border border-cream-300 bg-white text-charcoal-600 hover:bg-cream-100">
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -127,7 +142,7 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
           <ul className="divide-y divide-cream-100">
             {order.items.map((item, index) => <li key={index} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
               <span className="min-w-0"><span className="font-semibold text-charcoal-900">{item.name}</span>
-                <span className="block text-xs text-charcoal-500">Size {item.size} · SL {item.quantity}</span></span>
+                <span className="block text-xs text-charcoal-500">{/^size\b/i.test(item.size) ? item.size : `Size ${item.size}`} · SL {item.quantity}</span></span>
               <span className="shrink-0 tabular-nums">{formatPrice(item.total)}</span>
             </li>)}
           </ul>
@@ -145,7 +160,8 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
         <section className="rounded-2xl border border-cream-200 bg-white p-4" aria-label="Lịch sử đơn">
           <h3 className="mb-2 text-sm font-bold text-charcoal-900">Lịch sử</h3>
           <ol className="space-y-2 text-sm">
-            {[...order.events].reverse().map((event, index) => <li key={index} className="flex gap-3">
+            {/* Sự kiện "Chờ xử lý" lúc tạo đơn chính là dòng "Đặt hàng" bên dưới nên không lặp lại. */}
+            {order.events.filter((event) => event.status !== 'PENDING').reverse().map((event, index) => <li key={index} className="flex gap-3">
               <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cream-300" aria-hidden />
               <span className="min-w-0">
                 <span className="font-semibold text-charcoal-800">{orderStatusLabel(event.status)}</span>
@@ -169,11 +185,20 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose }: {
             className="min-h-11 rounded-xl border border-blush-200 px-4 text-sm font-semibold text-blush-700 hover:bg-blush-50 disabled:opacity-50">
             {order.orderStatus === 'SHIPPING' ? 'Giao không thành công' : 'Hủy đơn'}
           </button>
-          {next && <button type="button" onClick={onAdvance} disabled={busy}
+          {next && <button type="button" onClick={() => onAdvance(next.to)} disabled={busy}
             className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white hover:bg-honey-700 disabled:opacity-50">
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{next.label}
           </button>}
         </div>
+        {jumpTargets.length > 0 && <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-charcoal-600">
+            <FastForward className="h-3.5 w-3.5" aria-hidden />Chuyển nhanh tới:
+          </span>
+          {jumpTargets.map((status) => <button key={status} type="button" onClick={() => onAdvance(status)} disabled={busy}
+            className="min-h-9 rounded-lg border border-honey-200 bg-honey-50 px-3 text-xs font-semibold text-honey-800 hover:bg-honey-100 disabled:opacity-50">
+            {ADMIN_TARGET_LABELS[status]}
+          </button>)}
+        </div>}
       </footer>}
     </aside>
   </div>;

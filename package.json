@@ -8,7 +8,7 @@
     "build": "prisma generate && node scripts/build.cjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/architecture-boundary.test.mjs && node tests/security.test.mjs && node tests/content-input.test.mjs && node tests/site-content.test.mjs && node tests/account-provisioning.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/catalog-client-cache.test.mjs && node tests/baby-profile.test.mjs && node tests/admin-dashboard.test.mjs && node tests/export-workbook.test.mjs && node tests/purchase-review.test.mjs",
+    "test": "node tests/architecture-boundary.test.mjs && node tests/security.test.mjs && node tests/content-input.test.mjs && node tests/site-content.test.mjs && node tests/account-provisioning.test.mjs && node tests/order-pricing.test.mjs && node tests/variant-match.test.mjs && node tests/commerce-pricing.test.mjs && node tests/commerce-input.test.mjs && node tests/cart-selection.test.mjs && node tests/auth-identity.test.mjs && node tests/password-reset.test.mjs && node tests/catalog-client-cache.test.mjs && node tests/baby-profile.test.mjs && node tests/admin-dashboard.test.mjs && node tests/export-workbook.test.mjs && node tests/purchase-review.test.mjs && node tests/catalog-filters.test.mjs && node tests/stability.test.mjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -24,6 +24,7 @@
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
     "@prisma/client": "^5.16.0",
+    "@vercel/functions": "^3.9.9",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",

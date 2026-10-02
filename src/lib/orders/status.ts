@@ -34,14 +34,39 @@ export const ADMIN_NEXT_STEP: Partial<Record<OrderStatus, { to: OrderStatus; lab
   SHIPPING: { to: 'COMPLETED', label: 'Đã giao thành công' },
 };
 
+/** Tên hành động khi chuyển tới một trạng thái (dùng cho "Chuyển tới…" và thông báo). */
+export const ADMIN_TARGET_LABELS: Partial<Record<OrderStatus, string>> = {
+  CONFIRMED: 'Đã xác nhận', PROCESSING: 'Đang chuẩn bị hàng', SHIPPING: 'Đã giao cho shipper', COMPLETED: 'Giao thành công',
+};
+
+/** Quy trình chính theo thứ tự (không gồm Hủy). */
+export const MAIN_FLOW: readonly OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'COMPLETED'];
+
 /**
- * Bấm nhầm bước tiến thì được hoàn tác ngay sau đó (nút trên thông báo hiện 8 giây; máy chủ cho phép
- * trong 30 giây để bù độ trễ mạng). Không hoàn tác Hủy (đã hoàn kho) và Hoàn tất (đã mở quyền đánh giá).
+ * Các bước lần lượt đi qua để đưa đơn từ `from` tới `to` theo quy trình chính, ví dụ PENDING → SHIPPING là
+ * [CONFIRMED, PROCESSING, SHIPPING]. Quản trị viên chuyển thẳng tới bước sau (đơn đã xác nhận qua điện thoại và
+ * giao luôn) vẫn ghi đủ từng bước vào lịch sử để hành trình đơn của khách liền mạch.
+ * Trả về null nếu không tiến được: lùi bước, đứng yên, đơn đã hủy hoặc trạng thái lạ.
+ */
+export function forwardPath(from: string, to: string): OrderStatus[] | null {
+  const start = MAIN_FLOW.indexOf(from as OrderStatus);
+  const end = MAIN_FLOW.indexOf(to as OrderStatus);
+  if (start < 0 || end <= start) return null;
+  return MAIN_FLOW.slice(start + 1, end + 1);
+}
+
+/** Số đơn tối đa trong một lần xử lý hàng loạt (giống giới hạn 50 đơn/lần của các phần mềm quản lý bán hàng). */
+export const BULK_ORDER_LIMIT = 50;
+
+/**
+ * Bấm nhầm thì được hoàn tác ngay sau đó (nút trên thông báo hiện 8 giây; máy chủ cho phép trong 30 giây để bù
+ * độ trễ mạng), kể cả khi vừa chuyển thẳng nhiều bước. Hoàn tất cũng hoàn tác được trong khoảng này nếu khách
+ * chưa kịp đánh giá. Không hoàn tác Hủy vì đã hoàn kho và trả lượt mã giảm giá.
  */
 export const UNDO_WINDOW_MS = 30_000;
-export const UNDOABLE_STATUSES: readonly OrderStatus[] = ['CONFIRMED', 'PROCESSING', 'SHIPPING'];
+export const UNDOABLE_STATUSES: readonly OrderStatus[] = ['CONFIRMED', 'PROCESSING', 'SHIPPING', 'COMPLETED'];
 export const PREVIOUS_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  CONFIRMED: 'PENDING', PROCESSING: 'CONFIRMED', SHIPPING: 'PROCESSING',
+  CONFIRMED: 'PENDING', PROCESSING: 'CONFIRMED', SHIPPING: 'PROCESSING', COMPLETED: 'SHIPPING',
 };
 
 /**

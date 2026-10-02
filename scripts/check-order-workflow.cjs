@@ -108,6 +108,54 @@ async function main() {
     const stockAfter = (await prisma.productVariant.findUnique({ where: { id: variant.id } })).stock;
     assert(stockAfter === stockMid + 1, `Stock not restored on cancel: ${stockMid} -> ${stockAfter}`);
     console.log('✔ Cancel: reason required and saved, failed delivery cancels and restocks');
+
+    // --- Xử lý hàng loạt: chuyển thẳng nhiều bước (ghi đủ lịch sử), bỏ qua đơn không hợp lệ, hoàn tác về trạng thái cũ ---
+    const first = await makeOrder('PENDING', [{ status: 'PENDING' }]);
+    const second = await makeOrder('CONFIRMED', [{ status: 'PENDING' }, { status: 'CONFIRMED', actor: 'admin' }]);
+    const bulk = await request('/api/admin/orders/bulk', 'POST', admin,
+      { action: 'advance', codes: [first.orderCode, second.orderCode, shipping.orderCode], to: 'SHIPPING' });
+    assert(bulk.status === 200, `Bulk advance: ${bulk.status} ${bulk.text}`);
+    const byCode = Object.fromEntries(bulk.data.results.map((result) => [result.code, result]));
+    assert(byCode[first.orderCode].ok && byCode[second.orderCode].ok && !byCode[shipping.orderCode].ok,
+      `Bulk advance results: ${bulk.text}`);
+    const jumped = await prisma.order.findUnique({ where: { id: first.id }, include: { statusEvents: { orderBy: { createdAt: 'asc' } } } });
+    assert(jumped.orderStatus === 'SHIPPING' && jumped.statusEvents.map((event) => event.status).join() === 'PENDING,CONFIRMED,PROCESSING,SHIPPING'
+      && jumped.statusEvents.slice(1).every((event) => event.actor === 'admin'), `Jump history: ${jumped.statusEvents.map((event) => event.status)}`);
+    const bulkUndo = await request('/api/admin/orders/bulk', 'POST', admin, { action: 'undo', items: [
+      { code: first.orderCode, current: 'SHIPPING', to: 'PENDING' }, { code: second.orderCode, current: 'SHIPPING', to: 'CONFIRMED' }] });
+    assert(bulkUndo.status === 200 && bulkUndo.data.results.every((result) => result.ok), `Bulk undo: ${bulkUndo.text}`);
+    const [undoneFirst, undoneSecond] = await Promise.all([first, second].map((order) =>
+      prisma.order.findUnique({ where: { id: order.id }, include: { statusEvents: true } })));
+    assert(undoneFirst.orderStatus === 'PENDING' && undoneFirst.statusEvents.length === 1
+      && undoneSecond.orderStatus === 'CONFIRMED' && undoneSecond.statusEvents.length === 2, 'Bulk undo did not restore both orders');
+    console.log('✔ Bulk: jump PENDING → SHIPPING logs every step, invalid order skipped, undo restores each original status');
+
+    // --- Hoàn tất (COD) rồi hoàn tác: gỡ mốc hoàn tất và trạng thái đã thu tiền ---
+    const complete = await request('/api/admin/orders/bulk', 'POST', admin, { action: 'advance', codes: [first.orderCode], to: 'COMPLETED' });
+    assert(complete.status === 200 && complete.data.results[0].ok, `Complete: ${complete.text}`);
+    const done = await prisma.order.findUnique({ where: { id: first.id } });
+    assert(done.orderStatus === 'COMPLETED' && done.completedAt && done.paymentStatus === 'PAID', 'Completion did not record payment');
+    const reopen = await request('/api/admin/orders/bulk', 'POST', admin, { action: 'undo', items: [{ code: first.orderCode, current: 'COMPLETED', to: 'PENDING' }] });
+    assert(reopen.status === 200 && reopen.data.results[0].ok, `Undo completion: ${reopen.text}`);
+    const reopened = await prisma.order.findUnique({ where: { id: first.id } });
+    assert(reopened.orderStatus === 'PENDING' && !reopened.completedAt && reopened.paymentStatus === 'PENDING', 'Undo of completion left payment/completion data');
+    console.log('✔ Completion: COD marked paid, undo right after removes completion and payment');
+
+    // --- Giới hạn và phân quyền ---
+    const tooMany = await request('/api/admin/orders/bulk', 'POST', admin, { action: 'advance', to: 'CONFIRMED',
+      codes: Array.from({ length: 51 }, (_, index) => `TP-LIMIT-${index}`) });
+    assert(tooMany.status === 400, `51 orders accepted: ${tooMany.status}`);
+    const noReasonBulk = await request('/api/admin/orders/bulk', 'POST', admin, { action: 'cancel', codes: [first.orderCode] });
+    assert(noReasonBulk.status === 400, `Bulk cancel without reason accepted: ${noReasonBulk.status}`);
+    const staffName = `flowstaff${suffix}`;
+    const staffPassword = randomBytes(24).toString('base64url');
+    const staffUser = await prisma.user.create({ data: { username: staffName, email: `${staffName}@example.invalid`, name: 'Staff flow check',
+      password: await bcrypt.hash(staffPassword, 12), role: 'staff', status: 'active' } });
+    accountIds.push(staffUser.id);
+    const staff = await login(staffName, staffPassword);
+    const staffBulk = await request('/api/admin/orders/bulk', 'POST', staff, { action: 'advance', codes: [first.orderCode], to: 'CONFIRMED' });
+    assert(staffBulk.status === 403, `Staff could process orders: ${staffBulk.status}`);
+    console.log('✔ Bulk limits: 50 orders per request, cancel needs a reason, staff cannot process orders');
   } finally {
     if (orderIds.length) {
       await prisma.orderStatusEvent.deleteMany({ where: { orderId: { in: orderIds } } });
