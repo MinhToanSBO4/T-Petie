@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Trash2, Upload } from 'lucide-react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { ReviewModerationPanel } from '@/components/admin/ReviewModerationPanel';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
@@ -20,23 +20,33 @@ const formatPrice = (value: number) => `${value.toLocaleString('vi-VN')}₫`;
 /** Tổng tồn kho của sản phẩm trên mọi size đang bán. */
 const totalStock = (product: ProductRow) => product.variants.reduce((sum, variant) => sum + variant.stock, 0);
 
-/** Danh sách bộ sưu tập đi kèm mỗi lần tải bảng sản phẩm; form sửa dùng lại, không gọi API thêm. */
+/** Danh sách bộ sưu tập đi kèm mỗi lần tải bảng sản phẩm; ô lọc và form sửa dùng lại, không gọi API thêm. */
 let collectionOptions: CollectionOption[] | null = null;
 
-async function fetchProducts(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
-  const response = await fetch(`/api/admin/products?${params}`, { cache: 'no-store' });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Không tải được sản phẩm');
-  if (Array.isArray(data.collections)) collectionOptions = data.collections;
-  return { items: data.items as ProductRow[], total: data.total as number, page: data.page as number, pages: data.pages as number };
-}
+const PRODUCT_SORTS = [
+  { value: 'newest', label: 'Mới nhất' }, { value: 'updated', label: 'Cập nhật gần đây' }, { value: 'name', label: 'Tên A–Z' },
+  { value: 'price-asc', label: 'Giá thấp → cao' }, { value: 'price-desc', label: 'Giá cao → thấp' },
+];
+const STATUS_FILTER: TableFilter = { key: 'status', label: 'Trạng thái bán', all: 'Tất cả sản phẩm',
+  options: [{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Đang ẩn' }] };
+const CONDITION_FILTER: TableFilter = { key: 'filter', label: 'Tình trạng', options: [
+  { value: 'low-stock', label: 'Sắp hết hàng (còn ≤ 5)' }, { value: 'out-of-stock', label: 'Hết hàng' },
+  { value: 'no-image', label: 'Chưa có ảnh' }, { value: 'sale', label: 'Đang giảm giá' },
+  { value: 'best-seller', label: 'Bán chạy' }, { value: 'new', label: 'Hàng mới' }] };
 
 export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean }) {
   const [view, setView] = useState<View>({ mode: 'list' });
   const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
+  const [collections, setCollections] = useState(collectionOptions);
   const back = useCallback((text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); }, []);
+  const fetchProducts = useCallback(async (query: TableQuery) => {
+    const response = await fetch(`/api/admin/products?${tableParams(query)}`, { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Không tải được sản phẩm');
+    if (Array.isArray(data.collections)) { collectionOptions = data.collections; setCollections(data.collections); }
+    return { items: data.items as ProductRow[], total: data.total as number, page: data.page as number, pages: data.pages as number };
+  }, []);
 
   if (view.mode === 'create') return <ProductCreateForm onDone={back} />;
   if (view.mode === 'edit') return <ProductEditForm product={view.product} onBack={back} />;
@@ -60,18 +70,17 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchProducts} reloadKey={reloadKey}
-      searchPlaceholder="Tìm theo tên, SKU hoặc slug (không cần dấu)"
-      filters={[{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Đang ẩn' },
-        { value: 'low-stock', label: 'Sắp hết hàng (còn ≤ 5)' }, { value: 'out-of-stock', label: 'Hết hàng' },
-        { value: 'sale', label: 'Đang giảm giá' }, { value: 'best-seller', label: 'Bán chạy' },
-        { value: 'new', label: 'Hàng mới' }, { value: 'no-image', label: 'Chưa có ảnh' }]}
+      searchPlaceholder="Tìm theo tên, SKU hoặc slug"
+      sorts={PRODUCT_SORTS}
+      filters={[STATUS_FILTER, CONDITION_FILTER, { key: 'collection', label: 'Bộ sưu tập', options: [
+        ...(collections || []).map((collection) => ({ value: collection.id, label: collection.title })),
+        { value: 'none', label: 'Chưa thuộc bộ sưu tập' }] }]}
       emptyText="Chưa có sản phẩm nào."
       onRowClick={(row) => setView({ mode: 'edit', product: row })}
       toolbar={canCreateProduct
         ? <button type="button" onClick={() => setView({ mode: 'create' })}
             className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm sản phẩm</button>
         : undefined} />
-    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết và chỉnh sửa sản phẩm.</p>
   </div>;
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronsUp, GripVertical, ImagePlus, Images, ListOrdered, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { MediaPicker, type MediaAssetRow } from '@/components/admin/MediaPicker';
 import { compressImage, SCREENSHOT_OPTIONS } from '@/client/image-compress';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
@@ -16,9 +16,16 @@ const field = 'mt-1 block w-full rounded-xl border p-3';
 const normalize = (text: string) => text.toLocaleLowerCase('vi-VN').normalize('NFD')
   .replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 
+/** Mặc định đúng thứ tự khách thấy trên website. */
+const FEEDBACK_SORTS = [{ value: 'display', label: 'Thứ tự trên website' }, { value: 'newest', label: 'Mới thêm nhất' }];
+const FEEDBACK_FILTERS: TableFilter[] = [
+  { key: 'filter', label: 'Trạng thái', options: [{ value: 'published', label: 'Đang công bố' }, { value: 'draft', label: 'Bản nháp' }] },
+  { key: 'product', label: 'Sản phẩm được khen', all: 'Tất cả sản phẩm',
+    options: [{ value: 'linked', label: 'Đã gắn sản phẩm' }, { value: 'unlinked', label: 'Chưa gắn sản phẩm' }] },
+];
+
 async function fetchTestimonials(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
-  const response = await fetch(`/api/admin/testimonials?${params}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/testimonials?${tableParams(query)}`, { cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Không tải được feedback');
   return { items: data.items as AdminTestimonial[], total: data.total as number, page: data.page as number, pages: data.pages as number };
@@ -64,8 +71,8 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchTestimonials} reloadKey={reloadKey} pageSize={12}
-      searchPlaceholder="Tìm theo chú thích hoặc sản phẩm"
-      filters={[{ value: 'published', label: 'Đang công bố' }, { value: 'draft', label: 'Bản nháp' }]}
+      searchPlaceholder="Tìm chú thích hoặc sản phẩm"
+      sorts={FEEDBACK_SORTS} filters={FEEDBACK_FILTERS}
       emptyText="Chưa có feedback nào. Bấm “Thêm feedback” để tải ảnh feedback của khách."
       onRowClick={(row) => setView({ mode: 'edit', testimonial: row })}
       toolbar={<>
@@ -76,10 +83,6 @@ export function TestimonialManager({ products }: { products: FeedbackProductOpti
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">
           <ImagePlus className="size-4" aria-hidden />Thêm feedback</button>
       </>} />
-    <p className="text-xs text-charcoal-500">
-      Danh sách xếp đúng thứ tự trên website. Trang chủ hiện {HOME_STORY_COUNT} ảnh đầu dạng story, trang /feedback hiện toàn bộ dạng album.
-      Feedback mới thêm hiện trước; bấm “Sắp xếp hiển thị” để kéo-thả đổi vị trí. Chỉ ảnh đã xác nhận khách đồng ý và bật công bố mới hiển thị.
-    </p>
   </div>;
 }
 

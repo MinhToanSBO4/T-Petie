@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { markAdminPagesStale } from '@/client/admin-freshness';
+import { compactFilters, type TableFilter, type TableOption, type TableQuery } from '@/lib/admin/table-query';
+
+export { tableParams, type TableFilter, type TableOption, type TableQuery } from '@/lib/admin/table-query';
 
 export type Column<T> = {
   key: string;
@@ -13,14 +16,12 @@ export type Column<T> = {
 };
 
 export type TablePage<T> = { items: T[]; total: number; page: number; pages: number };
-export type TableQuery = { page: number; limit: number; q: string; filter: string };
-export type TableFilter = { value: string; label: string };
 
-type Snapshot = { page: number; query: string; filter: string; reloadKey: number };
+type Snapshot = { page: number; query: string; sort: string; filters: Record<string, string>; reloadKey: number };
 type CachedPage = { data: TablePage<unknown>; loadedAt: number };
 /**
  * Bộ nhớ đệm của bảng quản trị, nằm trong bộ nhớ tab trình duyệt nên mất khi F5.
- * - snapshots: trang/từ khóa/bộ lọc đang xem, để quay lại đúng chỗ.
+ * - snapshots: trang/từ khóa/cách sắp xếp/bộ lọc đang xem, để quay lại đúng chỗ.
  * - pages: dữ liệu từng trang đã tải; xem lại không gửi truy vấn nào lên máy chủ.
  * Dữ liệu chỉ tải lại khi bấm "Làm mới", sau khi chính người dùng sửa dữ liệu (reloadKey đổi), hoặc F5.
  */
@@ -37,12 +38,14 @@ const pageCache = (table: string) => {
   return pageStore.get(table)!;
 };
 
+const selectBase = 'min-h-11 w-full rounded-xl border text-sm sm:w-auto';
+
 /**
- * Bảng quản trị dùng chung: tìm kiếm, lọc, phân trang phía máy chủ và thanh nút chức năng.
+ * Bảng quản trị dùng chung: tìm kiếm, sắp xếp, lọc, phân trang phía máy chủ và thanh nút chức năng.
  * Mỗi trang chỉ tải đúng số dòng cần hiển thị.
  */
 export function DataTable<T extends { id: string }>({
-  columns, fetchPage, toolbar, searchPlaceholder, emptyText, onRowClick, filters, pageSize = 10, reloadKey = 0, stateKey, onData,
+  columns, fetchPage, toolbar, searchPlaceholder, emptyText, onRowClick, sorts, filters, pageSize = 10, reloadKey = 0, stateKey, onData,
   alwaysRevalidate = false,
 }: {
   columns: Column<T>[];
@@ -51,6 +54,8 @@ export function DataTable<T extends { id: string }>({
   searchPlaceholder?: string;
   emptyText?: string;
   onRowClick?: (row: T) => void;
+  /** Cách sắp xếp API hỗ trợ; phương án đầu tiên là mặc định. */
+  sorts?: TableOption[];
   filters?: TableFilter[];
   pageSize?: number;
   reloadKey?: number;
@@ -64,12 +69,16 @@ export function DataTable<T extends { id: string }>({
   const pathname = usePathname();
   const key = stateKey || pathname;
   const saved = snapshots.get(key);
+  const defaultSort = sorts?.[0]?.value ?? '';
+  // Cách sắp xếp đã lưu không còn trong danh sách (bảng vừa đổi phương án) thì về mặc định.
+  const savedSort = saved && sorts?.some((item) => item.value === saved.sort) ? saved.sort : defaultSort;
   const [page, setPage] = useState(saved?.page ?? 1);
   const [query, setQuery] = useState(saved?.query ?? '');
   const [debouncedQuery, setDebouncedQuery] = useState(saved?.query ?? '');
-  const [filter, setFilter] = useState(saved?.filter ?? '');
-  const cacheId = (target: number) => JSON.stringify([target, pageSize, debouncedQuery, filter]);
-  const initial = pageCache(key).get(JSON.stringify([saved?.page ?? 1, pageSize, saved?.query ?? '', saved?.filter ?? '']));
+  const [sort, setSort] = useState(savedSort);
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(saved?.filters ?? {});
+  const cacheId = (target: number) => JSON.stringify([target, pageSize, debouncedQuery, sort, filterValues]);
+  const initial = pageCache(key).get(JSON.stringify([saved?.page ?? 1, pageSize, saved?.query ?? '', savedSort, saved?.filters ?? {}]));
   const [data, setData] = useState<TablePage<T> | null>((initial?.data as TablePage<T> | undefined) ?? null);
   const [loadedAt, setLoadedAt] = useState<number | null>(initial?.loadedAt ?? null);
   const [loading, setLoading] = useState(!initial);
@@ -101,7 +110,7 @@ export function DataTable<T extends { id: string }>({
     const inflightId = `${key}|${cacheId(page)}`;
     let pending = inflight.get(inflightId);
     if (!pending) {
-      pending = (fetcher.current({ page, limit: pageSize, q: debouncedQuery, filter }) as Promise<TablePage<unknown>>)
+      pending = (fetcher.current({ page, limit: pageSize, q: debouncedQuery, sort, filters: filterValues }) as Promise<TablePage<unknown>>)
         .finally(() => inflight.delete(inflightId));
       inflight.set(inflightId, pending);
     }
@@ -117,7 +126,7 @@ export function DataTable<T extends { id: string }>({
     } finally { if (request === latestRequest.current) setLoading(false); }
     // cacheId phụ thuộc đúng các giá trị trong danh sách bên dưới.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, page, pageSize, debouncedQuery, filter, alwaysRevalidate]);
+  }, [key, page, pageSize, debouncedQuery, sort, filterValues, alwaysRevalidate]);
 
   /** Nút "Làm mới": bỏ các trang đã lưu của bảng này rồi tải lại trang đang xem. */
   const refresh = useCallback(() => {
@@ -135,36 +144,58 @@ export function DataTable<T extends { id: string }>({
     }
     void load(false);
   }, [load, reloadKey, refresh]);
-  useEffect(() => { snapshots.set(key, { page, query: debouncedQuery, filter, reloadKey }); }, [key, page, debouncedQuery, filter, reloadKey]);
+  useEffect(() => { snapshots.set(key, { page, query: debouncedQuery, sort, filters: filterValues, reloadKey }); },
+    [key, page, debouncedQuery, sort, filterValues, reloadKey]);
   const onDataRef = useRef(onData);
   onDataRef.current = onData;
   useEffect(() => { onDataRef.current?.(data?.items ?? []); }, [data]);
 
+  const changeSort = (value: string) => { setSort(value); setPage(1); };
+  const changeFilter = (name: string, value: string) => { setFilterValues((current) => compactFilters({ ...current, [name]: value })); setPage(1); };
+  const resetView = () => { setSort(defaultSort); setFilterValues({}); setPage(1); };
+  const customized = sort !== defaultSort || Object.keys(filterValues).length > 0;
+  const sortOptions = sorts && sorts.length > 1 ? sorts : null;
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;
 
   return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {searchPlaceholder && <label className="relative">
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-charcoal-400" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder}
-            className="min-h-11 w-64 rounded-xl border border-cream-300 bg-white pl-9 pr-3 text-sm" />
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {searchPlaceholder && <label className="relative w-full sm:w-80 lg:w-96">
+          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-charcoal-400" aria-hidden />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder}
+            className="min-h-11 w-full rounded-xl border border-cream-300 bg-white pl-9 pr-3 text-sm" />
         </label>}
-        {filters && filters.length > 0 && <select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1); }}
-          className="min-h-11 rounded-xl border border-cream-300 bg-white px-3 text-sm">
-          <option value="">Tất cả</option>
-          {filters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {loadedAt && <span className="text-xs text-charcoal-500">Cập nhật lúc {new Date(loadedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>}
+          <button type="button" onClick={refresh} disabled={loading} title="Tải lại dữ liệu mới nhất từ máy chủ"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cream-300 bg-white px-3 text-sm font-semibold text-charcoal-700 transition-colors hover:border-honey-300 hover:text-honey-700 disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden />Làm mới
+          </button>
+          {toolbar}
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {loadedAt && <span className="text-xs text-charcoal-500">Cập nhật lúc {new Date(loadedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>}
-        <button type="button" onClick={refresh} disabled={loading} title="Tải lại dữ liệu mới nhất từ máy chủ"
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cream-300 bg-white px-3 text-sm font-semibold text-charcoal-700 transition-colors hover:border-honey-300 hover:text-honey-700 disabled:opacity-50">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden />Làm mới
-        </button>
-        {toolbar}
-      </div>
+      {(sortOptions || Boolean(filters?.length)) && <div className="flex flex-wrap items-center gap-2">
+        {sortOptions && <label className="relative w-full sm:w-auto">
+          <ArrowUpDown className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-charcoal-400" aria-hidden />
+          <select aria-label="Sắp xếp" title="Sắp xếp" value={sort} onChange={(event) => changeSort(event.target.value)}
+            className={`${selectBase} border-cream-300 bg-white pl-9 pr-3`}>
+            {sortOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>}
+        {filters?.map((group) => {
+          const value = filterValues[group.key] ?? '';
+          // Nhóm đang lọc được tô nhẹ để không quên mình đang xem một phần dữ liệu.
+          return <select key={group.key} aria-label={group.label} title={group.label} value={value}
+            onChange={(event) => changeFilter(group.key, event.target.value)}
+            className={`${selectBase} px-3 ${value ? 'border-honey-400 bg-honey-50' : 'border-cream-300 bg-white'}`}>
+            <option value="">{group.all ?? `Tất cả ${group.label.toLocaleLowerCase('vi-VN')}`}</option>
+            {group.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>;
+        })}
+        {customized && <button type="button" onClick={resetView}
+          className="min-h-11 rounded-xl px-3 text-sm font-semibold text-honey-700 hover:bg-honey-50">Đặt lại</button>}
+      </div>}
     </div>
 
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}

@@ -1,8 +1,8 @@
-import { requireStaffPage } from '@/server/auth/staff-session';
-import { AdminHeader } from '@/components/admin/AdminHeader';
-import { AdminSidebar, type AdminNavItem } from '@/components/admin/AdminSidebar';
-import { AdminFreshness } from '@/components/admin/AdminFreshness';
+import { requireAdminPage } from '@/server/auth/staff-session';
+import { BackOfficeShell } from '@/components/admin/BackOfficeShell';
+import type { AdminNavItem } from '@/components/admin/AdminSidebar';
 import { getSiteContent } from '@/server/content/site-content';
+import { getOrdersToHandleCount } from '@/server/admin/staff-home';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,36 +20,19 @@ const ADMIN_ITEMS: AdminNavItem[] = [
   { href: '/admin/exports', label: 'Xuất dữ liệu', icon: 'exports' },
 ];
 
-const STAFF_ITEMS: AdminNavItem[] = [
-  { href: '/admin/products', label: 'Sản phẩm', icon: 'products' },
-  { href: '/admin/collections', label: 'Bộ sưu tập', icon: 'collections' },
-  { href: '/admin/content', label: 'Nội dung website', icon: 'content' },
-  { href: '/admin/reviews', label: 'Đánh giá sản phẩm', icon: 'reviews' },
-  { href: '/admin/feedback', label: 'Feedback', icon: 'feedback' },
-];
-
 /**
- * Cửa chặn tập trung cho toàn bộ khu vực quản trị + điều hướng chức năng.
- * Mỗi trang vẫn tự kiểm tra vai trò chi tiết (admin hay staff), nhưng lớp này bảo đảm
- * một trang thêm mới dưới /admin/* không thể vô tình mở cho người chưa đăng nhập.
+ * Cửa chặn tập trung cho khu quản trị (chỉ quản trị viên; nhân viên được đưa sang /staff) + điều hướng chức năng.
+ * Mỗi trang vẫn tự kiểm tra vai trò, nhưng lớp này bảo đảm một trang thêm mới dưới /admin/* không thể vô tình
+ * mở cho người khác.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Nội dung thương hiệu đã được cache nên đọc song song với kiểm tra phiên; chuyển hướng vẫn xảy ra trước khi dựng trang.
-  const [session, siteContent] = await Promise.all([requireStaffPage('/admin'), getSiteContent()]);
-  const items = session.user.role === 'admin' ? ADMIN_ITEMS : STAFF_ITEMS;
+  // Nội dung thương hiệu và số đơn đã được cache nên đọc song song với kiểm tra phiên; chuyển hướng vẫn xảy ra trước khi dựng trang.
+  const [session, siteContent, ordersToHandle] = await Promise.all([requireAdminPage('/admin'), getSiteContent(), getOrdersToHandleCount()]);
   const brandAssets = siteContent.brand_assets;
-  const userName = session.user.name || session.user.email || 'Tài khoản quản trị';
+  const items = ADMIN_ITEMS.map((item) => item.icon === 'orders' ? { ...item, badge: ordersToHandle } : item);
 
-  return <div className="admin-theme min-h-screen bg-cream-50">
-    <AdminFreshness />
-    <AdminHeader logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt}
-      userName={userName} userRole={session.user.role} />
-    <div className="flex w-full items-start gap-3 px-3 py-6 sm:gap-4 sm:px-6 lg:gap-8">
-      {/* Sidebar luôn nằm bên trái và giữ nguyên vị trí khi cuộn nội dung. */}
-      <aside className="no-scrollbar sticky top-20 w-[4.5rem] shrink-0 self-start sm:w-48 lg:w-60 max-h-[calc(100vh-6rem)] overflow-y-auto">
-        <AdminSidebar items={items} />
-      </aside>
-      <main className="min-w-0 flex-1">{children}</main>
-    </div>
-  </div>;
+  return <BackOfficeShell home="/admin" items={items} logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt}
+    userName={session.user.name || session.user.email || 'Tài khoản quản trị'} userRole={session.user.role}>
+    {children}
+  </BackOfficeShell>;
 }

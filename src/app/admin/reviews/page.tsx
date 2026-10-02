@@ -1,9 +1,9 @@
-import { requireStaffPage } from '@/server/auth/staff-session';
+import { requireAdminPage } from '@/server/auth/staff-session';
 import { ReviewManager } from '@/components/admin/ReviewManager';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminReviewsPage() {
-  await requireStaffPage('/admin/reviews');
+  await requireAdminPage('/admin/reviews');
   return <ReviewManager />;
 }

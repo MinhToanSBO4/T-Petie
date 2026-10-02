@@ -6,7 +6,7 @@ import { prisma } from '@/server/db/client';
 import { table } from '@/server/db/sql';
 import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 import {
-  AUTO_COMPLETE_DAYS, canTransition, forwardPath, PREVIOUS_STATUS, UNDO_WINDOW_MS, UNDOABLE_STATUSES,
+  AUTO_COMPLETE_DAYS, canTransition, forwardPath, isShopActor, PREVIOUS_STATUS, UNDO_WINDOW_MS, UNDOABLE_STATUSES,
   type OrderStatus, type StatusActor,
 } from '@/lib/orders/status';
 
@@ -159,7 +159,7 @@ export async function bulkChangeOrderStatus(codes: string[], next: OrderStatus, 
 
 /**
  * Hoàn tác thao tác vừa bấm: đưa đơn từ `current` về `to` (mặc định là bước liền trước) khi đơn vẫn đang ở đúng
- * `current` và mọi bước cần gỡ đều do quản trị viên ghi trong UNDO_WINDOW_MS. Xóa các dòng lịch sử đó để hành trình đơn
+ * `current` và mọi bước cần gỡ đều do shop (quản trị viên hoặc nhân viên) ghi trong UNDO_WINDOW_MS. Xóa các dòng lịch sử đó để hành trình đơn
  * của khách không hiện bước đã hoàn tác. Hoàn tác Hoàn tất thì gỡ mốc hoàn tất (khóa lại quyền đánh giá) và trạng thái
  * đã thu tiền COD, chỉ khi khách chưa kịp đánh giá. Không hoàn tác Hủy.
  */
@@ -177,7 +177,7 @@ async function undoOne(orderCode: string, current: OrderStatus, to: OrderStatus 
   const expected = [...path].reverse();
   const now = Date.now();
   const removable = order.statusEvents.length === path.length && order.statusEvents.every((event, index) =>
-    event.status === expected[index] && event.actor === 'admin' && now - event.createdAt.getTime() <= UNDO_WINDOW_MS);
+    event.status === expected[index] && isShopActor(event.actor) && now - event.createdAt.getTime() <= UNDO_WINDOW_MS);
   if (!removable) throw new OrderStatusError(UNDO_EXPIRED);
   if (order.items.some((item) => item.review)) throw new OrderStatusError(UNDO_REVIEWED);
   const reopen = current === 'COMPLETED'

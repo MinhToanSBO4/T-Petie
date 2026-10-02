@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { markAdminPagesStale } from '@/client/admin-freshness';
 
 type Settings = { shippingFee: number; freeShippingThreshold: number };
@@ -29,9 +29,19 @@ const toDateInput = (value: string | null) => {
 const emptyDraft = (): CouponDraft => ({ code: '', type: 'FIXED', value: '10000', minSubtotal: '0',
   active: true, requiresLogin: false, usageLimit: '', startsAt: '', expiresAt: '' });
 
+const COUPON_SORTS = [
+  { value: 'newest', label: 'Mới nhất' }, { value: 'expiring', label: 'Sắp hết hạn' },
+  { value: 'usage', label: 'Dùng nhiều nhất' }, { value: 'code', label: 'Mã A–Z' },
+];
+const COUPON_FILTERS: TableFilter[] = [
+  { key: 'filter', label: 'Trạng thái', options: [{ value: 'active', label: 'Đang bật' }, { value: 'inactive', label: 'Đã tắt' }] },
+  { key: 'validity', label: 'Hiệu lực', options: [
+    { value: 'usable', label: 'Đang dùng được' }, { value: 'scheduled', label: 'Chưa đến ngày bắt đầu' },
+    { value: 'expired', label: 'Đã hết hạn' }, { value: 'used-up', label: 'Đã hết lượt' }] },
+];
+
 async function fetchCoupons(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
-  const response = await fetch(`/api/admin/coupons?${params}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/coupons?${tableParams(query)}`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Không tải được mã giảm giá');
   // Mã giảm giá dùng chính mã làm khóa dòng cho bảng.
@@ -131,7 +141,7 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       <h2 className="text-lg font-bold">Mã giảm giá</h2>
       <DataTable columns={columns} fetchPage={fetchCoupons} reloadKey={reloadKey}
         searchPlaceholder="Tìm theo mã"
-        filters={[{ value: 'active', label: 'Đang bật' }, { value: 'inactive', label: 'Đã tắt' }]}
+        sorts={COUPON_SORTS} filters={COUPON_FILTERS}
         emptyText="Chưa có mã giảm giá nào."
         onRowClick={(row) => setEditing({ mode: 'edit', code: row.code, draft: {
           code: row.code, type: row.type, value: String(row.value), minSubtotal: String(row.minSubtotal),
@@ -140,7 +150,6 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
           startsAt: toDateInput(row.startsAt), expiresAt: toDateInput(row.expiresAt) } })}
         toolbar={<button type="button" onClick={() => setEditing({ mode: 'create' })}
           className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm mã giảm giá</button>} />
-      <p className="text-xs text-charcoal-500">Bấm vào một dòng để chỉnh sửa hoặc xóa mã.</p>
     </section>
 
     {editing && <CouponForm

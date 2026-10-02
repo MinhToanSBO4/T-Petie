@@ -52,7 +52,7 @@ SQL viết tay trong ứng dụng luôn ghi rõ schema (`src/server/db/sql.ts`),
 ## 4. Kiểm tra sau khi deploy
 
 - `https://<domain>/api/products?limit=1` trả JSON có `total`.
-- Đăng nhập `/login` bằng tài khoản admin, mở `/admin/orders`, `/admin/products`.
+- Đăng nhập `/login` bằng tài khoản admin, mở `/admin/orders`, `/admin/products`. Tài khoản nhân viên đăng nhập phải vào `/staff` (trang chủ nhắc việc) và mở được `/staff/orders`.
 - Đặt một đơn thử ở trang khách, đổi trạng thái ở `/admin/orders` (thử "Chuyển tới…" và "Hoàn tác"), rồi hủy đơn thử.
 - Gọi thử cron: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<domain>/api/cron/maintenance` trả `completedOrders`, `failedExports`, `expiredRateLimits`. Không có header thì trả 401.
 - Vercel → **Logs**: không có `Timed out fetching a new connection` hay cảnh báo `[database] ... session pooler`.

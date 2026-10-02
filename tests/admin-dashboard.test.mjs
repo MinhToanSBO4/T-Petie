@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bucketLabel, parseRange, percentChange, resolvePeriod } from '../src/lib/admin/dashboard-range.ts';
+import { bucketLabel, parseRange, percentChange, resolvePeriod, vnDayStart } from '../src/lib/admin/dashboard-range.ts';
 import { formatVNDShort } from '../src/lib/utils/formatters.ts';
-import { MAX_PAGE, parsePagination } from '../src/lib/pagination.ts';
+import { MAX_PAGE, parseChoice, parsePagination, splitPage } from '../src/lib/pagination.ts';
+import { compactFilters, tableParams } from '../src/lib/admin/table-query.ts';
 import { orderStatusLabel } from '../src/lib/orders/status.ts';
 
 test('range parameter only accepts known presets and falls back to 30 days', () => {
@@ -70,6 +71,49 @@ test('pagination rejects huge or fractional values that would break Prisma', () 
   assert.equal(parse('limit=2.5').take, 2);
   assert.equal(parse('limit=1000').take, 50);
   assert.equal(parse('page=-3').page, 1);
+});
+
+test('list sort and filter parameters only accept whitelisted values', () => {
+  const choices = { newest: 'N', 'price-asc': 'P' };
+  const parse = (query) => parseChoice(new URLSearchParams(query), 'sort', choices);
+  assert.equal(parse('sort=newest'), 'N');
+  assert.equal(parse('sort=price-asc'), 'P');
+  for (const query of ['', 'sort=', 'sort=bogus', 'sort=NEWEST', 'sort=__proto__', 'sort=constructor', 'sort=toString', 'filter=newest']) {
+    assert.equal(parse(query), undefined, query);
+  }
+});
+
+test('"today", "7 days" and "30 days" list filters start at Vietnam midnight', () => {
+  const morning = new Date('2026-10-01T02:00:00Z'); // 09:00 ngày 01/10 giờ VN
+  assert.equal(vnDayStart(0, morning).toISOString(), '2026-09-30T17:00:00.000Z');
+  assert.equal(vnDayStart(6, morning).toISOString(), resolvePeriod('7d', morning).from.toISOString(), 'same window as the dashboard');
+  assert.equal(vnDayStart(29, morning).toISOString(), resolvePeriod('30d', morning).from.toISOString());
+  assert.equal(vnDayStart(0, new Date('2026-09-30T17:30:00Z')).toISOString(), '2026-09-30T17:00:00.000Z', '00:30 VN is already the new day');
+  assert.equal(vnDayStart(0, new Date('2026-09-30T16:59:59Z')).toISOString(), '2026-09-29T17:00:00.000Z', '23:59 VN is still the old day');
+  assert.equal(vnDayStart(0, new Date('2027-01-01T03:00:00Z')).toISOString(), '2026-12-31T17:00:00.000Z', 'rolls over the year');
+});
+
+test('a page spanning two separately ordered groups has no gaps or repeats', () => {
+  assert.deepEqual(splitPage(0, 10, [4, 20]), [{ skip: 0, take: 4 }, { skip: 0, take: 6 }]);
+  assert.deepEqual(splitPage(10, 10, [4, 20]), [{ skip: 4, take: 0 }, { skip: 6, take: 10 }]);
+  assert.deepEqual(splitPage(0, 10, [0, 3]), [{ skip: 0, take: 0 }, { skip: 0, take: 3 }]);
+  assert.deepEqual(splitPage(40, 10, [4, 20]), [{ skip: 4, take: 0 }, { skip: 20, take: 0 }], 'past the end is empty');
+  const groups = [['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'], ['b1', 'b2', 'b3', 'b4', 'b5']];
+  const pages = [0, 1, 2, 3, 4].flatMap((page) => splitPage(page * 3, 3, groups.map((group) => group.length))
+    .flatMap((part, index) => groups[index].slice(part.skip, part.skip + part.take)));
+  assert.deepEqual(pages, groups.flat());
+});
+
+test('admin tables keep one cache key per sort/filter choice and send only active filters', () => {
+  assert.deepEqual(compactFilters({ status: '', filter: 'out-of-stock', collection: 'abc' }), { collection: 'abc', filter: 'out-of-stock' });
+  assert.equal(JSON.stringify(compactFilters({ status: 'active', collection: 'abc' })),
+    JSON.stringify(compactFilters({ collection: 'abc', status: 'active' })), 'choosing filters in any order gives the same key');
+  assert.deepEqual(compactFilters({ status: '' }), {});
+  const query = { page: 2, limit: 10, q: 'váy', sort: 'price-asc', filters: { collection: 'abc' } };
+  assert.equal(tableParams(query).toString(), 'page=2&limit=10&q=v%C3%A1y&sort=price-asc&collection=abc');
+  assert.equal(tableParams({ ...query, sort: '', filters: {} }).toString(), 'page=2&limit=10&q=v%C3%A1y');
+  assert.equal(tableParams({ ...query, filters: { filter: 'blocked' } }, { filter: 'staff' }).get('filter'), 'staff',
+    'a table\'s fixed parameter (staff vs customer list) cannot be overridden by a filter');
 });
 
 test('order status labels are shared and unknown values pass through', () => {

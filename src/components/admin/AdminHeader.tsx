@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
-import { ChevronDown, LogOut, User as UserIcon } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, UserRoundCog } from 'lucide-react';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 
 /**
- * Header của khu quản trị: chỉ gồm tên thương hiệu và nút tài khoản.
- * Menu tài khoản chứa chức năng đăng xuất.
+ * Header của khu quản trị/nhân viên: tên thương hiệu và nút tài khoản. Cao cố định h-16 để sidebar dính ngay bên dưới.
+ * Menu tài khoản gồm trang thông tin tài khoản và đăng xuất.
  */
-export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
-  logoUrl?: string; logoAlt?: string; userName: string; userRole: string;
+export function AdminHeader({ home, logoUrl, logoAlt, userName, userRole }: {
+  home: string; logoUrl?: string; logoAlt?: string; userName: string; userRole: string;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -30,9 +30,9 @@ export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
     };
   }, []);
 
-  return <header className="sticky top-0 z-40 border-b border-cream-200 bg-white shadow-sm">
-    <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
-      <Link href="/admin" className="flex items-center gap-2">
+  return <header className="sticky top-0 z-40 h-16 border-b border-cream-200 bg-white shadow-sm">
+    <div className="flex h-full items-center justify-between gap-4 px-4 sm:px-6">
+      <Link href={home} className="flex items-center gap-2">
         {logoUrl
           ? <img src={cloudinaryImage(logoUrl, { width: 300 })} alt={logoAlt || "T'Petie"} className="h-9 w-auto object-contain" />
           : <span className="font-heading text-lg font-bold text-honey-700">T&apos;Petie</span>}
@@ -51,6 +51,11 @@ export function AdminHeader({ logoUrl, logoAlt, userName, userRole }: {
             <p className="truncate text-sm font-bold text-charcoal-900">{userName}</p>
             <p className="text-[11px] text-charcoal-500">{userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}</p>
           </div>
+          <Link href={`${home}/account`} role="menuitem" onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-charcoal-800 hover:bg-honey-50">
+            <UserRoundCog className="h-4 w-4 text-honey-600" />
+            Tài khoản của tôi
+          </Link>
           <button type="button" role="menuitem" onClick={() => void signOut({ callbackUrl: '/' })}
             className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-blush-700 hover:bg-blush-50">
             <LogOut className="h-4 w-4" />

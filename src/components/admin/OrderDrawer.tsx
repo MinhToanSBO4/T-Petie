@@ -17,7 +17,7 @@ const STEPS = [
   { status: 'COMPLETED', label: 'Đã giao' },
 ] as const;
 
-const ACTOR_LABEL = { admin: 'Quản trị viên', customer: 'Khách hàng', system: 'Hệ thống' } as const;
+const ACTOR_LABEL = { admin: 'Quản trị viên', staff: 'Nhân viên', customer: 'Khách hàng', system: 'Hệ thống' } as const;
 
 /** Gợi ý việc cần làm ở từng bước, hiện ngay trên nút thao tác chính. */
 const STEP_HINT: Record<string, string> = {

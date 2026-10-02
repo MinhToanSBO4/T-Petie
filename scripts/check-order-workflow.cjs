@@ -154,8 +154,12 @@ async function main() {
     accountIds.push(staffUser.id);
     const staff = await login(staffName, staffPassword);
     const staffBulk = await request('/api/admin/orders/bulk', 'POST', staff, { action: 'advance', codes: [first.orderCode], to: 'CONFIRMED' });
-    assert(staffBulk.status === 403, `Staff could process orders: ${staffBulk.status}`);
-    console.log('✔ Bulk limits: 50 orders per request, cancel needs a reason, staff cannot process orders');
+    assert(staffBulk.status === 200 && staffBulk.data.results[0]?.ok, `Staff could not process orders: ${staffBulk.status} ${staffBulk.text}`);
+    const staffStep = await prisma.orderStatusEvent.findFirst({ where: { orderId: first.id, status: 'CONFIRMED' }, orderBy: { createdAt: 'desc' } });
+    assert(staffStep?.actor === 'staff', `Staff step recorded as ${staffStep?.actor}`);
+    const staffUndo = await request(`/api/admin/orders/${first.orderCode}`, 'PATCH', staff, { undo: 'CONFIRMED' });
+    assert(staffUndo.status === 200 && staffUndo.data.status === 'PENDING', `Staff undo: ${staffUndo.status} ${staffUndo.text}`);
+    console.log('✔ Bulk limits: 50 orders per request, cancel needs a reason; staff process orders (logged as staff) and can undo');
   } finally {
     if (orderIds.length) {
       await prisma.orderStatusEvent.deleteMany({ where: { orderId: { in: orderIds } } });

@@ -1,18 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { MediaPicker, MediaListPicker } from '@/components/admin/MediaPicker';
+import { ColorPicker } from '@/components/admin/ColorPicker';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { ACCENT_COLOR_PRESETS, THEME_COLOR_PRESETS } from '@/lib/content/collection-colors';
 import type { AdminCollection } from '@/types/admin-content';
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; collection: AdminCollection };
 
 const field = 'mt-1 block w-full rounded-xl border p-3';
 
+const COLLECTION_SORTS = [
+  { value: 'manual', label: 'Thứ tự hiển thị' }, { value: 'newest', label: 'Mới nhất' },
+  { value: 'title', label: 'Tên A–Z' }, { value: 'products', label: 'Nhiều sản phẩm nhất' },
+];
+const COLLECTION_FILTERS: TableFilter[] = [
+  { key: 'filter', label: 'Trạng thái', options: [{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Lưu trữ' }] },
+  { key: 'placement', label: 'Vị trí hiển thị', all: 'Tất cả vị trí',
+    options: [{ value: 'menu', label: 'Đang hiện ở menu' }, { value: 'home', label: 'Đang hiện ở trang chủ' }] },
+];
+
 async function fetchCollections(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: query.filter });
-  const response = await fetch(`/api/admin/collections?${params}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/collections?${tableParams(query)}`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Không tải được bộ sưu tập');
   return { items: data.items as AdminCollection[], total: data.total as number, page: data.page as number, pages: data.pages as number };
@@ -46,12 +57,11 @@ export function CollectionManager() {
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchCollections} reloadKey={reloadKey}
       searchPlaceholder="Tìm theo tên hoặc slug"
-      filters={[{ value: 'active', label: 'Đang bán' }, { value: 'hidden', label: 'Lưu trữ' }]}
+      sorts={COLLECTION_SORTS} filters={COLLECTION_FILTERS}
       emptyText="Chưa có bộ sưu tập nào."
       onRowClick={(row) => setView({ mode: 'edit', collection: row })}
       toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
         className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm bộ sưu tập</button>} />
-    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết và chỉnh sửa bộ sưu tập.</p>
   </div>;
 }
 
@@ -119,12 +129,10 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
           onChange={(lookbookUrls) => setDraft({ ...draft, lookbookUrls })} />
         <p className="mt-1 text-xs text-charcoal-500">Ảnh dọc (tỉ lệ 2:3) đẹp nhất. 3 ảnh đầu hiện ở trang Bộ sưu tập; ảnh đầu tiên là ảnh lớn trong trang chi tiết. Dùng nút lên/xuống để đổi thứ tự.</p>
       </div>
-      <label className="text-sm font-semibold">Màu nền
-        <input className={`${field} h-11 p-1`} type="color" value={draft.themeColor}
-          onChange={(event) => setDraft({ ...draft, themeColor: event.target.value })} /></label>
-      <label className="text-sm font-semibold">Màu nhấn (số chương ở trang Bộ sưu tập; màu quá nhạt sẽ tự đổi sang màu đậm để dễ đọc)
-        <input className={`${field} h-11 p-1`} type="color" value={draft.accentColor}
-          onChange={(event) => setDraft({ ...draft, accentColor: event.target.value })} /></label>
+      <ColorPicker label="Màu nền" value={draft.themeColor} presets={THEME_COLOR_PRESETS}
+        onChange={(themeColor) => setDraft({ ...draft, themeColor })} />
+      <ColorPicker label="Màu nhấn" value={draft.accentColor} presets={ACCENT_COLOR_PRESETS}
+        onChange={(accentColor) => setDraft({ ...draft, accentColor })} />
     </div>
     <div className="flex flex-wrap gap-5 text-sm font-semibold">
       {([['isActive', 'Đang hoạt động'], ['showInMenu', 'Hiện ở menu'], ['showOnHome', 'Hiện ở trang chủ']] as const)

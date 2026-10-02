@@ -1,10 +1,22 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
-import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
+import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
+
+/** Cách sắp xếp danh sách tài khoản; luôn kèm id để phân trang ổn định. Chưa từng đăng nhập/chưa đặt tên xếp cuối. */
+const SORTS: Record<string, Prisma.UserOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  login: [{ lastLoginAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+  name: [{ name: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+  orders: [{ orders: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }],
+};
+const STATUS: Record<string, Prisma.UserWhereInput> = { active: { status: 'active' }, blocked: { status: 'blocked' } };
+/** Đơn gắn với tài khoản (khách đặt khi đã đăng nhập). */
+const ORDERED: Record<string, Prisma.UserWhereInput> = { yes: { orders: { some: {} } }, no: { orders: { none: {} } } };
 
 // GET: Lấy danh sách người dùng trong hệ thống, có tìm kiếm và phân trang (Chỉ Admin)
 export async function GET(request: Request) {
@@ -20,9 +32,11 @@ export async function GET(request: Request) {
     const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
     const search = parseSearch(searchParams);
     const roleFilter = searchParams.get('filter') || '';
-    const where = {
+    const where: Prisma.UserWhereInput = {
       deletedAt: null,
       ...(roleFilter === 'user' || roleFilter === 'staff' || roleFilter === 'admin' ? { role: roleFilter } : {}),
+      ...parseChoice(searchParams, 'status', STATUS),
+      ...parseChoice(searchParams, 'ordered', ORDERED),
       ...(search ? { OR: [
         { name: { contains: search, mode: 'insensitive' as const } },
         { email: { contains: search, mode: 'insensitive' as const } },
@@ -33,7 +47,7 @@ export async function GET(request: Request) {
 
     const [users, total] = await Promise.all([prisma.user.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: parseChoice(searchParams, 'sort', SORTS) ?? SORTS.newest,
       skip,
       take,
       select: {
@@ -55,6 +69,7 @@ export async function GET(request: Request) {
         recommendedSize: true,
         createdAt: true,
         lastLoginAt: true,
+        _count: { select: { orders: true } },
       },
     }), prisma.user.count({ where })]);
 
@@ -71,6 +86,7 @@ export async function GET(request: Request) {
       address: u.address || undefined,
       city: u.city || undefined,
       points: u.points,
+      orderCount: u._count.orders,
       babyProfile: u.babyName
         ? {
             name: u.babyName,

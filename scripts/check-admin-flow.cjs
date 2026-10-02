@@ -72,9 +72,10 @@ async function main() {
     const publicHome = await request('/', 'GET');
     assert(publicHome.text.includes('Giỏ hàng'), 'Customer chrome missing on the public site.');
 
-    // 2. Nhân viên mở trang chỉ dành admin được đưa về khu vực của họ (không về trang đăng nhập).
+    // 2. Nhân viên mở trang chỉ dành admin được đưa về khu nhân viên /staff (không về trang đăng nhập).
     const staffOnAdminPage = await request('/admin/exports', 'GET', staff.cookie);
-    assert(staffOnAdminPage.text.includes('/admin/products'), 'Staff was not redirected to their own area.');
+    assert(staffOnAdminPage.text.includes('href="/staff/orders"') && !staffOnAdminPage.text.includes('Tạo file Excel mới'),
+      'Staff was not redirected to their own area.');
 
     // 3. Trình chỉnh sửa nội dung hiển thị khối thật của trang chủ kèm nút Sửa.
     const contentEditor = await request('/admin/content', 'GET', admin.cookie);

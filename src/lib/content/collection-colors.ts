@@ -2,6 +2,20 @@
 const FALLBACK_ACCENT = '#B45309';
 const PAGE_BACKGROUND = '#FFF8EE';
 
+/** Màu nền gợi ý trong trang quản trị: tông nhạt, hiện sau banner trong lúc ảnh đang tải. */
+export const THEME_COLOR_PRESETS = [
+  { value: '#fff8ee', name: 'Kem' }, { value: '#ffffff', name: 'Trắng' }, { value: '#f5ebe1', name: 'Be cát' },
+  { value: '#fff2d6', name: 'Vàng bơ' }, { value: '#ffebeb', name: 'Hồng phấn' }, { value: '#eaf4ec', name: 'Xanh bạc hà' },
+  { value: '#e8f1fa', name: 'Xanh da trời' }, { value: '#f1ecfa', name: 'Tím oải hương' },
+] as const;
+
+/** Màu nhấn gợi ý: đều đạt tương phản 3:1 trên nền kem nên trang hiện đúng màu đã chọn. */
+export const ACCENT_COLOR_PRESETS = [
+  { value: '#d97706', name: 'Cam mật ong' }, { value: '#b45309', name: 'Nâu caramel' }, { value: '#b8434f', name: 'Hồng đất' },
+  { value: '#be4c7b', name: 'Hồng sen' }, { value: '#4b834e', name: 'Xanh rêu' }, { value: '#2f6690', name: 'Xanh biển' },
+  { value: '#6d4c9f', name: 'Tím mận' }, { value: '#2d3142', name: 'Than chì' },
+] as const;
+
 function luminance(hex: string) {
   const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
     .map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));

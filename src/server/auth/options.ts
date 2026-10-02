@@ -75,6 +75,8 @@ export const authOptions: NextAuthOptions = {
       const currentFingerprint = credentialFingerprint(stored?.password || null, process.env.NEXTAUTH_SECRET || '');
       if (user) token.credentialFingerprint = currentFingerprint;
       token.status = (stored?.status === 'active' && token.credentialFingerprint === currentFingerprint ? 'active' : 'blocked') as UserStatus;
+      // Họ tên/email sửa ở trang tài khoản hiện ngay, không phải chờ đăng nhập lại.
+      if (stored) { token.name = stored.name; token.email = stored.email; }
       token.phone = stored?.phone;
       token.address = stored?.address;
       token.city = stored?.city;

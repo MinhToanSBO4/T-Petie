@@ -1,19 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 
 type Customer = {
   id: string; name: string | null; email: string | null; username: string | null;
-  phone: string | null; city: string | null; status: string; points: number;
+  phone: string | null; city: string | null; status: string; points: number; orderCount: number;
   createdAt: string; lastLoginAt: string | null;
 };
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '—';
 
+const CUSTOMER_SORTS = [
+  { value: 'newest', label: 'Mới tham gia' }, { value: 'login', label: 'Đăng nhập gần nhất' },
+  { value: 'orders', label: 'Nhiều đơn nhất' }, { value: 'name', label: 'Tên A–Z' },
+];
+const CUSTOMER_FILTERS: TableFilter[] = [
+  { key: 'status', label: 'Trạng thái', options: [{ value: 'active', label: 'Đang hoạt động' }, { value: 'blocked', label: 'Đã khóa' }] },
+  { key: 'ordered', label: 'Đơn hàng', all: 'Tất cả khách hàng',
+    options: [{ value: 'yes', label: 'Đã từng đặt hàng' }, { value: 'no', label: 'Chưa đặt đơn nào' }] },
+];
+
 async function fetchCustomers(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: 'user' });
-  const response = await fetch(`/api/admin/users?${params}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/users?${tableParams(query, { filter: 'user' })}`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Không tải được khách hàng');
   return { items: data.items as Customer[], total: data.total as number, page: data.page as number, pages: data.pages as number };
@@ -86,7 +95,11 @@ export function CustomerManager() {
     { key: 'phone', header: 'Điện thoại', render: (row) => row.phone || '—' },
     { key: 'city', header: 'Tỉnh/thành', render: (row) => row.city || '—' },
     { key: 'points', header: 'Điểm', render: (row) => row.points },
-    { key: 'joined', header: 'Tham gia', render: (row) => <span className="text-xs text-charcoal-600">{formatDate(row.createdAt)}</span> },
+    { key: 'orders', header: 'Đơn', render: (row) => row.orderCount },
+    { key: 'joined', header: 'Tham gia', render: (row) => <div className="text-xs text-charcoal-600">
+        <p>{formatDate(row.createdAt)}</p>
+        {row.lastLoginAt && <p className="text-charcoal-500">Đăng nhập: {formatDate(row.lastLoginAt)}</p>}
+      </div> },
     { key: 'status', header: 'Trạng thái', render: (row) => <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${
       row.status === 'active' ? 'bg-sage-100 text-sage-800' : 'bg-blush-100 text-blush-700'}`}>
       {row.status === 'active' ? 'Đang hoạt động' : 'Đã khóa'}</span> },
@@ -96,9 +109,9 @@ export function CustomerManager() {
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchCustomers} reloadKey={reloadKey}
-      searchPlaceholder="Tìm theo tên, email hoặc số điện thoại"
+      searchPlaceholder="Tìm theo tên, email hoặc SĐT"
+      sorts={CUSTOMER_SORTS} filters={CUSTOMER_FILTERS}
       emptyText="Chưa có khách hàng nào."
       onRowClick={(row) => setSelected(row)} />
-    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết, khóa hoặc xóa tài khoản.</p>
   </div>;
 }

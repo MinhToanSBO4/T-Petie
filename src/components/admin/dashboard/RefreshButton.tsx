@@ -4,16 +4,21 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 
-/** Lấy số liệu mới nhất: xóa cache số liệu trên máy chủ rồi dựng lại trang, giữ nguyên vị trí cuộn. */
-export function RefreshButton() {
+/**
+ * Lấy số liệu mới nhất rồi dựng lại trang, giữ nguyên vị trí cuộn. `clearCache`: xóa cache số liệu tổng quan trên máy
+ * chủ trước (chỉ quản trị viên); trang không cache như trang chủ nhân viên chỉ cần dựng lại.
+ */
+export function RefreshButton({ clearCache = true }: { clearCache?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
   const loading = busy || pending;
   const refresh = async () => {
-    setBusy(true);
-    try { await fetch('/api/admin/dashboard/refresh', { method: 'POST' }); }
-    finally { setBusy(false); }
+    if (clearCache) {
+      setBusy(true);
+      try { await fetch('/api/admin/dashboard/refresh', { method: 'POST' }); }
+      finally { setBusy(false); }
+    }
     startTransition(() => router.refresh());
   };
   return <button type="button" onClick={() => void refresh()} disabled={loading}

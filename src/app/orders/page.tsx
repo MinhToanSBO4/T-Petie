@@ -9,6 +9,7 @@ import { SignInPrompt } from '@/components/orders/SignInPrompt';
 import { getActiveSession } from '@/server/auth/session';
 import { listCustomerOrders } from '@/server/orders/customer-orders';
 import { CUSTOMER_ORDER_TABS, parseOrderTab, type CustomerOrderTab } from '@/lib/orders/customer-orders';
+import { backOfficeHome } from '@/lib/admin/back-office';
 import { RefreshWhenStale } from '@/components/orders/RefreshWhenStale';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,8 @@ const EMPTY_TEXT: Record<CustomerOrderTab, string> = {
 export default async function OrdersPage({ searchParams }: { searchParams: { tab?: string; page?: string } }) {
   const session = await getActiveSession();
   if (!session) return <SignInPrompt callbackUrl="/orders" />;
-  if (session.user.role !== 'user') redirect(session.user.role === 'admin' ? '/admin/orders' : '/admin/products');
+  const backOffice = backOfficeHome(session.user.role);
+  if (backOffice) redirect(`${backOffice}/orders`);
   const tab = parseOrderTab(searchParams.tab);
   const data = await listCustomerOrders(session.user.id, tab, Number(searchParams.page) || 1);
   const tabLabel = CUSTOMER_ORDER_TABS.find((entry) => entry.id === tab)!.label;

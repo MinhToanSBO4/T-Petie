@@ -78,14 +78,20 @@ async function main() {
 
     // --- Phân quyền trang tổng quan ---
     assertRedirect(await request('/admin'), '/login', 'Anonymous /admin');
-    assertRedirect(await request('/admin', 'GET', staff), '/admin/products', 'Staff /admin');
+    assertRedirect(await request('/staff'), '/login', 'Anonymous /staff');
+    assertRedirect(await request('/admin', 'GET', staff), '/staff', 'Staff /admin');
+    assertRedirect(await request('/admin/orders', 'GET', staff), '/staff/orders', 'Staff /admin/orders');
+    assertRedirect(await request('/admin/exports', 'GET', staff), '/staff', 'Staff /admin/exports');
+    assertRedirect(await request('/staff/orders', 'GET', admin), '/admin/orders', 'Admin /staff/orders');
     assertRedirect(await request('/admin', 'GET', customer), '/dashboard', 'Customer /admin');
-    assertRedirect(await request('/admin/orders', 'GET', staff), '/admin/products', 'Staff /admin/orders');
-    for (const path of ['/api/admin/orders', '/api/admin/export', '/api/admin/commerce', '/api/admin/users']) {
+    assertRedirect(await request('/staff', 'GET', customer), '/dashboard', 'Customer /staff');
+    const staffOrders = await request('/api/admin/orders', 'GET', staff);
+    assert(staffOrders.status === 200, `Staff cannot list orders: ${staffOrders.status}`);
+    for (const path of ['/api/admin/export', '/api/admin/commerce', '/api/admin/users']) {
       const denied = await request(path, 'GET', staff);
       assert(denied.status === 403, `Staff reached ${path}: ${denied.status}`);
     }
-    console.log('✔ Role boundaries: anonymous → login, staff → products, customer → account; staff blocked from admin-only APIs');
+    console.log('✔ Role boundaries: anonymous → login, staff → /staff, admin → /admin, customer → account; staff blocked from admin-only APIs');
 
     // --- Tạo đơn tạm trong kỳ này và kỳ trước với số tiền biết trước ---
     const variant = await prisma.productVariant.findFirst({ where: { isActive: true, product: { isActive: true } },
@@ -117,8 +123,10 @@ async function main() {
     const missing = await request('/api/admin/orders/KHONG-TON-TAI', 'PATCH', admin, { status: 'CONFIRMED' });
     assert(missing.status === 409, `Unknown order: ${missing.status}`);
     const staffPatch = await request(`/api/admin/orders/${pending.orderCode}`, 'PATCH', staff, { status: 'PROCESSING' });
-    assert(staffPatch.status === 403, `Staff changed order status: ${staffPatch.status}`);
-    console.log('✔ Order status: valid transition saved, skipping steps rejected, staff blocked');
+    assert(staffPatch.status === 200, `Staff could not process the order: ${staffPatch.status} ${staffPatch.text}`);
+    const staffStep = await prisma.orderStatusEvent.findFirst({ where: { orderId: pending.id, status: 'PROCESSING' } });
+    assert(staffStep?.actor === 'staff', `Staff step recorded as ${staffStep?.actor}`);
+    console.log('✔ Order status: valid transition saved, skipping steps rejected, staff processes orders (logged as staff)');
 
     // --- Tự tính số liệu 7 ngày từ database, độc lập với truy vấn của trang ---
     const from = vnMidnight(6);

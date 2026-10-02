@@ -20,6 +20,7 @@ import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { SearchDialog } from '@/components/layout/SearchDialog';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { backOfficeHome } from '@/lib/admin/back-office';
 
 export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   logoUrl?: string; logoAlt?: string; collectionNav?: SubNavItem[];
@@ -214,14 +215,14 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
                     </div>
 
                     <div className="py-1 text-xs text-charcoal-900">
-                      {user.role !== 'user' && (
+                      {backOfficeHome(user.role) && (
                         <Link
-                          href={user.role === 'admin' ? '/admin' : '/admin/products'}
+                          href={backOfficeHome(user.role)!}
                           onClick={() => setIsUserMenuOpen(false)}
                           className="flex items-center space-x-2 px-3.5 py-2 hover:bg-honey-50 font-bold text-honey-700"
                         >
                           <ShieldCheck className="w-4 h-4 text-honey-600" />
-                          <span>Trang quản trị</span>
+                          <span>{user.role === 'admin' ? 'Trang quản trị' : 'Trang nhân viên'}</span>
                         </Link>
                       )}
                       {/* Đơn mua (đơn đã đặt) tách khỏi Giỏ hàng (món chưa đặt) như mục "Đơn mua" của Shopee. */}

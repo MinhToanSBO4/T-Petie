@@ -123,10 +123,10 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
         {item.value === 'unreplied' && data && data.stats.unreplied > 0 && <span className={`rounded-full px-1.5 text-xs ${filter === 'unreplied' ? 'bg-white/25' : 'bg-honey-100 text-honey-800'}`}>{data.stats.unreplied}</span>}
         {item.value === 'hidden' && data && data.stats.hidden > 0 && <span className={`rounded-full px-1.5 text-xs ${filter === 'hidden' ? 'bg-white/25' : 'bg-cream-100 text-charcoal-600'}`}>{data.stats.hidden}</span>}
       </button>)}
-      {!productId && <label className="relative ml-auto">
+      {!productId && <label className="relative ml-auto w-full sm:w-80 lg:w-96">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-charcoal-400" aria-hidden />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm theo khách, nội dung, sản phẩm, mã đơn"
-          aria-label="Tìm đánh giá" className="min-h-10 w-72 max-w-full rounded-xl border border-cream-300 bg-white pl-9 pr-3 text-sm" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm khách, nội dung, sản phẩm, mã đơn"
+          aria-label="Tìm đánh giá" className="min-h-10 w-full rounded-xl border border-cream-300 bg-white pl-9 pr-3 text-sm" />
       </label>}
     </div>
 

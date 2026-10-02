@@ -64,6 +64,13 @@ export function resolvePeriod(key: DashboardRangeKey, now = new Date()): Dashboa
   };
 }
 
+/** Mốc 00:00 giờ Việt Nam của ngày cách hôm nay `daysBack` ngày (0 = hôm nay), cho bộ lọc "Hôm nay", "7 ngày qua"... */
+export function vnDayStart(daysBack: number, now = new Date()): Date {
+  const vnNow = new Date(now.getTime() + VN_OFFSET_MS);
+  const todayVn = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate());
+  return new Date(todayVn - daysBack * DAY_MS - VN_OFFSET_MS);
+}
+
 /** Nhãn trục ngắn gọn: "25/09" cho ngày, "09/2026" cho tháng. */
 export function bucketLabel(key: string) {
   const [year, month, day] = key.split('-');

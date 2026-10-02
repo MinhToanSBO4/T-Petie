@@ -1,5 +1,6 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
+import { pathInArea } from '@/lib/admin/back-office';
 import { currentSession } from './session';
 
 export async function getStaffSession() {
@@ -22,27 +23,25 @@ export async function requireStaffApi() {
 }
 
 /**
- * Dùng cho trang quản trị dành cho cả admin và nhân viên.
- * Người chưa đăng nhập về trang đăng nhập; khách đã đăng nhập về trang tài khoản của họ.
- */
-export async function requireStaffPage(callbackUrl: string) {
-  const session = await currentSession();
-  const user = session?.user;
-  if (!user || user.status !== 'active') redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-  if (!['admin', 'staff'].includes(user.role)) redirect('/dashboard');
-  return session;
-}
-
-/**
- * Dùng cho trang chỉ dành quản trị viên.
- * Nhân viên đã đăng nhập được đưa về khu vực họ có quyền thay vì trang đăng nhập,
- * tránh cảm giác bị mất phiên khi mở nhầm trang chỉ dành admin.
+ * Dùng cho trang trong khu quản trị (/admin), chỉ dành quản trị viên.
+ * Người chưa đăng nhập về trang đăng nhập, khách về trang tài khoản. Nhân viên mở nhầm được đưa sang trang tương ứng
+ * ở khu nhân viên thay vì trang đăng nhập, tránh cảm giác bị mất phiên.
  */
 export async function requireAdminPage(callbackUrl: string) {
   const session = await currentSession();
   const user = session?.user;
   if (!user || user.status !== 'active') redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-  if (user.role === 'staff') redirect('/admin/products');
+  if (user.role === 'staff') redirect(pathInArea('staff', callbackUrl));
   if (user.role !== 'admin') redirect('/dashboard');
+  return session;
+}
+
+/** Dùng cho trang trong khu nhân viên (/staff). Quản trị viên mở nhầm được đưa sang trang tương ứng ở /admin. */
+export async function requireStaffAreaPage(callbackUrl: string) {
+  const session = await currentSession();
+  const user = session?.user;
+  if (!user || user.status !== 'active') redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  if (user.role === 'admin') redirect(pathInArea('admin', callbackUrl));
+  if (user.role !== 'staff') redirect('/dashboard');
   return session;
 }

@@ -42,6 +42,17 @@ export const ADMIN_TARGET_LABELS: Partial<Record<OrderStatus, string>> = {
 /** Quy trình chính theo thứ tự (không gồm Hủy). */
 export const MAIN_FLOW: readonly OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'COMPLETED'];
 
+/** Liên kết mở sẵn trang đơn hàng: ?tab=<trạng thái>&order=<mã đơn>; giá trị lạ bị bỏ qua. */
+export function parseOrdersLink(params: { tab?: string; order?: string }) {
+  return {
+    initialTab: ORDER_STATUSES.find((status) => status === params.tab),
+    initialOrder: params.order && /^[A-Za-z0-9-]{4,60}$/.test(params.order) ? params.order : undefined,
+  };
+}
+
+/** Bước shop còn phải xử lý: danh sách đơn mặc định xếp đơn cũ nhất lên đầu để làm theo thứ tự đặt. */
+export const OLDEST_FIRST_STATUSES: readonly OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
+
 /**
  * Các bước lần lượt đi qua để đưa đơn từ `from` tới `to` theo quy trình chính, ví dụ PENDING → SHIPPING là
  * [CONFIRMED, PROCESSING, SHIPPING]. Quản trị viên chuyển thẳng tới bước sau (đơn đã xác nhận qua điện thoại và
@@ -83,7 +94,10 @@ export const CANCEL_REASONS = {
 export const CANCEL_REASON_MAX = 200;
 export const CUSTOMER_CANCEL_NOTE = 'Khách tự hủy đơn';
 
-export type StatusActor = 'admin' | 'customer' | 'system';
+/** Ai đổi trạng thái đơn: quản trị viên, nhân viên, khách (tự hủy/xác nhận đã nhận) hoặc hệ thống (tự hoàn tất). */
+export type StatusActor = 'admin' | 'staff' | 'customer' | 'system';
+/** Thao tác của shop (quản trị viên hoặc nhân viên), hoàn tác được trong UNDO_WINDOW_MS. */
+export const isShopActor = (actor: string | null) => actor === 'admin' || actor === 'staff';
 
 /**
  * Thao tác khách tự làm trên đơn của mình (như Shopee): hủy khi shop chưa xác nhận,

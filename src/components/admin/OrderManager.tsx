@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2, Undo2, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
-import { DataTable, clearTableCache, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, clearTableCache, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
 import { OrderDrawer } from '@/components/admin/OrderDrawer';
 import { CancelOrderDialog } from '@/components/admin/CancelOrderDialog';
@@ -12,7 +12,8 @@ import {
   autoCompleteDate, bulkOrders, fetchOrder, formatDateTime, formatPrice, type AdminOrder, type BulkResult,
 } from '@/components/admin/order-admin';
 import {
-  ADMIN_NEXT_STEP, ADMIN_TARGET_LABELS, BULK_ORDER_LIMIT, forwardPath, MAIN_FLOW, ORDER_STATUS_LABELS, type OrderStatus,
+  ADMIN_NEXT_STEP, ADMIN_TARGET_LABELS, BULK_ORDER_LIMIT, forwardPath, MAIN_FLOW, OLDEST_FIRST_STATUSES, ORDER_STATUS_LABELS,
+  type OrderStatus,
 } from '@/lib/orders/status';
 
 const TABLE_KEY = '/admin/orders';
@@ -27,6 +28,15 @@ const TABS: { value: OrderStatus | ''; label: string }[] = [
 ];
 /** Tab cần xử lý: số đơn được tô nổi để biết ngay còn bao nhiêu việc. */
 const ACTIVE_TABS = new Set<string>(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING']);
+const SORT_NEWEST = { value: 'newest', label: 'Mới nhất' };
+const SORT_OLDEST = { value: 'oldest', label: 'Cũ nhất trước' };
+const SORT_TOTAL = { value: 'total-desc', label: 'Tổng tiền cao nhất' };
+/** Bước còn phải xử lý mặc định đơn cũ nhất lên đầu (làm theo thứ tự đặt), các tab khác mới nhất lên đầu, giống máy chủ. */
+const sortsFor = (tab: OrderStatus | '') => (OLDEST_FIRST_STATUSES as readonly string[]).includes(tab)
+  ? [SORT_OLDEST, SORT_NEWEST, SORT_TOTAL] : [SORT_NEWEST, SORT_OLDEST, SORT_TOTAL];
+const ORDER_FILTERS: TableFilter[] = [{ key: 'period', label: 'Thời gian đặt', all: 'Tất cả thời gian', options: [
+  { value: 'today', label: 'Hôm nay' }, { value: '7d', label: '7 ngày qua' }, { value: '30d', label: '30 ngày qua' },
+] }];
 /** Các bước có thể chuyển tới (không gồm Chờ xử lý). */
 const TARGETS = MAIN_FLOW.slice(1);
 const UNDO_VISIBLE_MS = 8000;
@@ -52,9 +62,15 @@ const label = (codes: string[]) => codes.length > 1 ? `${codes.length} đơn` : 
  * sẵn nút cho bước kế tiếp, chọn nhiều đơn ở bất kỳ tab nào để xử lý một lần, "Chuyển tới…" để đi thẳng nhiều bước
  * (đơn đã gọi xác nhận và giao luôn), chi tiết mở dạng ngăn kéo, bấm nhầm thì hoàn tác được.
  */
-export function OrderManager() {
+export function OrderManager({ actor = 'admin', initialTab, initialOrder }: {
+  /** Người đang thao tác, để lịch sử trong ngăn kéo hiện đúng ngay, trước khi tải lại. */
+  actor?: 'admin' | 'staff';
+  /** Liên kết từ trang chủ nhân viên/tổng quan: mở sẵn một tab (?tab=PENDING) và chi tiết một đơn (?order=...). */
+  initialTab?: OrderStatus;
+  initialOrder?: string;
+}) {
   const { showToast } = useToast();
-  const [tab, setTab] = useState<OrderStatus | ''>(rememberedTab);
+  const [tab, setTab] = useState<OrderStatus | ''>(initialTab ?? rememberedTab);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [rows, setRows] = useState<AdminOrder[]>([]);
@@ -71,10 +87,15 @@ export function OrderManager() {
 
   useEffect(() => { rememberedTab = tab; setSelected(new Set()); }, [tab]);
   useEffect(() => () => clearTimeout(undoTimer.current), []);
+  useEffect(() => {
+    if (!initialOrder) return;
+    let cancelled = false;
+    void fetchOrder(initialOrder).then((order) => { if (order && !cancelled) { setOpenCode(order.orderCode); setOpenOrder(order); } });
+    return () => { cancelled = true; };
+  }, [initialOrder]);
 
   const fetchOrders = useCallback(async (query: TableQuery) => {
-    const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: tab });
-    const response = await fetch(`/api/admin/orders?${params}`, { cache: 'no-store' });
+    const response = await fetch(`/api/admin/orders?${tableParams(query, { filter: tab })}`, { cache: 'no-store' });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Không tải được đơn hàng, vui lòng bấm Làm mới');
     setCounts(data.counts);
@@ -164,7 +185,7 @@ export function OrderManager() {
       const from = order && done.includes(order.orderCode) ? origin.get(order.orderCode) : undefined;
       if (!order || !from) return order;
       const createdAt = new Date().toISOString();
-      const steps = (forwardPath(from, to) ?? [to]).map((status) => ({ status, actor: 'admin' as const, note: null, createdAt }));
+      const steps = (forwardPath(from, to) ?? [to]).map((status) => ({ status, actor, note: null, createdAt }));
       // Đơn COD hoàn tất nghĩa là shipper đã thu tiền (máy chủ ghi nhận cùng lúc).
       const paymentStatus = to === 'COMPLETED' && order.paymentMethod === 'COD' ? 'PAID' : order.paymentStatus;
       return { ...order, orderStatus: to, paymentStatus, events: [...order.events, ...steps] };
@@ -182,7 +203,7 @@ export function OrderManager() {
     setCancelTarget(null);
     if (!done.length) return;
     setOpenOrder((order) => order && done.includes(order.orderCode)
-      ? { ...order, orderStatus: 'CANCELLED', events: [...order.events, { status: 'CANCELLED', actor: 'admin', note: reason, createdAt: new Date().toISOString() }] }
+      ? { ...order, orderStatus: 'CANCELLED', events: [...order.events, { status: 'CANCELLED', actor, note: reason, createdAt: new Date().toISOString() }] }
       : order);
     showToast(`Đã hủy ${done.length > 1 ? `${done.length} đơn` : `đơn ${done[0]}`}`, 'info');
   };
@@ -299,13 +320,10 @@ export function OrderManager() {
     </nav>
 
     <DataTable key={tab || 'all'} stateKey={`${TABLE_KEY}:${tab || 'all'}`} columns={columns} fetchPage={fetchOrders}
-      reloadKey={reloadKey} onData={setRows} alwaysRevalidate
-      searchPlaceholder="Tìm theo mã đơn, tên khách hoặc số điện thoại"
+      reloadKey={reloadKey} onData={setRows} alwaysRevalidate sorts={sortsFor(tab)} filters={ORDER_FILTERS}
+      searchPlaceholder="Tìm mã đơn, tên khách, SĐT"
       emptyText={tab && ACTIVE_TABS.has(tab) ? 'Không còn đơn nào cần xử lý ở bước này.' : 'Chưa có đơn hàng nào.'}
       onRowClick={openDrawer} />
-    <p className="text-xs text-charcoal-500">
-      Tick chọn nhiều đơn để xử lý một lần (tối đa {BULK_ORDER_LIMIT} đơn), hoặc bấm vào một dòng để xem đủ thông tin giao hàng, lịch sử và chuyển nhanh nhiều bước.
-    </p>
 
     {selectedRows.length > 0 && <div role="region" aria-label="Thao tác hàng loạt"
       className="sticky bottom-4 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-honey-200 bg-white p-3 shadow-soft">

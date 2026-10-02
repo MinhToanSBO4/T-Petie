@@ -76,7 +76,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { rang
       <Panel title="Cần chú ý" subtitle={attention ? `${attention} việc cần xử lý` : 'Mọi thứ đều ổn'}>
         <ul className="space-y-2">
           <li>
-            <Link href="/admin/orders" className="flex items-center gap-3 rounded-xl p-3 transition-colors hover:bg-honey-50">
+            <Link href="/admin/orders?tab=PENDING" className="flex items-center gap-3 rounded-xl p-3 transition-colors hover:bg-honey-50">
               <span className={`flex h-9 w-9 items-center justify-center rounded-full ${data.pendingNow ? 'bg-amber-100 text-amber-800' : 'bg-cream-100 text-charcoal-500'}`}>
                 <AlertTriangle className="h-4 w-4" aria-hidden />
               </span>

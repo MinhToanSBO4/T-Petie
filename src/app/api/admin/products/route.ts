@@ -3,17 +3,28 @@ import { revalidateTag } from 'next/cache';
 import { getStaffSession, requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import type { Prisma } from '@prisma/client';
-import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
+import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
 import { normalizeText } from '@/lib/catalog/filters';
 import { prisma } from '@/server/db/client';
 import { LOW_STOCK_THRESHOLD } from '@/server/admin/dashboard';
 
 export const dynamic = 'force-dynamic';
 
+/** Cách sắp xếp bảng sản phẩm; luôn kèm id để phân trang ổn định khi trùng giá hoặc thời điểm. */
+const SORTS: Record<string, Prisma.ProductOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  updated: [{ updatedAt: 'desc' }, { id: 'desc' }],
+  name: [{ name: 'asc' }, { id: 'asc' }],
+  'price-asc': [{ basePrice: 'asc' }, { id: 'asc' }],
+  'price-desc': [{ basePrice: 'desc' }, { id: 'desc' }],
+};
+
+/** Đang bán/đang ẩn tách riêng để kết hợp được với bộ lọc bên dưới, ví dụ "đang bán mà hết hàng". */
+const STATUS: Record<string, Prisma.ProductWhereInput> = { active: { isActive: true }, hidden: { isActive: false } };
+
 /** Bộ lọc của bảng sản phẩm quản trị (truy soát nhanh hàng sắp hết, hết hàng, thiếu ảnh...). */
 const FILTERS: Record<string, Prisma.ProductWhereInput> = {
-  active: { isActive: true },
-  hidden: { isActive: false },
+  ...STATUS,
   'low-stock': { variants: { some: { isActive: true, stock: { gt: 0, lte: LOW_STOCK_THRESHOLD } } } },
   'out-of-stock': { variants: { none: { isActive: true, stock: { gt: 0 } } } },
   sale: { isSale: true },
@@ -21,6 +32,12 @@ const FILTERS: Record<string, Prisma.ProductWhereInput> = {
   new: { isNewArrival: true },
   'no-image': { images: { none: {} } },
 };
+
+/** Lọc theo bộ sưu tập: mã bộ sưu tập, hoặc "none" là chưa thuộc bộ sưu tập nào; mã sai định dạng thì bỏ qua. */
+function collectionWhere(value: string | null): Prisma.ProductWhereInput {
+  if (value === 'none') return { collectionId: null };
+  return value && /^[\w-]{1,64}$/.test(value) ? { collectionId: value } : {};
+}
 
 /**
  * Mã các sản phẩm khớp từ khóa, không phân biệt dấu ("ao so mi" tìm được "Áo Sơ Mi"). Catalog chỉ vài trăm sản phẩm nên
@@ -40,10 +57,15 @@ export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
   const search = parseSearch(searchParams);
-  const filter = FILTERS[searchParams.get('filter') || ''] ?? {};
-  const where: Prisma.ProductWhereInput = { AND: [filter, ...(search ? [{ id: { in: await matchingProductIds(search) } }] : [])] };
+  const where: Prisma.ProductWhereInput = { AND: [
+    parseChoice(searchParams, 'status', STATUS) ?? {},
+    parseChoice(searchParams, 'filter', FILTERS) ?? {},
+    collectionWhere(searchParams.get('collection')),
+    ...(search ? [{ id: { in: await matchingProductIds(search) } }] : []),
+  ] };
+  const orderBy = parseChoice(searchParams, 'sort', SORTS) ?? SORTS.newest;
   const [rows, total, collections] = await Promise.all([
-    prisma.product.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take,
+    prisma.product.findMany({ where, orderBy, skip, take,
       include: { images: { orderBy: { sortOrder: 'asc' } }, variants: { orderBy: { size: 'asc' } } } }),
     prisma.product.count({ where }),
     prisma.collection.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],

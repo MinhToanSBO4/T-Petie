@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { parseTestimonialBatch } from '@/lib/content/testimonial-input';
-import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
+import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
 import { getStaffSession } from '@/server/auth/staff-session';
 import { FeedbackInputError, resolveFeedbackImages } from '@/server/content/feedback-admin';
 import { invalidateTestimonials } from '@/server/content/invalidate';
@@ -8,21 +9,31 @@ import { prisma } from '@/server/db/client';
 
 export const dynamic = 'force-dynamic';
 
+/** Mặc định đúng thứ tự hiển thị trên website; luôn kèm id để phân trang ổn định. */
+const SORTS: Record<string, Prisma.CustomerTestimonialOrderByWithRelationInput[]> = {
+  display: [{ sortOrder: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+};
+const STATUS: Record<string, Prisma.CustomerTestimonialWhereInput> = {
+  published: { isPublished: true, consentConfirmed: true },
+  draft: { OR: [{ isPublished: false }, { consentConfirmed: false }] },
+};
+const PRODUCT: Record<string, Prisma.CustomerTestimonialWhereInput> = { linked: { productId: { not: null } }, unlinked: { productId: null } };
+
 export async function GET(request: Request) {
   if (!(await getStaffSession())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 12, 48);
   const search = parseSearch(searchParams);
-  const status = searchParams.get('filter') || '';
-  // Hai điều kiện đều có thể là OR (tìm kiếm, bản nháp) nên ghép bằng AND, không trộn chung một object.
-  const where = { AND: [
-    search ? { OR: [{ caption: { contains: search, mode: 'insensitive' as const } },
-      { product: { name: { contains: search, mode: 'insensitive' as const } } }] } : {},
-    status === 'published' ? { isPublished: true, consentConfirmed: true }
-      : status === 'draft' ? { OR: [{ isPublished: false }, { consentConfirmed: false }] } : {},
+  // Các điều kiện có thể là OR (tìm kiếm, bản nháp) nên ghép bằng AND, không trộn chung một object.
+  const where: Prisma.CustomerTestimonialWhereInput = { AND: [
+    search ? { OR: [{ caption: { contains: search, mode: 'insensitive' } },
+      { product: { name: { contains: search, mode: 'insensitive' } } }] } : {},
+    parseChoice(searchParams, 'filter', STATUS) ?? {},
+    parseChoice(searchParams, 'product', PRODUCT) ?? {},
   ] };
   const [rows, total] = await Promise.all([
-    prisma.customerTestimonial.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }], skip, take,
+    prisma.customerTestimonial.findMany({ where, orderBy: parseChoice(searchParams, 'sort', SORTS) ?? SORTS.display, skip, take,
       include: { product: { select: { name: true } } } }),
     prisma.customerTestimonial.count({ where }),
   ]);

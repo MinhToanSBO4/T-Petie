@@ -1,19 +1,30 @@
 import { NextResponse } from 'next/server';
-import { requireAdminApi } from '@/server/auth/staff-session';
+import type { Prisma } from '@prisma/client';
+import { requireStaffApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
-import { paginated, parsePagination, parseSearch } from '@/lib/pagination';
-import { ORDER_STATUSES } from '@/lib/orders/status';
+import { vnDayStart } from '@/lib/admin/dashboard-range';
+import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
+import { OLDEST_FIRST_STATUSES, ORDER_STATUSES } from '@/lib/orders/status';
 import { autoCompleteShippedOrders } from '@/server/orders/order-status';
 
 export const dynamic = 'force-dynamic';
 
+/** Cách sắp xếp danh sách đơn; luôn kèm id để phân trang ổn định khi trùng thời điểm hoặc tổng tiền. */
+const SORTS: Record<string, Prisma.OrderOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  oldest: [{ createdAt: 'asc' }, { id: 'asc' }],
+  'total-desc': [{ totalAmount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+};
+/** Lọc theo ngày đặt: số ngày gần nhất tính cả hôm nay, theo lịch Việt Nam. */
+const PERIOD_DAYS: Record<string, number> = { today: 1, '7d': 7, '30d': 30 };
+
 /**
- * Danh sách đơn hàng cho quản trị viên, có tìm kiếm, lọc theo trạng thái và phân trang.
+ * Danh sách đơn hàng cho quản trị viên và nhân viên, có tìm kiếm, lọc theo trạng thái/ngày đặt, sắp xếp và phân trang.
  * Kèm số đơn của từng trạng thái (theo từ khóa đang tìm) cho thanh tab, và đủ thông tin
  * giao hàng + lịch sử trạng thái để mở chi tiết đơn không phải tải thêm.
  */
 export async function GET(request: Request) {
-  if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!(await requireStaffApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   await autoCompleteShippedOrders();
   const searchParams = new URL(request.url).searchParams;
   const { page, limit, skip, take } = parsePagination(searchParams, 10, 50);
@@ -37,22 +48,27 @@ export async function GET(request: Request) {
     // Kiểm tra định kỳ: một truy vấn gộp, không đọc đơn và sản phẩm.
     return NextResponse.json(await summarize({}), { headers: { 'Cache-Control': 'no-store' } });
   }
-  const where = { ...searchWhere, ...(status ? { orderStatus: status } : {}) };
-  // Đơn chờ xử lý: cũ nhất lên đầu để xử lý theo thứ tự đặt; các tab khác mới nhất lên đầu.
-  const oldestFirst = status === 'PENDING' || status === 'CONFIRMED' || status === 'PROCESSING';
-  const [orders, filtered, overall] = await Promise.all([
-    prisma.order.findMany({ where, orderBy: { createdAt: oldestFirst ? 'asc' : 'desc' }, skip, take, include: {
+  const days = parseChoice(searchParams, 'period', PERIOD_DAYS);
+  const periodWhere = days ? { createdAt: { gte: vnDayStart(days - 1) } } : {};
+  const where = { ...searchWhere, ...periodWhere, ...(status ? { orderStatus: status } : {}) };
+  // Mặc định: đơn chờ xử lý cũ nhất lên đầu để xử lý theo thứ tự đặt; các tab khác mới nhất lên đầu.
+  const orderBy = parseChoice(searchParams, 'sort', SORTS)
+    ?? SORTS[(OLDEST_FIRST_STATUSES as readonly string[]).includes(status) ? 'oldest' : 'newest'];
+  const [orders, filtered, overall, periodTotal] = await Promise.all([
+    prisma.order.findMany({ where, orderBy, skip, take, include: {
       items: { select: { productName: true, size: true, quantity: true, totalPrice: true } },
       statusEvents: { orderBy: { createdAt: 'asc' }, select: { status: true, actor: true, note: true, createdAt: true } },
     } }),
     summarize(searchWhere),
     // Khi đang tìm kiếm, số đếm theo từ khóa còn mốc thay đổi phải tính trên toàn bộ đơn.
     search ? summarize({}) : null,
+    // Số đơn trên các tab là việc cần làm nên không theo bộ lọc ngày; riêng tổng dòng của bảng phải đếm theo bộ lọc.
+    days ? prisma.order.count({ where }) : null,
   ]);
   const { counts } = filtered;
   const version = (overall ?? filtered).version;
-  // Tổng số dòng của tab đang xem lấy luôn từ số đếm, không cần thêm truy vấn count.
-  const total = status ? counts[status] ?? 0 : Object.values(counts).reduce((sum, value) => sum + value, 0);
+  // Không lọc theo ngày thì tổng số dòng của tab đang xem lấy luôn từ số đếm, không cần thêm truy vấn count.
+  const total = periodTotal ?? (status ? counts[status] ?? 0 : Object.values(counts).reduce((sum, value) => sum + value, 0));
   return NextResponse.json({ ...paginated(orders.map((order) => ({
     id: order.id, orderCode: order.orderCode, customerName: order.customerName,
     customerPhone: order.customerPhone, customerEmail: order.customerEmail,

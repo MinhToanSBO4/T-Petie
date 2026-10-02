@@ -7,6 +7,7 @@ import { signIn } from 'next-auth/react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { safeCallbackPath } from '@/lib/auth-identity';
+import { landingPath } from '@/lib/admin/back-office';
 import {
   Lock,
   Mail,
@@ -63,13 +64,7 @@ function LoginForm() {
     if (result.success) {
       window.dispatchEvent(new Event('tpetie:navigation-start'));
       showToast(`Chào mừng bạn trở lại với T'Petie! 🌸`);
-      if (result.role === 'admin') {
-        router.push(callbackUrl || '/admin');
-      } else if (result.role === 'staff') {
-        router.push(callbackUrl || '/admin/products');
-      } else {
-        router.push(callbackUrl || '/');
-      }
+      router.push(landingPath(result.role, callbackUrl));
     } else {
       setIsSubmitting(false);
       setErrorMessage(result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');

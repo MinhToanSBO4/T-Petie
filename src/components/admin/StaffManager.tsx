@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column, type TableQuery } from '@/components/admin/DataTable';
+import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
+import { normalizePhone } from '@/lib/account/account-input';
 
 type Staff = {
-  id: string; name: string; username: string; email: string;
+  id: string; name: string; username: string; email: string; phone?: string;
   status: 'active' | 'blocked'; lastLoginAt?: string;
 };
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'detail'; staff: Staff };
@@ -12,9 +13,15 @@ type View = { mode: 'list' } | { mode: 'create' } | { mode: 'detail'; staff: Sta
 const field = 'w-full rounded-xl border border-cream-200 px-4 py-3';
 const formatDate = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '—';
 
+const STAFF_SORTS = [
+  { value: 'newest', label: 'Mới tạo' }, { value: 'name', label: 'Tên A–Z' }, { value: 'login', label: 'Đăng nhập gần nhất' },
+];
+const STAFF_FILTERS: TableFilter[] = [
+  { key: 'status', label: 'Trạng thái', options: [{ value: 'active', label: 'Đang hoạt động' }, { value: 'blocked', label: 'Đã khóa' }] },
+];
+
 async function fetchStaff(query: TableQuery) {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit), q: query.q, filter: 'staff' });
-  const response = await fetch(`/api/admin/users?${params}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/users?${tableParams(query, { filter: 'staff' })}`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Không tải được nhân viên');
   return { items: data.items as Staff[], total: data.total as number, page: data.page as number, pages: data.pages as number };
@@ -45,12 +52,12 @@ export function StaffManager() {
   return <div className="space-y-4">
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchStaff} reloadKey={reloadKey}
-      searchPlaceholder="Tìm theo tên, email hoặc tên đăng nhập"
+      searchPlaceholder="Tìm tên, email, tên đăng nhập"
+      sorts={STAFF_SORTS} filters={STAFF_FILTERS}
       emptyText="Chưa có nhân viên nào."
       onRowClick={(row) => setView({ mode: 'detail', staff: row })}
       toolbar={<button type="button" onClick={() => setView({ mode: 'create' })}
         className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white">Thêm nhân viên</button>} />
-    <p className="text-xs text-charcoal-500">Bấm vào một dòng để xem chi tiết, khóa tài khoản hoặc đặt lại mật khẩu.</p>
   </div>;
 }
 
@@ -95,12 +102,16 @@ function StaffCreateForm({ onDone }: { onDone: (message?: string) => void }) {
   </form>;
 }
 
-/** Chi tiết nhân viên: khóa/mở tài khoản và đặt lại mật khẩu. */
-function StaffDetail({ staff, onBack }: { staff: Staff; onBack: (message?: string) => void }) {
+/** Chi tiết nhân viên: sửa thông tin liên hệ, khóa/mở tài khoản và đặt lại mật khẩu. */
+function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: (message?: string) => void }) {
+  const [staff, setStaff] = useState(initial);
+  const [draft, setDraft] = useState({ name: initial.name, email: initial.email, phone: initial.phone || '' });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
+  const dirty = draft.name.trim() !== staff.name || draft.email.trim().toLowerCase() !== staff.email.toLowerCase()
+    || draft.phone.trim() !== (staff.phone || '');
 
   const update = async (body: Record<string, unknown>, okMessage: string) => {
     setBusy(true); setMessage(''); setError('');
@@ -108,10 +119,20 @@ function StaffDetail({ staff, onBack }: { staff: Staff; onBack: (message?: strin
       const response = await fetch(`/api/admin/users/${staff.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Thao tác thất bại');
+      // Hiện ngay trạng thái/thông tin mới thay vì giữ bản đọc từ danh sách.
+      setStaff((current) => ({ ...current, ...data.user, ...(typeof body.phone === 'string' ? { phone: body.phone } : {}) }));
       setMessage(okMessage);
       if (data.temporaryPassword) setTemporaryPassword(data.temporaryPassword);
     } catch (updateError) { setError(updateError instanceof Error ? updateError.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
+  };
+
+  const saveContact = (event: React.FormEvent) => {
+    event.preventDefault();
+    const phone = draft.phone.trim() ? normalizePhone(draft.phone) : '';
+    if (phone === null) { setMessage(''); setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
+    setDraft({ ...draft, phone });
+    void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đã lưu thông tin nhân viên.');
   };
 
   return <div className="space-y-4">
@@ -127,6 +148,22 @@ function StaffDetail({ staff, onBack }: { staff: Staff; onBack: (message?: strin
     {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
       Mật khẩu tạm thời mới: <strong className="font-mono">{temporaryPassword}</strong> — hãy gửi cho nhân viên và yêu cầu đổi ngay sau khi đăng nhập.
     </p>}
+
+    <form onSubmit={saveContact} className="space-y-3 rounded-2xl border border-cream-200 bg-white p-5">
+      <h3 className="font-bold">Thông tin liên hệ</h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-sm font-semibold">Họ tên
+          <input className={`${field} mt-1 font-normal`} required minLength={2} maxLength={100} value={draft.name}
+            onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Email đăng nhập
+          <input className={`${field} mt-1 font-normal`} type="email" required maxLength={254} value={draft.email}
+            onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
+        <label className="text-sm font-semibold">Số điện thoại
+          <input className={`${field} mt-1 font-normal`} type="tel" inputMode="tel" maxLength={20} placeholder="0912 345 678" value={draft.phone}
+            onChange={(event) => setDraft({ ...draft, phone: event.target.value })} /></label>
+      </div>
+      <button disabled={busy || !dirty} className="min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white disabled:opacity-50">Lưu thông tin</button>
+    </form>
 
     <section className="grid gap-3 rounded-2xl border border-cream-200 bg-white p-5 sm:grid-cols-2">
       <div><p className="text-xs font-semibold uppercase tracking-wide text-charcoal-500">Trạng thái</p>

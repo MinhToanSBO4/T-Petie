@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
@@ -105,7 +106,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     if (raw.length > 4000) return NextResponse.json({ error: 'Dữ liệu quá lớn' }, { status: 413 });
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
-    const { role, status, name, phone, address, city, password, resetPassword } = body;
+    const { role, status, name, email, phone, address, city, password, resetPassword } = body;
 
     // Không cho phép Admin tự khóa hoặc tự hạ quyền chính mình
     if (session.user.id === targetUserId) {
@@ -156,8 +157,16 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       updateData.password = await bcrypt.hash(temporaryPassword || (password as string), 12);
     }
     if (name !== undefined) {
-      if (typeof name !== 'string' || name.length > 100) return NextResponse.json({ error: 'Tên không hợp lệ' }, { status: 400 });
+      if (typeof name !== 'string' || name.trim().length < 2 || name.length > 100) return NextResponse.json({ error: 'Tên không hợp lệ' }, { status: 400 });
       updateData.name = name.trim();
+    }
+    // Email là tên đăng nhập của nhân viên: chỉ sửa cho tài khoản nhân viên, không để trống.
+    if (email !== undefined) {
+      if (targetUser.role !== 'staff') return NextResponse.json({ error: 'Chỉ sửa email của tài khoản nhân viên' }, { status: 403 });
+      if (typeof email !== 'string' || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return NextResponse.json({ error: 'Email không hợp lệ' }, { status: 400 });
+      }
+      updateData.email = email.trim().toLowerCase();
     }
     if (phone !== undefined) {
       if (typeof phone !== 'string' || phone.length > 20) return NextResponse.json({ error: 'Số điện thoại không hợp lệ' }, { status: 400 });
@@ -188,6 +197,9 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       ...(temporaryPassword ? { temporaryPassword } : {}),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Email này đã được dùng cho tài khoản khác' }, { status: 409 });
+    }
     console.error('Error in Admin PATCH /api/admin/users/[id]:', error);
     return NextResponse.json(
       { error: 'Lỗi máy chủ khi cập nhật tài khoản.' },

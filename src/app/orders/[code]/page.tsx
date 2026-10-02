@@ -11,6 +11,7 @@ import { getActiveSession } from '@/server/auth/session';
 import { getCustomerOrder } from '@/server/orders/customer-orders';
 import { getSiteContent } from '@/server/content/site-content';
 import { customerStatus } from '@/lib/orders/status';
+import { backOfficeHome } from '@/lib/admin/back-office';
 import { telHref } from '@/lib/content/site-content';
 import { formatDateVN, formatPriceCompact } from '@/lib/utils/formatters';
 import { RefreshWhenStale } from '@/components/orders/RefreshWhenStale';
@@ -31,7 +32,8 @@ export default async function OrderDetailPage({ params }: { params: { code: stri
   const code = decodeURIComponent(params.code);
   const session = await getActiveSession();
   if (!session) return <SignInPrompt callbackUrl={`/orders/${code}`} />;
-  if (session.user.role !== 'user') redirect(session.user.role === 'admin' ? '/admin/orders' : '/admin/products');
+  const backOffice = backOfficeHome(session.user.role);
+  if (backOffice) redirect(`${backOffice}/orders`);
   const [order, content] = await Promise.all([getCustomerOrder(session.user.id, code), getSiteContent()]);
   if (!order) notFound();
   const status = customerStatus(order.status);

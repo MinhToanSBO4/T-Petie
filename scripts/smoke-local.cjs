@@ -33,7 +33,7 @@ async function main() {
     const { csrfToken } = await csrfResponse.json();
     const body = new URLSearchParams({
       csrfToken, email: account.username, password: account.password,
-      callbackUrl: new URL(account.role === 'admin' ? '/admin' : '/admin/products', base).toString(), json: 'true',
+      callbackUrl: new URL(account.role === 'admin' ? '/admin' : '/staff', base).toString(), json: 'true',
     });
     const loginResponse = await fetch(new URL('/api/auth/callback/credentials', base), {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookies(csrfResponse) }, body, redirect: 'manual',
