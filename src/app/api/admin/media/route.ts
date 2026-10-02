@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/server/db/client';
 import { getStaffSession } from '@/server/auth/staff-session';
 import { MEDIA_MAX_BYTES, isValidImageFile, uploadImageToCloudinary } from '@/server/media/cloudinary';
+import { detectImageType } from '@/lib/media/image-signature';
+import { isSameOrigin } from '@/server/security/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,12 +28,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getStaffSession();
   if (!session) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  if (request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin) {
-    return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
-  }
-  const maxTotal = MEDIA_MAX_BYTES * 12;
-  if (Number(request.headers.get('content-length') || 0) > maxTotal + 500_000) {
-    return NextResponse.json({ error: 'Tổng dung lượng ảnh vượt quá giới hạn' }, { status: 413 });
+  if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
+  // Vercel từ chối request trên 4,5 MB trước khi tới đây; giao diện nén và gửi từng ảnh một.
+  if (Number(request.headers.get('content-length') || 0) > 4_400_000) {
+    return NextResponse.json({ error: 'Ảnh quá lớn (tối đa 4 MB mỗi lần gửi)' }, { status: 413 });
   }
   let form: FormData;
   try { form = await request.formData(); }
@@ -41,7 +41,13 @@ export async function POST(request: Request) {
   if (files.length === 0) return NextResponse.json({ error: 'Chưa chọn ảnh' }, { status: 400 });
   if (files.length > 12) return NextResponse.json({ error: 'Mỗi lần tải lên tối đa 12 ảnh' }, { status: 400 });
   const invalid = files.find((file) => !isValidImageFile(file));
-  if (invalid) return NextResponse.json({ error: 'Chỉ nhận JPEG, PNG, WebP, AVIF tối đa 5 MB mỗi ảnh' }, { status: 400 });
+  if (invalid) return NextResponse.json({ error: `Chỉ nhận JPEG, PNG, WebP, AVIF tối đa ${MEDIA_MAX_BYTES / 1_000_000} MB mỗi ảnh` }, { status: 400 });
+  // Kiểm tra nội dung thật của tệp, không chỉ loại MIME do trình duyệt khai báo (tệp SVG/HTML đổi tên không lọt qua).
+  for (const file of files as File[]) {
+    if (!detectImageType(new Uint8Array(await file.slice(0, 16).arrayBuffer()), true)) {
+      return NextResponse.json({ error: `${file.name} không phải ảnh JPEG, PNG, WebP hoặc AVIF` }, { status: 400 });
+    }
+  }
 
   const assets = [];
   for (const file of files) {

@@ -11,8 +11,9 @@ import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { getSiteContent } from '@/server/content/site-content';
 import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
-import type { Product } from '@/types/product';
+import { toProductCard, type Product } from '@/types/product';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { siteUrl } from '@/lib/site-url';
 
 export const revalidate = 60;
 
@@ -28,8 +29,8 @@ export default async function HomePage() {
   const selectedProducts = (ids: string[] | undefined, fallback: Product[]) => ids?.length
     ? ids.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product))
     : fallback;
-  const bestSellers = selectedProducts(sections?.bestSellers.productIds, products.filter((product) => product.isBestSeller)).slice(0, 12);
-  const flashSaleProducts = selectedProducts(sections?.sale.productIds, products.filter((product) => product.isSale)).slice(0, 12);
+  const bestSellers = selectedProducts(sections?.bestSellers.productIds, products.filter((product) => product.isBestSeller)).slice(0, 12).map(toProductCard);
+  const flashSaleProducts = selectedProducts(sections?.sale.productIds, products.filter((product) => product.isSale)).slice(0, 12).map(toProductCard);
   const blockImage = (image?: BlockImage) => image?.imageUrl && <img src={cloudinaryImage(image.imageUrl, { width: 1600 })} alt={image.imageAlt || ''}
     className="mb-5 h-40 w-full rounded-3xl object-cover sm:h-56" />;
   const blocks: Record<HomeBlockId, React.ReactNode> = {
@@ -42,5 +43,13 @@ export default async function HomePage() {
     testimonials: <TestimonialsSection feedback={feedback.slice(0, HOME_FEEDBACK_LIMIT)} feedbackTotal={feedback.length} section={content.testimonials_section} />,
   };
   const order = content.home_layout?.order || HOME_BLOCK_IDS;
-  return <div className="flex flex-col gap-10 sm:gap-14">{orderHomeBlocks(blocks, order).map((block, index) => <React.Fragment key={order[index]}>{block}</React.Fragment>)}</div>;
+  // Tiêu đề trang cho máy tìm kiếm và trình đọc màn hình (các khối trang chủ chỉ có h2); thông tin thương hiệu dạng có cấu trúc.
+  const organization = { '@context': 'https://schema.org', '@type': 'Organization', name: "T'Petie", url: siteUrl(),
+    ...(content.brand_assets?.logoUrl ? { logo: content.brand_assets.logoUrl } : {}),
+    sameAs: [content.contact_info?.facebookUrl, content.contact_info?.instagramUrl, content.contact_info?.tiktokUrl].filter(Boolean) };
+  return <div className="flex flex-col gap-10 sm:gap-14">
+    <h1 className="sr-only">T&apos;Petie – thời trang thiết kế cho bé gái</h1>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organization).replace(/</g, '\\u003c') }} />
+    {orderHomeBlocks(blocks, order).map((block, index) => <React.Fragment key={order[index]}>{block}</React.Fragment>)}
+  </div>;
 }

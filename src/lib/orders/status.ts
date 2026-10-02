@@ -92,6 +92,12 @@ export const CANCEL_REASONS = {
   shipping: ['Khách không nhận hàng', 'Giao không thành công, hàng hoàn về shop', 'Hàng hư hỏng khi vận chuyển'],
 } as const;
 export const CANCEL_REASON_MAX = 200;
+/**
+ * Lý do hủy mà hàng không quay lại kệ: hết hàng thật (tồn kho trên hệ thống đang sai) hoặc hàng hư khi vận chuyển.
+ * Hủy với các lý do này không cộng lại tồn kho, tránh bán tiếp số hàng không còn.
+ */
+export const NO_RESTOCK_REASONS: readonly string[] = ['Hết hàng / hết size', 'Hàng hư hỏng khi vận chuyển'];
+export const restocksOnCancel = (reason: string | null | undefined) => !NO_RESTOCK_REASONS.includes((reason || '').trim());
 export const CUSTOMER_CANCEL_NOTE = 'Khách tự hủy đơn';
 
 /** Ai đổi trạng thái đơn: quản trị viên, nhân viên, khách (tự hủy/xác nhận đã nhận) hoặc hệ thống (tự hoàn tất). */

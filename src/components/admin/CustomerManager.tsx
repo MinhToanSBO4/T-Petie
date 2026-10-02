@@ -34,6 +34,21 @@ export function CustomerManager() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+
+  /** Khách quên mật khẩu (chưa có gửi email đặt lại): tạo mật khẩu tạm để shop gửi cho khách qua Zalo/điện thoại. */
+  const resetPassword = async (customer: Customer) => {
+    if (!window.confirm(`Tạo mật khẩu tạm mới cho ${customer.name || customer.email || 'khách này'}? Mật khẩu cũ và mọi phiên đăng nhập cũ sẽ hết hiệu lực.`)) return;
+    setBusy(true); setMessage(''); setError(''); setTemporaryPassword('');
+    try {
+      const response = await fetch(`/api/admin/users/${customer.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetPassword: true }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.temporaryPassword) throw new Error(data.error || 'Không đặt lại được mật khẩu');
+      setTemporaryPassword(data.temporaryPassword);
+    } catch (resetError) { setError(resetError instanceof Error ? resetError.message : 'Có lỗi xảy ra'); }
+    finally { setBusy(false); }
+  };
 
   const change = async (customer: Customer, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete' && !window.confirm(`Xóa tài khoản của ${customer.name || customer.email || customer.id}? Đơn hàng cũ vẫn được giữ lại.`)) return;
@@ -59,10 +74,14 @@ export function CustomerManager() {
         <h2 className="text-lg font-bold">{selected.name || 'Chưa đặt tên'}</h2>
         <p className="text-xs text-charcoal-500">{selected.email || selected.username || selected.id}</p>
       </div>
-      <button type="button" onClick={() => setSelected(null)} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
+      <button type="button" onClick={() => { setSelected(null); setTemporaryPassword(''); }} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
     {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
+      Mật khẩu tạm mới: <strong className="select-all font-mono">{temporaryPassword}</strong> — chỉ hiện một lần. Gửi cho khách (Zalo/điện thoại),
+      dặn khách đăng nhập rồi đổi mật khẩu trong trang Tài khoản.
+    </p>}
 
     <section className="grid gap-3 rounded-2xl border border-cream-200 bg-white p-5 sm:grid-cols-2">
       {[
@@ -82,6 +101,8 @@ export function CustomerManager() {
             className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Khóa tài khoản</button>
         : <button type="button" disabled={busy} onClick={() => void change(selected, 'unblock')}
             className="min-h-11 rounded-xl border border-cream-300 px-5 text-sm font-semibold disabled:opacity-50">Mở khóa</button>}
+      {selected.email && <button type="button" disabled={busy} onClick={() => void resetPassword(selected)}
+        className="min-h-11 rounded-xl bg-sage-700 px-5 text-sm font-bold text-white disabled:opacity-50">Đặt lại mật khẩu</button>}
       <button type="button" disabled={busy} onClick={() => void change(selected, 'delete')}
         className="min-h-11 rounded-xl px-5 text-sm font-semibold text-red-700 disabled:opacity-50">Xóa tài khoản</button>
     </div>

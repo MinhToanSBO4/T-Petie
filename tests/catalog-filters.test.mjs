@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeFilterCount, catalogFacets, catalogParams, colorFamily, EMPTY_FILTERS, filterCatalog, normalizeText,
+  activeFilterCount, catalogFacets, catalogParams, colorFamily, compareSizeLabels, EMPTY_FILTERS, filterCatalog, normalizeText,
   parseCatalogParams, searchCatalog, sortCatalog,
 } from '../src/lib/catalog/filters.ts';
 
@@ -100,4 +100,30 @@ test('colour families follow the first colour named', () => {
   assert.equal(colorFamily('Đỏ Ruby & Xanh Cốm'), 'cam-do');
   assert.equal(colorFamily('Nâu Be Trầm Ấm'), 'nau-xam');
   assert.equal(colorFamily(undefined), null);
+});
+
+test('sizes sort by their number, not as text, and labels without a number go last', () => {
+  const labels = ['Size 150', 'Size 100', 'Người lớn', 'Size 90', 'Size 100 - Màu rêu', 'Size 120', 'Set S mẹ'];
+  assert.deepEqual([...labels].sort(compareSizeLabels),
+    ['Size 90', 'Size 100', 'Size 100 - Màu rêu', 'Size 120', 'Size 150', 'Người lớn', 'Set S mẹ']);
+});
+
+test('the page number lives in the URL and the sale page keeps its own default sort', () => {
+  const params = new URLSearchParams('size=Size%2090&page=3');
+  const parsed = parseCatalogParams(params, 'discount');
+  assert.equal(parsed.page, 3);
+  assert.equal(parsed.sort, 'discount');
+  // Sắp xếp mặc định của trang không ghi lên URL; trang 1 cũng không.
+  assert.equal(catalogParams({ ...parsed, page: 1 }, 'discount'), 'size=Size+90');
+  assert.equal(catalogParams(parsed, 'discount'), 'size=Size+90&page=3');
+  assert.equal(parseCatalogParams(new URLSearchParams('page=-2')).page, 1);
+  assert.equal(parseCatalogParams(new URLSearchParams('page=abc')).page, 1);
+});
+
+test('pagination shows the first, last and neighbouring pages with gaps', async () => {
+  const { pageWindow } = await import('../src/lib/catalog/page-window.ts');
+  assert.deepEqual(pageWindow(1, 1), [1]);
+  assert.deepEqual(pageWindow(1, 10), [1, 2, 3, 4, 'gap', 10]);
+  assert.deepEqual(pageWindow(6, 10), [1, 'gap', 5, 6, 7, 'gap', 10]);
+  assert.deepEqual(pageWindow(10, 10), [1, 'gap', 7, 8, 9, 10]);
 });

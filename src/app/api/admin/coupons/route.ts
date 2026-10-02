@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { isSameOrigin } from '@/server/security/origin';
 import { prisma } from '@/server/db/client';
@@ -65,19 +65,32 @@ export async function GET(request: Request) {
     total, page, limit) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
-/** Tạo mới hoặc cập nhật một mã giảm giá. */
+/**
+ * Tạo mới (`mode: "create"`) hoặc cập nhật một mã giảm giá. Tạo mã trùng với mã đã có bị từ chối thay vì
+ * âm thầm ghi đè loại/giá trị của mã đang chạy.
+ */
 export async function PATCH(request: Request) {
   if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ' }, { status: 403 });
   const raw = await request.text();
   if (raw.length > 4000) return NextResponse.json({ error: 'Dữ liệu quá lớn' }, { status: 413 });
   try {
-    const { code, ...data } = parseCouponInput(JSON.parse(raw));
-    await prisma.coupon.upsert({ where: { code }, create: { code, ...data }, update: data });
+    const body = JSON.parse(raw);
+    if (!body || typeof body !== 'object') throw new SyntaxError('body');
+    const { code, ...data } = parseCouponInput(body);
+    if (body.mode === 'create') {
+      await prisma.coupon.create({ data: { code, ...data } });
+    } else {
+      const updated = await prisma.coupon.updateMany({ where: { code }, data });
+      if (updated.count !== 1) return NextResponse.json({ error: 'Không tìm thấy mã giảm giá' }, { status: 404 });
+    }
     revalidateTag(COMMERCE_TAG);
     return NextResponse.json({ success: true, code });
   } catch (error) {
     if (error instanceof SyntaxError) return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Mã này đã tồn tại. Mở mã đó trong danh sách để sửa.' }, { status: 409 });
+    }
     if (error instanceof Error && /không hợp lệ/.test(error.message)) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

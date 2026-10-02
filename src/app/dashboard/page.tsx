@@ -26,8 +26,10 @@ import {
   Hourglass,
   PackageOpen,
   Truck,
-  Star
+  Star,
+  KeyRound
 } from 'lucide-react';
+import { ChangePasswordForm } from '@/components/account/ChangePasswordForm';
 import { CustomerStatusBadge } from '@/components/orders/CustomerStatusBadge';
 import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
@@ -46,7 +48,7 @@ function DashboardContent() {
   const { user, updateProfile, updateBabyProfile, logout } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'baby' | 'orders' | 'rewards'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'baby' | 'orders' | 'rewards' | 'security'>('profile');
 
   // Form State cá nhân
   const [name, setName] = useState(user?.name || '');
@@ -185,6 +187,7 @@ function DashboardContent() {
             { id: 'baby', label: 'Hồ sơ bé & Gợi ý size', icon: Baby, desc: 'Cân nặng, chiều cao, size chuẩn' },
             { id: 'orders', label: 'Đơn mua', icon: Package, desc: `${orderData?.counts.all ?? 0} đơn đã đặt` },
             { id: 'rewards', label: 'Điểm thưởng & Ưu đãi', icon: Award, desc: `${user?.points ?? 0} điểm hiện có` },
+            { id: 'security', label: 'Mật khẩu', icon: KeyRound, desc: 'Đổi hoặc đặt mật khẩu đăng nhập' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isCurrent = activeTab === tab.id;
@@ -442,6 +445,16 @@ function DashboardContent() {
                   </Link>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <div className="border-b border-cream-200 pb-4">
+                <h2 className="text-lg sm:text-xl font-bold font-heading text-charcoal-900">🔒 Mật Khẩu</h2>
+                <p className="text-xs text-charcoal-500 mt-0.5">Đổi mật khẩu, hoặc đặt mật khẩu cho tài khoản tạo bằng Google.</p>
+              </div>
+              <ChangePasswordForm />
             </div>
           )}
 

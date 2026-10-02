@@ -6,9 +6,12 @@ import { Product, ProductSizeOption } from '@/types/product';
 import { trackAddToCart } from '@/client/analytics/tracker';
 import { cartSizeLabel } from '@/lib/orders/variant-match';
 
+/** Thông tin sản phẩm giỏ hàng cần lưu: thẻ trong danh sách (dữ liệu gọn) và trang chi tiết đều có đủ. */
+type CartProduct = Pick<Product, 'id' | 'name' | 'sku' | 'thumbnail' | 'categoryName'>;
+
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Product, selectedSize: ProductSizeOption, quantity?: number) => void;
+  addToCart: (product: CartProduct, selectedSize: ProductSizeOption, quantity?: number) => void;
   /** Thêm nhiều món một lần (mua lại đơn cũ): gộp với món cùng size đã có trong giỏ. */
   addItems: (items: CartItem[]) => void;
   removeFromCart: (productId: string, selectedSize: string) => void;
@@ -25,6 +28,29 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'tpetie_cart_v1';
+/** Máy chủ nhận tối đa 99 cho mỗi món; vượt quá thì cả giỏ bị từ chối. */
+export const MAX_ITEM_QUANTITY = 99;
+
+const isCartItem = (value: unknown): value is CartItem => {
+  const item = value as CartItem;
+  return Boolean(item) && typeof item.productId === 'string' && typeof item.selectedSize === 'string'
+    && typeof item.productName === 'string' && Number.isInteger(item.quantity) && item.quantity > 0
+    && typeof item.price === 'number';
+};
+
+/**
+ * Giỏ đã lưu, bỏ dòng hỏng: dữ liệu localStorage có thể bị sửa tay hay từ phiên bản cũ; một giá trị không phải
+ * mảng trước đây làm sập cả trang (items.reduce trong layout).
+ */
+function readStoredCart(raw: string | null): CartItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isCartItem).map((item) => ({ ...item, quantity: Math.min(item.quantity, MAX_ITEM_QUANTITY) })) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -35,14 +61,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Load from localStorage on client mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setItems(JSON.parse(stored));
-      }
+      setItems(readStoredCart(localStorage.getItem(STORAGE_KEY)));
     } catch (e) {
       console.warn('Could not read cart from localStorage', e);
     }
     setIsHydrated(true);
+    // Đồng bộ giữa các tab: thêm món ở tab này thì tab kia không ghi đè giỏ bằng bản cũ của nó.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY) setItems(readStoredCart(event.newValue));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   // Save to localStorage
@@ -55,8 +84,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, isHydrated]);
 
-  const addToCart = (product: Product, selectedSize: ProductSizeOption, quantity = 1) => {
+  const addToCart = (product: CartProduct, selectedSize: ProductSizeOption, quantity = 1) => {
     const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
+    // Không cho giỏ vượt tồn kho đang thấy (và tối đa 99): vượt thì báo giá cả giỏ bị từ chối, khách không thanh toán được.
+    const cap = Math.min(MAX_ITEM_QUANTITY, selectedSize.stock > 0 ? selectedSize.stock : MAX_ITEM_QUANTITY);
     setItems((prevItems) => {
       const existingIndex = prevItems.findIndex(
         (i) => i.productId === product.id && i.selectedSize === formattedSize
@@ -66,7 +97,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const updated = [...prevItems];
         updated[existingIndex] = {
           ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + quantity,
+          quantity: Math.min(cap, updated[existingIndex].quantity + quantity),
         };
         return updated;
       } else {
@@ -78,7 +109,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           category: product.categoryName,
           selectedSize: formattedSize,
           price: selectedSize.price,
-          quantity,
+          quantity: Math.min(cap, quantity),
         };
         return [...prevItems, newItem];
       }
@@ -104,7 +135,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const index = next.findIndex((item) => item.productId === addition.productId && item.selectedSize === addition.selectedSize);
       if (index === -1) return [...next, addition];
       const updated = [...next];
-      updated[index] = { ...updated[index], price: addition.price, quantity: updated[index].quantity + addition.quantity };
+      updated[index] = { ...updated[index], price: addition.price, quantity: Math.min(MAX_ITEM_QUANTITY, updated[index].quantity + addition.quantity) };
       return updated;
     }, prevItems));
     setCartBounceTrigger((prev) => prev + 1);
@@ -119,7 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       prev
         .map((item) => {
           if (item.productId === productId && item.selectedSize === selectedSize) {
-            const newQty = item.quantity + delta;
+            const newQty = Math.min(MAX_ITEM_QUANTITY, item.quantity + delta);
             return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;

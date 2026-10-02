@@ -13,7 +13,8 @@ export function cloudinaryConfig() {
 }
 
 export const MEDIA_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
-export const MEDIA_MAX_BYTES = 5_000_000;
+/** Một ảnh tối đa 4 MB: Vercel từ chối mọi request lớn hơn 4,5 MB trước khi tới mã của ứng dụng. */
+export const MEDIA_MAX_BYTES = 4_000_000;
 
 export type UploadedImage = {
   url: string; publicId: string; width: number | null; height: number | null;
@@ -76,6 +77,24 @@ export function cloudinaryPublicId(url: string): string | null {
   const match = /^https:\/\/res\.cloudinary\.com\/([^/]+)\/image\/upload\/(?:v\d+\/)?([^,]+?)\.[a-z0-9]+$/i.exec(url);
   if (!config || !match || match[1] !== config.cloud) return null;
   return match[2];
+}
+
+/** Xóa một tệp raw (file xuất Excel) của chính tài khoản Cloudinary này; true khi đã xóa hoặc tệp không còn. */
+export async function deleteCloudinaryRaw(url: string): Promise<boolean> {
+  const config = cloudinaryConfig();
+  const match = /^https:\/\/res\.cloudinary\.com\/([^/]+)\/raw\/upload\/(?:v\d+\/)?(.+)$/.exec(url);
+  if (!config || !match || match[1] !== config.cloud) return false;
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${config.cloud}/raw/destroy`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ public_id: decodeURIComponent(match[2]) }),
+  });
+  if (!response.ok) return false;
+  const result = await response.json() as { result?: string };
+  return result.result === 'ok' || result.result === 'not found';
 }
 
 /** Tải một tệp bất kỳ (ví dụ báo cáo Excel) lên Cloudinary dưới dạng raw. */

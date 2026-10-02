@@ -59,3 +59,12 @@ export const REVIEW_PHOTO_OPTIONS: CompressOptions = { maxWidth: 1600, maxHeight
 export const SCREENSHOT_OPTIONS: CompressOptions = {
   maxWidth: 1440, maxHeight: 8000, quality: 0.9, type: 'image/webp', keepBelowBytes: 900_000,
 };
+
+/**
+ * Ảnh sản phẩm: cạnh dài tối đa 2000px (đủ phóng to xem chất vải), JPEG ~0.4–1 MB. Ảnh chụp điện thoại 3–8 MB
+ * vượt giới hạn 4,5 MB mỗi request của Vercel nên phải nén trước khi gửi; ảnh đã nhẹ và vừa cỡ thì giữ nguyên.
+ */
+export const PRODUCT_PHOTO_OPTIONS: CompressOptions = { maxWidth: 2000, maxHeight: 2000, quality: 0.86, keepBelowBytes: 1_500_000 };
+
+/** Ảnh banner, ảnh bìa bộ sưu tập, logo: rộng tối đa 2560px cho màn hình lớn. */
+export const BANNER_PHOTO_OPTIONS: CompressOptions = { maxWidth: 2560, maxHeight: 2560, quality: 0.86, keepBelowBytes: 1_500_000 };

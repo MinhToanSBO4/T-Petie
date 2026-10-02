@@ -16,6 +16,11 @@ const STATUS_STYLE: Record<string, string> = {
 };
 const formatTime = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '—';
 
+/** File xuất được xóa khỏi kho lưu trữ sau số ngày này (cron hằng ngày), giống EXPORT_RETENTION_DAYS ở máy chủ. */
+const RETENTION_DAYS = 7;
+const expired = (job: { completedAt: string | null }) =>
+  Boolean(job.completedAt) && Date.now() - new Date(job.completedAt!).getTime() > RETENTION_DAYS * 86_400_000;
+
 export function ExportManager() {
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [busy, setBusy] = useState(false);
@@ -89,8 +94,10 @@ export function ExportManager() {
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLE[job.status] || 'bg-cream-200 text-charcoal-700'}`}>
             {STATUS_LABEL[job.status] || job.status}
           </span>
-          {job.status === 'completed' && <a href={`/api/admin/export/${job.id}/download`}
-            className="min-h-11 rounded-xl bg-sage-700 px-4 py-2.5 text-sm font-bold text-white">Tải file</a>}
+          {job.status === 'completed' && (expired(job)
+            ? <span className="text-xs text-charcoal-500">Đã xóa sau {RETENTION_DAYS} ngày, hãy xuất lại</span>
+            : <a href={`/api/admin/export/${job.id}/download`}
+                className="min-h-11 rounded-xl bg-sage-700 px-4 py-2.5 text-sm font-bold text-white">Tải file</a>)}
         </div>
       </article>)}
       {jobs.length === 0 && <p className="rounded-2xl border border-dashed p-6 text-sm text-charcoal-600">Chưa có lần xuất dữ liệu nào.</p>}

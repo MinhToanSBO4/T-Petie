@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
+import { EXPORT_RETENTION_DAYS } from '@/server/orders/export-orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,9 @@ const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   if (!(await requireAdminApi())) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const job = await prisma.exportJob.findUnique({ where: { id: params.id } });
+  if (job?.status === 'completed' && !job.fileUrl) {
+    return NextResponse.json({ error: `File đã quá ${EXPORT_RETENTION_DAYS} ngày nên được xóa để bảo vệ dữ liệu khách. Bấm xuất lại để có file mới.` }, { status: 410 });
+  }
   if (!job || job.status !== 'completed' || !job.fileUrl) {
     return NextResponse.json({ error: 'File chưa sẵn sàng' }, { status: 404 });
   }

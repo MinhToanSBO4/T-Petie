@@ -45,7 +45,11 @@ export async function POST(request: Request) {
     { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    if (/giỏ hàng|sản phẩm|số lượng|tồn kho|giá|mã giảm|thanh toán/i.test(message)) {
+    if (message === 'Chưa cấu hình phí giao hàng') {
+      console.error('Quote blocked: commerce_settings row "default" is missing (save /admin/settings)');
+      return NextResponse.json({ error: 'Shop đang cập nhật phí giao hàng, mẹ vui lòng thử lại sau ít phút nhé.' }, { status: 503 });
+    }
+    if (/giỏ hàng|sản phẩm|số lượng|tồn kho|giá|mã giảm|thanh toán|tổng tiền/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error('Quote failed:', error);

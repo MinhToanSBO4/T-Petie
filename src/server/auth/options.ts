@@ -15,6 +15,9 @@ import type { UserRole, UserStatus } from '@/types/auth';
 const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
+/** Mã băm bcrypt (cost 12) của một chuỗi ngẫu nhiên, chỉ để so khi tài khoản không tồn tại. */
+const DUMMY_HASH = '$2a$12$CwTycUXWue0Thq9StjUM0uJ8.6oPq7e1ylXGQ0ZrZz0nYbV7m1nJ2';
+
 const googleProviders = googleClientId && googleClientSecret
   ? [GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })]
   : [];
@@ -24,6 +27,13 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
   pages: { signIn: '/login', error: '/login' },
+  events: {
+    // Đăng nhập mật khẩu đã ghi trong authorize(); đăng nhập Google ghi ở đây để cột "Đăng nhập gần nhất" đúng cho mọi khách.
+    async signIn({ user, account }) {
+      if (account?.provider !== 'google' || !user.id) return;
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'Email hoặc tên đăng nhập và mật khẩu',
@@ -32,11 +42,17 @@ export const authOptions: NextAuthOptions = {
         const identity = parseLoginIdentifier(credentials?.email);
         const password = credentials?.password;
         if (!identity || !password) return null;
-        const ip = request.headers?.['x-forwarded-for']?.split(',')[0] || 'unknown';
-        if (!(await allowAttempt(`login:${ip}:${Object.values(identity)[0]}`, 10))) return null;
+        if (password.length > 128) return null;
+        const ip = request.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+        // Hai giới hạn: 10 lần/tài khoản/IP (gõ nhầm mật khẩu) và 30 lần/IP cho mọi tài khoản (dò mật khẩu hàng loạt).
+        const [perAccount, perIp] = await Promise.all([
+          allowAttempt(`login:${ip}:${Object.values(identity)[0]}`, 10), allowAttempt(`login-ip:${ip}`, 30),
+        ]);
+        if (!perAccount || !perIp) return null;
         const user = await prisma.user.findUnique({ where: identity });
-        if (!user?.password || user.status !== 'active') return null;
-        if (!(await bcrypt.compare(password, user.password))) return null;
+        // Luôn chạy bcrypt (với mã băm giả khi không có tài khoản) để thời gian phản hồi không lộ email nào đã đăng ký.
+        const valid = await bcrypt.compare(password, user?.password || DUMMY_HASH);
+        if (!user?.password || user.status !== 'active' || !valid) return null;
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         return {
           id: user.id,
@@ -51,8 +67,10 @@ export const authOptions: NextAuthOptions = {
     ...googleProviders,
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
       if (!user.email) return false;
+      // Chỉ nhận email Google đã được Google xác minh: email chưa xác minh có thể là của người khác.
+      if (account?.provider === 'google' && (profile as { email_verified?: boolean } | undefined)?.email_verified !== true) return false;
       const stored = await prisma.user.findUnique({ where: { email: user.email.toLowerCase() } });
       return !stored || stored.status === 'active';
     },

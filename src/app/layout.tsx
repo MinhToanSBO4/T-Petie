@@ -17,10 +17,13 @@ import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
 import { getCollections } from '@/server/catalog/queries';
 import { Suspense } from 'react';
+import { siteUrl } from '@/lib/site-url';
 
 const DEFAULT_GA4_ID = 'G-LF9P82Z9QM';
 
 export const metadata: Metadata = {
+  // Gốc để Next.js dựng URL tuyệt đối cho canonical và ảnh Open Graph.
+  metadataBase: new URL(siteUrl()),
   title: "T'Petie | Thời Trang Trẻ Em Cao Cấp & Dịu Ngọt",
   description: "Thương hiệu thời trang thiết kế cho bé gái từ chất liệu organic mềm mát. Phong cách ngọt ngào, trong trẻo, an toàn cho làn da nhạy cảm của bé.",
   keywords: ["thời trang trẻ em", "váy bé gái", "thời trang bé gái", "T'Petie", "thời trang mẹ và bé"],
@@ -34,8 +37,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Không chặn phóng to: khách cần zoom xem chất vải, chữ nhỏ (WCAG 1.4.4).
   themeColor: '#FFF8EE',
 };
 

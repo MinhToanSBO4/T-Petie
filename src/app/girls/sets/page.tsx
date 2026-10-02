@@ -1,17 +1,13 @@
-import { CategoryHero } from '@/components/collection/CategoryHero';
-import { CategoryProductList } from '@/components/catalog/CategoryProductList';
-import { CATEGORY_PAGE_LABELS } from '@/lib/content/site-content';
-import { getCategoryPage } from '@/server/content/site-content';
+import type { Metadata } from 'next';
+import { CategoryCatalogPage, categoryMetadata } from '@/app/_catalog/category-page';
+import type { SearchParams } from '@/app/_catalog/catalog-section';
 
-export const revalidate = 60;
+type Props = { searchParams: SearchParams };
 
-export default async function GirlsSetsPage() {
-  const category = await getCategoryPage('sets');
-  const route = CATEGORY_PAGE_LABELS.sets;
-  return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-      <CategoryHero page={category} />
-      <CategoryProductList subcategory="set-do" />
-    </div>
-  );
+export function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  return categoryMetadata('sets', searchParams);
+}
+
+export default function GirlsSetsPage({ searchParams }: Props) {
+  return <CategoryCatalogPage id="sets" searchParams={searchParams} />;
 }

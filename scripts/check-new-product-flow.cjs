@@ -31,11 +31,17 @@ async function main() {
   try {
     const created = await fetch(new URL('/api/admin/products', base), {
       method: 'POST', headers: { 'Content-Type': 'application/json', cookie: sessionCookie, origin: base },
-      body: JSON.stringify({ name: 'Sản phẩm kiểm thử tạm', sku: `TEST-${suffix}`, slug: `test-${suffix}`, price: 123000, size: 'Size Test', stock: 1 }),
+      body: JSON.stringify({ name: 'Sản phẩm kiểm thử tạm', sku: `TEST-${suffix}`, slug: `test-${suffix}`, price: 123000, size: 'Size Test', stock: 1, subcategory: 'ao' }),
     });
     const result = await created.json();
     if (!created.ok || !result.id) throw new Error(`Admin product create failed: HTTP ${created.status} ${result.error || ''}`);
     id = result.id;
+    // Sản phẩm mới tạo ở trạng thái ẩn: bật bán để kiểm tra trên cửa hàng.
+    const published = await fetch(new URL(`/api/admin/products/${id}`, base), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', cookie: sessionCookie, origin: base },
+      body: JSON.stringify({ product: { isActive: true } }),
+    });
+    if (!published.ok) throw new Error(`Publishing the new product failed: HTTP ${published.status}`);
     const catalog = await fetch(new URL('/api/products?limit=48', base));
     const products = (await catalog.json()).products;
     const product = products.find((item) => item.id === id);

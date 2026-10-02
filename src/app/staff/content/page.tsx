@@ -6,5 +6,5 @@ export const dynamic = 'force-dynamic';
 
 export default async function StaffSiteContentPage() {
   await requireStaffAreaPage('/staff/content');
-  return <SiteContentManager {...await loadSiteContentEditor()} />;
+  return <SiteContentManager {...await loadSiteContentEditor()} canEditContact={false} />;
 }

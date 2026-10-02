@@ -141,7 +141,8 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     const updateData: Record<string, unknown> = {};
     if (resetPassword !== undefined && resetPassword !== true) return NextResponse.json({ error: 'Yêu cầu đặt lại mật khẩu không hợp lệ' }, { status: 400 });
     if (resetPassword && password !== undefined) return NextResponse.json({ error: 'Chỉ chọn một cách đặt lại mật khẩu' }, { status: 400 });
-    if (resetPassword && targetUser.role !== 'staff') return NextResponse.json({ error: 'Chỉ đặt lại mật khẩu nhân viên' }, { status: 403 });
+    // Khách quên mật khẩu chưa có email đặt lại: quản trị viên tạo mật khẩu tạm cho khách hoặc nhân viên (không cho tài khoản admin).
+    if (resetPassword && targetUser.role !== 'staff' && targetUser.role !== 'user') return NextResponse.json({ error: 'Không đặt lại được mật khẩu tài khoản này' }, { status: 403 });
     if (role && (role === 'staff' || role === 'user') && targetUser.role !== 'admin') {
       updateData.role = role;
     }

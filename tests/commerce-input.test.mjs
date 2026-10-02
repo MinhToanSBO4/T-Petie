@@ -13,3 +13,12 @@ test('coupon validation rejects misleading percentages and invalid codes', () =>
   assert.throws(() => parseCouponInput({ code: 'sale10', type: 'PERCENT', value: 120, minSubtotal: 0, active: true, requiresLogin: false }));
   assert.throws(() => parseCouponInput({ code: 'bad code', type: 'FIXED', value: 10000, minSubtotal: 0, active: true, requiresLogin: false }));
 });
+
+test('coupon times without a timezone are Vietnam time, not server (UTC) time', async () => {
+  const { optionalDate } = await import('../src/lib/orders/commerce-input.ts');
+  assert.equal(optionalDate('2026-10-31T23:59')?.toISOString(), '2026-10-31T16:59:00.000Z');
+  // Giao diện gửi ISO có múi giờ: giữ nguyên, lưu rồi mở lại không bị lệch thêm.
+  assert.equal(optionalDate('2026-10-31T16:59:00.000Z')?.toISOString(), '2026-10-31T16:59:00.000Z');
+  assert.equal(optionalDate(''), null);
+  assert.throws(() => optionalDate('ngày mai'), /không hợp lệ/);
+});

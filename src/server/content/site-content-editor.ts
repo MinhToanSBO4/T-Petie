@@ -4,6 +4,7 @@ import { SITE_CONTENT_KEYS } from '@/lib/content/site-content';
 import { getProducts, getCollections } from '@/server/catalog/queries';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
+import { toProductCard } from '@/types/product';
 
 /** Dữ liệu của trình chỉnh sửa nội dung website, dùng chung cho khu quản trị và khu nhân viên. */
 export async function loadSiteContentEditor() {
@@ -19,8 +20,8 @@ export async function loadSiteContentEditor() {
     initialContent: content,
     collections: collections.filter((collection) => collection.showOnHome),
     products: products.map(({ id, name, thumbnail, basePrice }) => ({ id, name, thumbnail, basePrice })),
-    bestSellers: products.filter((product) => product.isBestSeller).slice(0, 4),
-    saleProducts: products.filter((product) => product.isSale).slice(0, 4),
+    bestSellers: products.filter((product) => product.isBestSeller).slice(0, 4).map(toProductCard),
+    saleProducts: products.filter((product) => product.isSale).slice(0, 4).map(toProductCard),
     feedback: feedback.slice(0, HOME_FEEDBACK_LIMIT),
     feedbackTotal: feedback.length,
   };

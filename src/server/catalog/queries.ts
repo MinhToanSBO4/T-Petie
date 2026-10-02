@@ -3,8 +3,12 @@ import { unstable_cache } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import type { Product } from '@/types/product';
 import type { Collection } from '@/types/collection';
+import { compareSizeLabels } from '@/lib/catalog/filters';
 
-const productInclude = { images: { orderBy: { sortOrder: 'asc' as const } }, variants: { orderBy: { size: 'asc' as const } }, collection: true };
+// Bộ sưu tập chỉ cần mã và tên: không kéo câu chuyện/lookbook vào từng sản phẩm của danh sách đã cache
+// (Next.js bỏ qua cache cho mục lớn hơn 2 MB).
+const productInclude = { images: { orderBy: { sortOrder: 'asc' as const } }, variants: { orderBy: { size: 'asc' as const } },
+  collection: { select: { slug: true, title: true } } };
 
 function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ include: typeof productInclude }>>>[number]): Product {
   const images = row.images.map((image) => image.url);
@@ -21,7 +25,7 @@ function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ incl
     collectionName: row.collection?.title,
     material: row.material,
     materialFeatures: row.materialFeatures,
-    sizes: row.variants.filter((variant) => variant.isActive).map((variant) => ({
+    sizes: row.variants.filter((variant) => variant.isActive).sort((a, b) => compareSizeLabels(a.size, b.size)).map((variant) => ({
       size: variant.size, weightRange: variant.weightRange || '', ageRange: variant.ageRange || '',
       price: Number(variant.price), stock: variant.stock,
     })),
@@ -83,7 +87,8 @@ export const getRelatedProducts = unstable_cache(async (productId: string, colle
 }, ['related-products'], { revalidate: 60, tags: ['products'] });
 
 export const getCollections = unstable_cache(async (): Promise<Collection[]> => {
-  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { select: { id: true } } },
+  // Chỉ đếm sản phẩm đang bán: số "N thiết kế" khớp với danh sách khách thấy.
+  const rows = await prisma.collection.findMany({ where: { isActive: true }, include: { products: { where: { isActive: true }, select: { id: true } } },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   return rows.map((row) => ({
     id: row.slug, title: row.title, subtitle: row.subtitle || '', story: row.story || '',

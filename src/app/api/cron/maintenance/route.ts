@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/db/client';
 import { autoCompleteShippedOrders } from '@/server/orders/order-status';
-import { failStaleExportJobs } from '@/server/orders/export-orders';
+import { failStaleExportJobs, purgeExpiredExports } from '@/server/orders/export-orders';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -27,7 +27,8 @@ export async function GET(request: Request) {
   const now = new Date();
   const completedOrders = await autoCompleteShippedOrders(now, { force: true });
   const failedExports = await failStaleExportJobs(now);
+  const purgedExports = await purgeExpiredExports(now);
   const { count: expiredRateLimits } = await prisma.rateLimitCounter.deleteMany({ where: { expiresAt: { lt: now } } });
-  return NextResponse.json({ completedOrders, failedExports, expiredRateLimits, at: now.toISOString() },
+  return NextResponse.json({ completedOrders, failedExports, purgedExports, expiredRateLimits, at: now.toISOString() },
     { headers: { 'Cache-Control': 'no-store' } });
 }

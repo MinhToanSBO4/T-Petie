@@ -10,8 +10,13 @@ export function priceOrder(requested: RequestedItem[], variants: PricedVariant[]
     seen.add(variantId);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error('Số lượng không hợp lệ');
     const variant = byId.get(variantId);
-    if (!variant || !variant.active) throw new Error('Sản phẩm không còn bán');
-    if (variant.stock < quantity) throw new Error('Số lượng vượt quá tồn kho');
+    if (!variant || !variant.active) throw new Error(variant ? `Sản phẩm "${variant.name}" (${variant.size}) không còn bán, mẹ xóa khỏi giỏ giúp shop nhé`
+      : 'Có sản phẩm trong giỏ không còn bán, mẹ xóa khỏi giỏ giúp shop nhé');
+    // Nói rõ món nào thiếu hàng: trước đây cả giỏ chỉ báo "vượt quá tồn kho", khách không biết sửa dòng nào.
+    if (variant.stock < quantity) {
+      throw new Error(variant.stock > 0 ? `"${variant.name}" (${variant.size}) chỉ còn ${variant.stock} sản phẩm tồn kho, mẹ giảm số lượng giúp shop nhé`
+        : `"${variant.name}" (${variant.size}) đã hết hàng (tồn kho 0), mẹ xóa khỏi giỏ giúp shop nhé`);
+    }
     if (!Number.isSafeInteger(variant.price) || variant.price < 0) throw new Error('Giá không hợp lệ');
     return { variantId, productId: variant.productId, productName: variant.name, size: variant.size,
       quantity, unitPrice: variant.price, totalPrice: variant.price * quantity };
