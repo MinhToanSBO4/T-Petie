@@ -9,6 +9,21 @@ const { spawnSync } = require('node:child_process');
 const { join } = require('node:path');
 
 const root = join(__dirname, '..');
+
+// Trên Vercel: kiểm tra biến môi trường trước tiên, để thiếu/sai cấu hình báo ngay ở log build thay vì lỗi lúc chạy.
+// Bản production dừng build khi có lỗi; bản preview chỉ cảnh báo.
+if (process.env.VERCEL === '1') {
+  const { checkDeployEnvironment } = require('./lib/deploy-env.cjs');
+  const production = process.env.VERCEL_ENV === 'production';
+  const { errors, warnings } = checkDeployEnvironment(process.env, { production, vercel: true });
+  for (const warning of warnings) console.warn(`⚠ ${warning}`);
+  for (const error of errors) console[production ? 'error' : 'warn'](`${production ? '✖' : '⚠'} ${error}`);
+  if (production && errors.length) {
+    console.error('\n✖ Cấu hình biến môi trường chưa đủ cho production (Vercel → Settings → Environment Variables).\n');
+    process.exit(1);
+  }
+}
+
 const flag = process.env.MIGRATE_ON_BUILD;
 const migrate = flag === '1' || (flag !== '0' && process.env.VERCEL === '1' && process.env.VERCEL_ENV === 'production');
 

@@ -1,0 +1,16 @@
+# Khi deploy bằng Vercel CLI (`vercel`, `vercel --prod`) từ máy local: không gửi file bí mật và file build cục bộ.
+# Biến môi trường khai báo trong Vercel → Settings → Environment Variables, không lấy từ .env.
+.env
+.env.*
+!.env.example
+/.vercel/
+/node_modules/
+/.next/
+/coverage/
+/out/
+/build/
+*.tsbuildinfo
+*.pem
+npm-debug.log*
+/archive/
+/docs/reference/
