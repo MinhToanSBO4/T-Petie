@@ -14,6 +14,7 @@ const MAX_ENTRIES = 2_000;
 
 const userSelect = {
   role: true, status: true, password: true, name: true, email: true, phone: true, address: true, city: true, points: true,
+  emailVerified: true, emailVerificationRequired: true,
   babyName: true, babyBirthDate: true, babyWeight: true, babyHeight: true, babyGender: true, recommendedSize: true,
 } as const;
 

@@ -6,6 +6,7 @@ import { createOrder, IdempotencyConflictError, type CheckoutInput } from '@/ser
 import { clientIp } from '@/server/security/client-ip';
 import { normalizePhone } from '@/lib/account/account-input';
 import { normalizeEmail } from '@/lib/email/config';
+import { emailVerificationState } from '@/server/auth/email-tokens';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -54,6 +55,11 @@ export async function POST(request: Request) {
       }
     }
     const session = await getServerSession(authOptions);
+    const userId = session?.user?.status === 'active' ? session.user.id : undefined;
+    // Tài khoản đăng ký bằng email phải xác thực email trước khi đặt hàng. Đọc thẳng database: phiên có thể cũ vài giây.
+    if (userId && session?.user.role === 'user' && (await emailVerificationState(userId))?.verified === false) {
+      return NextResponse.json({ code: 'EMAIL_UNVERIFIED', message: 'Mẹ vui lòng xác thực email trước khi đặt hàng.' }, { status: 403 });
+    }
     const input = body as CheckoutInput;
     const result = await createOrder({
       fullName: input.fullName.trim(), phone: input.phone.trim(), address: input.address.trim(),
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
       note: input.note?.slice(0, 1000), couponCode: input.couponCode?.slice(0, 30),
       source: input.source?.trim().slice(0, 100) || undefined, items: input.items,
       email: input.email?.trim().toLowerCase(),
-    }, session?.user?.status === 'active' ? session.user.id : undefined, idempotencyKey);
+    }, userId, idempotencyKey);
     return NextResponse.json({ status: 'success', ...result }, { status: 201 });
   } catch (error) {
     if (error instanceof IdempotencyConflictError) return NextResponse.json({ message: error.message }, { status: 409 });

@@ -13,6 +13,8 @@ declare module 'next-auth' {
       address?: string | null;
       city?: string | null;
       points?: number;
+      /** false: khách đăng ký bằng email chưa bấm liên kết xác thực, chưa được đặt hàng. */
+      emailVerified: boolean;
       babyProfile?: BabyProfile | null;
     } & DefaultSession['user'];
     /** Thông báo một lần sau khi quay về từ Google, hiện bằng AuthNotice. */
@@ -41,6 +43,7 @@ declare module 'next-auth/jwt' {
     address?: string | null;
     city?: string | null;
     points?: number;
+    emailVerified?: boolean;
     babyProfile?: BabyProfile | null;
     notice?: AuthNotice;
   }

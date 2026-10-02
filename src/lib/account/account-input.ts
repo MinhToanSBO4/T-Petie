@@ -2,8 +2,8 @@
 const MOBILE = /^0[35789]\d{8}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Cùng chính sách với mật khẩu nhân viên do quản trị viên tạo. */
-export const PASSWORD_MIN = 12;
+/** Một chính sách mật khẩu cho mọi tài khoản: khách, nhân viên, quản trị viên. */
+export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 
 export type AccountProfileInput = { name: string; email: string; phone: string | null };
@@ -28,11 +28,17 @@ export function parseAccountProfile(raw: unknown): AccountProfileInput {
   return { name: name.trim().replace(/\s+/g, ' '), email: email.trim().toLowerCase(), phone: cleanPhone };
 }
 
+/** Lý do mật khẩu chưa đạt chính sách (độ dài), hoặc null. */
+export function passwordProblem(password: unknown): string | null {
+  if (typeof password !== 'string' || password.length < PASSWORD_MIN) return `Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự`;
+  if (password.length > PASSWORD_MAX) return `Mật khẩu tối đa ${PASSWORD_MAX} ký tự`;
+  return null;
+}
+
 /** Lý do mật khẩu mới chưa dùng được, hoặc null. */
 export function newPasswordProblem(password: unknown, current?: unknown): string | null {
-  if (typeof password !== 'string' || password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
-    return `Mật khẩu mới cần ${PASSWORD_MIN}–${PASSWORD_MAX} ký tự`;
-  }
+  const problem = passwordProblem(password);
+  if (problem) return problem;
   if (password === current) return 'Mật khẩu mới phải khác mật khẩu hiện tại';
   return null;
 }

@@ -36,6 +36,7 @@ import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
+import { EmailVerificationBanner } from '@/components/auth/EmailVerification';
 
 export default function UserDashboardPage() {
   return (
@@ -150,6 +151,7 @@ function DashboardContent() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
+      <EmailVerificationBanner />
 
       {/* 1. TOP USER CARD (Warm & Sweet) */}
       <div className="bg-gradient-to-r from-cream-100 via-blush-50 to-honey-100 rounded-3xl p-6 sm:p-8 border border-cream-200 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-6">

@@ -6,6 +6,7 @@ import { requireAdminApi } from '@/server/auth/staff-session';
 import { prisma } from '@/server/db/client';
 import * as bcrypt from 'bcryptjs';
 import { paginated, parseChoice, parsePagination, parseSearch } from '@/lib/pagination';
+import { passwordProblem, PASSWORD_MIN } from '@/lib/account/account-input';
 
 /** Cách sắp xếp danh sách tài khoản; luôn kèm id để phân trang ổn định. Chưa từng đăng nhập/chưa đặt tên xếp cuối. */
 const SORTS: Record<string, Prisma.UserOrderByWithRelationInput[]> = {
@@ -126,8 +127,8 @@ export async function POST(req: Request) {
     if (typeof name !== 'string' || name.trim().length < 2 || name.length > 100 ||
       typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254 ||
       typeof username !== 'string' || !/^[a-z][a-z0-9_]{2,31}$/.test(username.trim().toLowerCase()) ||
-      typeof password !== 'string' || password.length < 12 || password.length > 128) {
-      return NextResponse.json({ error: 'Tên, email, username và mật khẩu 12–128 ký tự là bắt buộc.' }, { status: 400 });
+      passwordProblem(password)) {
+      return NextResponse.json({ error: `Cần nhập tên, email, username và mật khẩu (ít nhất ${PASSWORD_MIN} ký tự).` }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();

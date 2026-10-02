@@ -13,6 +13,7 @@ import { MiniCart } from '@/components/cart/MiniCart';
 import { FloatingMessenger } from '@/components/layout/FloatingMessenger';
 import { NavigationProgress } from '@/components/layout/NavigationProgress';
 import { AuthNotice } from '@/components/auth/AuthNotice';
+import { EmailVerificationProvider } from '@/components/auth/EmailVerification';
 import { PublicChrome } from '@/components/layout/PublicChrome';
 import { getSiteContent } from '@/server/content/site-content';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
@@ -90,6 +91,7 @@ export default async function RootLayout({
           {ga4Id && <GoogleAnalytics measurementId={ga4Id} />}
           <AuthProvider>
             <ToastProvider>
+              <EmailVerificationProvider>
               <CartProvider>
                 <Suspense fallback={null}><NavigationProgress /></Suspense>
                 <AuthNotice />
@@ -106,6 +108,7 @@ export default async function RootLayout({
                   <main className="flex-1 pb-16 md:pb-0">{children}</main>
                 </PublicChrome>
               </CartProvider>
+              </EmailVerificationProvider>
             </ToastProvider>
           </AuthProvider>
         </SessionProvider>

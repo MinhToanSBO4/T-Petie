@@ -8,20 +8,21 @@ import * as bcrypt from 'bcryptjs';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { clientIp } from '@/server/security/client-ip';
 import { isSameOrigin } from '@/server/security/origin';
-import { normalizePhone } from '@/lib/account/account-input';
+import { normalizePhone, passwordProblem } from '@/lib/account/account-input';
 import { readMailConfig, normalizeEmail } from '@/lib/email/config';
 import { issueAccountEmail } from '@/server/auth/email-tokens';
 
 const EMAIL_TAKEN = 'Địa chỉ Email này đã được đăng ký. Mẹ vui lòng chọn Đăng nhập nhé!';
 
-/** Kiểm tra form đăng ký; trả về thông báo cho đúng ô bị sai (trước đây mọi lỗi đều báo "Mật khẩu cần 12–128 ký tự"). */
+/** Kiểm tra form đăng ký; trả về thông báo cho đúng ô bị sai. */
 function inputError(body: Record<string, unknown>): string | null {
   const { name, email, password, phone } = body;
   if (typeof name !== 'string' || !name.trim()) return 'Vui lòng nhập Họ tên.';
   if (name.trim().length > 100) return 'Họ tên tối đa 100 ký tự.';
   if (typeof email !== 'string' || !email.trim()) return 'Vui lòng nhập Email.';
   if (!normalizeEmail(email)) return 'Email không đúng định dạng (VD: mebe@gmail.com)!';
-  if (typeof password !== 'string' || password.length < 12 || password.length > 128) return 'Mật khẩu cần 12–128 ký tự.';
+  const problem = passwordProblem(password);
+  if (problem) return `${problem}.`;
   if (phone !== undefined && phone !== null && (typeof phone !== 'string' || (phone.trim() && !normalizePhone(phone)))) {
     return 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09 (có thể bỏ trống).';
   }
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
       select: { id: true, name: true, email: true, role: true, status: true, phone: true, points: true, createdAt: true },
     });
 
-    const emailSent = await issueAccountEmail(cleanEmail, 'verify').catch(() => false);
+    const emailSent = (await issueAccountEmail({ id: newUser.id }, 'verify').catch(() => null))?.status === 'queued';
     return NextResponse.json({ success: true, requiresVerification: true, emailSent,
       message: emailSent ? 'Vui lòng kiểm tra email để xác thực tài khoản.' : 'Tài khoản đã tạo. Chưa gửi được thư xác thực, vui lòng gửi lại.', user: newUser }, { status: 201 });
   } catch (error) {

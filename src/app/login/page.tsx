@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { safeCallbackPath } from '@/lib/auth-identity';
 import { landingPath } from '@/lib/admin/back-office';
 import { authErrorMessage } from '@/lib/auth-errors';
@@ -28,7 +28,6 @@ function LoginForm() {
   const callbackUrl = safeCallbackPath(searchParams.get('callbackUrl'));
 
   const { login, isLoading } = useAuth();
-  const { showToast } = useToast();
   const googleEnabled = useGoogleSignInEnabled();
 
   const [email, setEmail] = useState('');
@@ -66,7 +65,14 @@ function LoginForm() {
 
     if (result.success) {
       window.dispatchEvent(new Event('tpetie:navigation-start'));
-      showToast(`Chào mừng bạn trở lại với T'Petie! 🌸`);
+      if (result.emailVerified === false) {
+        toast.warning('Mẹ chưa xác thực email', {
+          description: 'Mẹ vẫn xem và thêm vào giỏ được; xác thực email để đặt hàng nhé.',
+          action: { label: 'Xác thực ngay', href: '/verify-email' }, duration: 10_000,
+        });
+      } else {
+        toast.success(`Chào mừng bạn trở lại với T'Petie! 🌸`);
+      }
       router.push(landingPath(result.role, callbackUrl));
     } else {
       setIsSubmitting(false);
@@ -181,7 +187,6 @@ function LoginForm() {
               Quên mật khẩu?
             </a>
           </div>
-          <a href="/verify-email" className="block text-sm text-honey-700 underline">Gửi lại email xác thực</a>
 
         </div>
       </div>

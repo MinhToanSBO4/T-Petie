@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useToast } from '@/context/ToastContext';
 import { errorText } from '@/client/toast';
+import { PASSWORD_MIN } from '@/lib/account/account-input';
 
-const PASSWORD_MIN = 12;
 const field = 'w-full rounded-2xl border border-cream-300 px-4 py-2.5 text-sm outline-none focus:border-honey-500 focus:ring-2 focus:ring-honey-100';
 
 /**

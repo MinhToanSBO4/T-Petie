@@ -11,6 +11,7 @@ import { useCart } from '@/context/CartContext';
 import { trackPurchase } from '@/client/analytics/tracker';
 import { normalizePhone } from '@/lib/account/account-input';
 import { useAuth } from '@/context/AuthContext';
+import { EmailVerificationBanner, useEmailVerification } from '@/components/auth/EmailVerification';
 
 interface CheckoutData {
   items: {
@@ -48,6 +49,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { removeFromCart } = useCart();
   const { user } = useAuth();
+  const { requireVerifiedEmail, openVerificationDialog } = useEmailVerification();
   const [emailTouched, setEmailTouched] = useState(false);
   
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
@@ -95,7 +97,8 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    if (!requireVerifiedEmail()) return;
+
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
       toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc!');
       return;
@@ -154,6 +157,9 @@ export default function CheckoutPage() {
         toast.success('Đặt hàng thành công! Đơn của Mẹ đã được ghi nhận 🌸', { id: notice });
         window.dispatchEvent(new Event('tpetie:navigation-start'));
         router.push('/checkout/success');
+      } else if (res.status === 403 && result.code === 'EMAIL_UNVERIFIED') {
+        toast.dismiss(notice);
+        openVerificationDialog();
       } else {
         throw new Error(result.message || 'Lỗi không xác định');
       }
@@ -203,6 +209,7 @@ export default function CheckoutPage() {
           Thanh Toán
         </h1>
       </div>
+      <EmailVerificationBanner className="mb-6" />
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Form Thông Tin */}

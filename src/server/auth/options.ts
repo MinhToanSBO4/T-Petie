@@ -66,7 +66,8 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(password, user?.password || DUMMY_HASH);
         if (!user?.password || user.status !== 'active' || !valid) return null;
         if (user.deletedAt) return null;
-        if (requiresEmailVerification(user)) throw new Error('EmailVerificationRequired');
+        // Khách chưa xác thực email vẫn đăng nhập được để xem tài khoản và gửi lại thư; chỉ đặt hàng mới bị chặn
+        // (api/checkout). Chặn ngay ở đây khiến khách mới đăng ký bị "khóa ngoài" và không hiểu vì sao.
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         return {
           id: user.id,
@@ -109,12 +110,13 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user, account, isNewUser }) {
+    async jwt({ token, user, account, isNewUser, trigger }) {
       if (user) token.id = user.id;
       if (!token.id) return token;
       let stored: Awaited<ReturnType<typeof readUserSnapshot>>;
       try {
-        stored = await readUserSnapshot(token.id, { fresh: Boolean(user) });
+        // `update()` từ trình duyệt (ví dụ sau khi xác thực email ở tab khác) đọc lại database, không dùng bản đệm.
+        stored = await readUserSnapshot(token.id, { fresh: Boolean(user) || trigger === 'update' });
       } catch (error) {
         // Database tạm thời không phản hồi (mất mạng, hết kết nối): giữ quyền đã xác minh ở lần trước. Nếu ném lỗi,
         // NextAuth xóa cookie phiên và người dùng bị đăng xuất, còn API trả "Không có quyền" dù tài khoản hợp lệ.
@@ -134,6 +136,7 @@ export const authOptions: NextAuthOptions = {
       token.address = stored?.address;
       token.city = stored?.city;
       token.points = stored?.points;
+      token.emailVerified = stored ? !requiresEmailVerification(stored) : true;
       token.babyProfile = stored ? toBabyProfile(stored) : null;
       if (user && account?.provider === 'google') {
         const link = googleLinks.get(account);
@@ -157,6 +160,7 @@ export const authOptions: NextAuthOptions = {
         session.user.address = token.address;
         session.user.city = token.city;
         session.user.points = token.points;
+        session.user.emailVerified = token.emailVerified !== false;
         session.user.babyProfile = token.babyProfile;
       }
       return session;
