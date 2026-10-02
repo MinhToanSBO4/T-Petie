@@ -1,0 +1,9 @@
+Xin chào Mẹ An,
+
+Bạn đã yêu cầu đặt lại mật khẩu. Liên kết có hiệu lực trong 30 phút và chỉ sử dụng được một lần.
+
+Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email. Không chia sẻ liên kết này với người khác.
+
+Đặt lại mật khẩu: https://shop.example.com/reset-password?token=preview-only
+
+Email tự động từ T'Petie. Vui lòng không trả lời email này.

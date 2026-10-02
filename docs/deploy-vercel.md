@@ -1,105 +1,163 @@
-# Triển khai T'Petie lên Vercel
+# Deploying to Vercel
 
-Frontend và backend nằm chung một ứng dụng Next.js: trang và API (`src/app/api/**`) cùng được Vercel build và chạy dưới dạng Vercel Functions. Database là Supabase PostgreSQL (schema `tpetie_app`, vùng Seoul `ap-northeast-2`), ảnh và file xuất Excel trên Cloudinary.
+The storefront, back office and API are one Next.js application, deployed as a single Vercel project. Pages and Route Handlers (`src/app/api`) run as Vercel Functions. The database is Supabase PostgreSQL; images and Excel export files are stored on Cloudinary.
 
-## 1. Cấu hình có sẵn trong repo
+This guide is intended for the project owner and authorized maintainers. For local setup and usage restrictions, see the [project README](../README.md).
 
-| Tệp | Nội dung |
+## 1. What the repository configures
+
+| File | Purpose |
 | --- | --- |
-| `vercel.json` | Framework Next.js, `npm ci`, `npm run build`, region **`icn1` (Seoul)** cạnh database Supabase, cron bảo trì `/api/cron/maintenance` lúc 20:00 UTC (03:00 giờ Việt Nam) mỗi ngày. |
-| `scripts/build.cjs` | Trên Vercel, kiểm tra biến môi trường trước tiên (`scripts/lib/deploy-env.cjs`): thiếu/sai cấu hình thì dừng build và in rõ biến nào cần sửa (production cần đủ mọi biến; preview chỉ bắt buộc `CONNECTION_STRING` và `NEXTAUTH_SECRET` vì lúc build các trang đã đọc database). Sau đó bản **production** tự chạy `prisma migrate deploy` (qua `DIRECT_URL`); lỗi migration thì dừng build. Bản preview không tự migrate. |
-| `package.json` → `engines.node` | Node **22.x** trên Vercel (bản LTS Prisma 5.22 hỗ trợ chính thức). |
-| `.vercelignore` | Khi deploy bằng Vercel CLI từ máy local, không gửi `.env`, `.next`, `node_modules` lên Vercel. |
-| `src/lib/db/connection-url.ts` | Tự chọn số kết nối Prisma theo môi trường: Vercel + transaction pooler 5 kết nối/instance, session pooler 1 kết nối (kèm cảnh báo), máy chủ chạy lâu 5 kết nối; tự thêm `pgbouncer=true` khi dùng cổng 6543. Ghi `connection_limit`/`pool_timeout` trong chuỗi kết nối để ghi đè. |
-| `next.config.mjs` | `next/image` dùng Cloudinary làm loader, không tốn hạn mức Image Optimization của Vercel; header bảo mật (CSP, HSTS…). |
-| `src/app/api/admin/export/route.ts` | Xuất Excel chạy nền bằng `waitUntil` của `@vercel/functions`, tối đa 120 giây. |
+| `vercel.json` | Next.js preset, `npm ci` install, `npm run build` build, functions in `icn1` (Seoul), and a daily cron calling `/api/cron/maintenance` at 20:00 UTC (03:00 in Vietnam). |
+| `scripts/build.cjs`, `scripts/lib/deploy-env.cjs` | On Vercel, validate environment variables before building and stop with a list of what to fix. By default, production builds run `prisma migrate deploy` through `DIRECT_URL` and stop if a migration fails; preview builds skip migrations. `MIGRATE_ON_BUILD` overrides this behavior (see section 4). |
+| `package.json` (`engines.node`) | Node.js 22.x. |
+| `.vercelignore` | Keeps `.env` files, build output, `node_modules`, `archive/` and `docs/reference/` out of deployments uploaded with the Vercel CLI. |
+| `src/lib/db/connection-url.ts` | Chooses Prisma connection-pool settings for the environment and adds `pgbouncer=true` to port-6543 URLs. |
+| `next.config.mjs` | Cloudinary loader for `next/image`, so Vercel Image Optimization is not used; security headers, including a Content Security Policy and HSTS. |
+| `src/app/api/admin/export/route.ts` | Builds the Excel export in the background with `waitUntil` from `@vercel/functions` (`maxDuration` 120 seconds). |
 
-Region đặt trong `vercel.json` vì mỗi truy vấn database phải đi từ function tới Supabase: function mặc định của Vercel chạy ở Washington (`iad1`), cách Seoul hơn 150 ms mỗi lượt; đặt `icn1` thì chỉ còn vài mili giây. Gói Hobby được chọn một region.
+Every database query is a round trip from a function to Supabase, so functions are pinned to `icn1` (Seoul), next to the database in `ap-northeast-2`. Vercel's default region is in the United States and would add a trans-Pacific round trip to every query. If your database is in another region, change `regions` in `vercel.json` to match; `npm run db:verify-structure` warns when the database is not in `ap-northeast-2`.
 
-## 2. Lấy chuỗi kết nối Supabase
+## 2. Supabase connection strings
 
-Supabase Dashboard → **Connect** → mục *Connection pooling*:
+In the Supabase dashboard, open **Connect** and copy the pooler connection strings:
 
-- **Transaction pooler** (cổng **6543**) → `CONNECTION_STRING`, thêm `?schema=tpetie_app&pgbouncer=true`.
-- **Session pooler** (cổng **5432**) → `DIRECT_URL`, thêm `?schema=tpetie_app`. Prisma CLI dùng chuỗi này để migrate (transaction pooler không hỗ trợ khóa và prepared statement mà migration cần).
+| Variable | Pooler | Port | Query parameters |
+| --- | --- | --- | --- |
+| `CONNECTION_STRING` | Transaction pooler | 6543 | `?schema=<schema>&pgbouncer=true` |
+| `DIRECT_URL` | Session pooler | 5432 | `?schema=<schema>` |
 
 ```env
-CONNECTION_STRING="postgresql://postgres.<ref>:<mật-khẩu>@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?schema=tpetie_app&pgbouncer=true"
-DIRECT_URL="postgresql://postgres.<ref>:<mật-khẩu>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?schema=tpetie_app"
+CONNECTION_STRING="postgresql://postgres.<project-ref>:<password>@<pooler-host>:6543/postgres?schema=<schema>&pgbouncer=true"
+DIRECT_URL="postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?schema=<schema>"
 ```
 
-SQL viết tay trong ứng dụng luôn ghi rõ schema (`src/server/db/sql.ts`), vì qua transaction pooler mỗi giao dịch có thể chạy trên một kết nối chưa đặt `search_path`.
+- `DIRECT_URL` is used by the Prisma CLI for migrations. The transaction pooler does not support the locks and prepared statements that migrations need, and the build rejects a `DIRECT_URL` on port 6543.
+- Both URLs must use the same `?schema=` value (`.env.example` uses `tpetie_app`); the build check fails otherwise, because migrations would run against a different schema than the app.
+- Supabase pooler URLs need the `postgres.<project-ref>` user name. URL-encode special characters such as `@`, `#`, `/` and `?` in the password.
+- Raw SQL in the app always names the schema explicitly (`table()` in `src/server/db/sql.ts`), because transaction-pooler connections do not keep a `search_path`.
 
-## 2b. Tạo cấu trúc database production (chỉ cấu trúc, không dữ liệu)
+## 3. Prepare the production database
 
-Làm **trước lần deploy production đầu tiên**. Nếu deploy trước với database production trống, bước `prisma migrate deploy` lúc build sẽ chạy toàn bộ migration và chèn dữ liệu mẫu (mã giảm giá `TPETIE20`/`MEMBERVIP`, phí giao hàng, nội dung trang, danh mục).
+Do this before the first production deployment. If the first production build finds an empty schema, `prisma migrate deploy` applies every migration together with its starter rows: the sample coupons `TPETIE20` and `MEMBERVIP`, default shipping settings, page content and a root category. Cloning the structure instead creates the same tables, empty, and records the migrations as applied.
 
-1. Supabase production → **Connect** → copy chuỗi **Session pooler** (cổng 5432), thêm `?schema=tpetie_app`.
-2. Trên máy local (`.env` vẫn trỏ database test), chạy trong PowerShell/cmd/terminal VS Code: `npm run db:clone-structure`, dán chuỗi ở bước 1 (không hiện trên màn hình, không lưu), gõ tên schema để xác nhận.
-3. Script dừng ngay, không ghi gì nếu: database test chưa áp đủ migration, chuỗi đích là transaction pooler 6543, đích trùng nguồn, hoặc **schema đích đã có bất kỳ bảng nào**. Nếu hợp lệ: tạo 20 bảng + index + khóa ngoại trong một transaction, đánh dấu 16 migration là đã áp dụng (bảng `_prisma_migrations`), rồi kiểm tra cấu trúc khớp database test và mọi bảng đều trống.
-   Kiểm tra lại bất cứ lúc nào (chỉ đọc, không ghi gì): `npm run db:verify-structure` — so cấu trúc production với database test, lịch sử migration, số dòng từng bảng, region.
-4. Sau đó: tạo quản trị viên bằng `npm run admin:create` (tạm trỏ `DIRECT_URL` trong `.env` tới production), đăng nhập, vào `/admin/settings` nhập **phí giao hàng** (chưa nhập thì khách chưa đặt hàng được), thêm sản phẩm/bộ sưu tập, nội dung trang tại `/admin/content`. Danh mục gốc tự tạo khi thêm sản phẩm đầu tiên.
+The production database can be a separate Supabase project or a separate schema in the same project.
 
-Các lần deploy sau, `prisma migrate deploy` chỉ chạy migration mới thêm.
+1. Copy the production session-pooler URL (port 5432) and append `?schema=<schema>`.
+2. Keep `.env` pointed at the development database and run, in an interactive terminal (PowerShell, cmd or the VS Code terminal):
 
-## 3. Tạo project trên Vercel
+   ```bash
+   npm run db:clone-structure
+   ```
 
-1. **Add New → Project**, chọn repo. Vercel đọc `vercel.json` (không cần sửa Build/Install Command).
-2. **Settings → Environment Variables**, khai báo cho *Production* (và *Preview* nếu dùng). Chỉ thêm các biến trong bảng; **không dán nguyên file `.env` local** (có các biến không dùng như `HOST`, `PORT`, `USER`, `DB_PASSWORD`, `CDN_URL`, `FOLDER_MODE`; `PORT`/`USER` còn trùng tên biến hệ thống). **Không** thêm biến tài khoản `ADMIN_*`/`STAFF_*`: build production sẽ dừng nếu thấy chúng.
+   Paste the production URL when prompted (the input is hidden and not saved), then type the schema name to confirm. For a non-interactive run, set `TARGET_DATABASE_URL` in the shell and use `npm run db:clone-structure -- --yes`.
+3. The script stops without writing anything if the development database has unapplied migrations, the target URL uses the transaction pooler, the target is the same database and schema as the source, or the target schema already contains any table. Otherwise it creates every table, index and foreign key in a single transaction, records all migrations as applied in `_prisma_migrations`, and checks that the target matches the source and that every table is empty.
+4. To check the result at any time, run the read-only comparison:
 
-| Biến | Giá trị |
-| --- | --- |
-| `CONNECTION_STRING` | Transaction pooler 6543 như trên |
-| `DIRECT_URL` | Session pooler 5432 như trên |
-| `NEXTAUTH_URL` | Domain chính thức, ví dụ `https://tpetie.vn` (chỉ khai báo cho *Production*; preview tự dùng URL của bản preview) |
-| `NEXTAUTH_SECRET` | Chuỗi mới: `openssl rand -base64 32` (không dùng lại khóa local) |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Khóa Cloudinary |
-| `CRON_SECRET` | Chuỗi ngẫu nhiên ≥ 16 ký tự (`openssl rand -hex 24`); Vercel gửi kèm khi gọi cron |
-| `NEXT_PUBLIC_GA4_ID` | Tùy chọn: bỏ trống thì production dùng property mặc định `G-LF9P82Z9QM`; chỉ đặt khi đổi sang property GA4 khác (xem mục 5) |
-| `NEXT_PUBLIC_CLARITY_PROJECT_ID` | Tùy chọn: Microsoft Clarity |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Chỉ khi bật đăng nhập Google |
-| `MIGRATE_ON_BUILD` | Tùy chọn: `0` tắt tự migrate, `1` bật cả cho preview (chỉ khi preview có database riêng) |
+   ```bash
+   npm run db:verify-structure
+   ```
 
-3. **Deploy**. Log build lần lượt có: cảnh báo/lỗi biến môi trường (nếu có), `prisma migrate deploy`, rồi `next build`.
-   Kiểm tra trước trên máy: `vercel env pull .env.production.local` rồi `npm run env:check -- --production` (xóa file đó sau khi kiểm tra).
-4. Gắn domain, đặt lại `NEXTAUTH_URL` đúng domain rồi redeploy.
-5. Tài khoản quản trị: database hiện tại đã có tài khoản thì dùng luôn. Database mới: trên máy local, trỏ `CONNECTION_STRING`/`DIRECT_URL` trong `.env` tới database production rồi chạy `npm run admin:create` trong PowerShell/cmd/terminal VS Code. Lệnh hỏi email, tên đăng nhập, tên hiển thị, mật khẩu (không hiện trên màn hình), in ra database đích và hỏi xác nhận trước khi tạo. Tài khoản **không** nằm trong `.env` hay biến môi trường Vercel. Nhân viên do admin tạo tại `/admin/staff`; mật khẩu đổi tại `/admin/account`.
+   It compares the production structure with the development database, checks the migration history, prints the row count of each table and checks the database region.
 
-## 4. Kiểm tra sau khi deploy
+Later deployments apply only new migrations.
 
-- `https://<domain>/api/products?limit=1` trả JSON có `total`.
-- Đăng nhập `/login` bằng tài khoản admin, mở `/admin/orders`, `/admin/products`. Tài khoản nhân viên đăng nhập phải vào `/staff` (trang chủ nhắc việc) và mở được `/staff/orders`.
-- Đặt một đơn thử ở trang khách, đổi trạng thái ở `/admin/orders` (thử "Chuyển tới…" và "Hoàn tác"), rồi hủy đơn thử.
-- Gọi thử cron: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<domain>/api/cron/maintenance` trả `completedOrders`, `failedExports`, `expiredRateLimits`. Không có header thì trả 401.
-- Vercel → **Logs**: không có `Timed out fetching a new connection` hay cảnh báo `[database] ... session pooler`.
+## 4. Create the Vercel project
 
-## 5. Supabase, CDN và độ ổn định
+1. In Vercel, choose **Add New → Project** and import the repository. The install and build commands come from `vercel.json`.
+2. Under **Settings → Environment Variables**, add the variables below for *Production*, and for *Preview* if you use preview deployments. Add only these variables; do not import a local `.env` file. Never add `ADMIN_*` or `STAFF_*` account variables: the build stops when one is set.
 
-- **Supabase**: ứng dụng truy cập PostgreSQL qua Prisma phía máy chủ (không dùng Supabase Data API/khóa anon). Vào *Database → Network restrictions* nếu đã giới hạn IP thì phải cho phép mọi IP (Vercel không có IP cố định ở gói Hobby/Pro). Nếu đổi mật khẩu database thì cập nhật cả `CONNECTION_STRING` và `DIRECT_URL` trên Vercel rồi redeploy. Project Supabase gói Free tự tạm dừng sau 7 ngày không có truy vấn: cron hằng ngày giữ database hoạt động.
-- **Kết nối**: function và database cùng ở Seoul (`icn1` / `ap-northeast-2`). Transaction pooler (6543) cho ứng dụng, mỗi instance tối đa 5 kết nối, chờ tối đa 20 giây; session pooler (5432) chỉ cho migration.
-- **CDN ảnh**: ảnh sản phẩm, bộ sưu tập, feedback lưu trên Cloudinary và phục vụ qua CDN `res.cloudinary.com`; `next/image` sinh URL Cloudinary đúng kích thước hiển thị, định dạng `f_auto` và chất lượng nén theo từng ảnh (không dùng Image Optimization của Vercel). Không cần biến `CDN_URL`.
-- **CDN Vercel**: JS/CSS/font trong `/_next/static` được Vercel cache lâu dài trên Edge; trang tĩnh được cache và làm mới khi deploy.
-- **Đổi `NEXTAUTH_SECRET`** làm mọi phiên đăng nhập hiện tại hết hạn (mọi người phải đăng nhập lại).
+   | Variable | Production | Value |
+   | --- | --- | --- |
+   | `CONNECTION_STRING` | Required | Transaction-pooler URL (port 6543) with `?schema=<schema>&pgbouncer=true` |
+   | `DIRECT_URL` | Required | Session-pooler URL (port 5432) with the same `?schema=` |
+   | `NEXTAUTH_URL` | Required | Production origin with `https://` and no path, for example `https://<your-domain>`. Set it for *Production* only; preview deployments use their own URL. |
+   | `NEXTAUTH_SECRET` | Required | New random value of at least 32 characters (`openssl rand -base64 32`); do not reuse the local secret |
+   | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Required | Cloudinary credentials |
+   | `CRON_SECRET` | Required | Random string of at least 16 characters (`openssl rand -hex 24`). Vercel sends it as `Authorization: Bearer <CRON_SECRET>` when it calls the cron. |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional | Google sign-in (see [Google sign-in](#google-sign-in)). Without them the Google button is hidden and the production build prints a warning. |
+   | `NEXT_PUBLIC_GA4_ID` | Optional | Leave unset to use the default GA4 property; set it to send data to another property |
+   | `NEXT_PUBLIC_CLARITY_PROJECT_ID` | Optional | Microsoft Clarity project ID |
+   | `NEXT_PUBLIC_SITE_URL` | Optional | Public origin for canonical URLs, the sitemap and robots rules, when it differs from `NEXTAUTH_URL` |
+   | `MIGRATE_ON_BUILD` | Optional | `0` disables the automatic migration; `1` also migrates preview builds (only when previews have their own database) |
 
-### Google Analytics 4 (theo dõi thời gian thực)
+   Preview builds require only `CONNECTION_STRING` and `NEXTAUTH_SECRET`, because pages read the database at build time; other missing values produce warnings.
+3. Optionally, check the configuration from your machine before deploying (with the Vercel CLI linked to the project through `vercel link`), then delete the pulled file:
 
-1. Bản production trên Vercel tự gửi dữ liệu tới property GA4 `G-LF9P82Z9QM` (lấy từ website giao diện gốc), máy local và bản preview không gửi. Cần quyền xem property này: chủ property vào GA4 → **Quản trị → Quản lý quyền truy cập tài sản** thêm email của bạn.
-2. Trong property: **Quản trị → Luồng dữ liệu → Web**, giữ bật *Enhanced measurement* (đo cả lượt xem trang khi chuyển trang trong website); **Quản trị → Chi tiết tài sản**: đơn vị tiền *VND*, múi giờ *Việt Nam*. Có thể thêm domain chính thức vào luồng dữ liệu (GA4 vẫn nhận dữ liệu từ mọi domain gắn mã).
-   Đổi sang property khác: đặt `NEXT_PUBLIC_GA4_ID` trên Vercel rồi **Redeploy** (biến `NEXT_PUBLIC_` được gắn vào mã lúc build).
-3. Mở website ở cửa sổ ẩn danh (chưa đăng nhập), vào GA4 → **Báo cáo → Thời gian thực**: trong vài giây thấy 1 người dùng, trang đang xem và các sự kiện.
-- Website gửi `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase` (kèm mã đơn, doanh thu VND, sản phẩm), `login`, `select_size`, `open_size_guide`.
-- **Không đo** tài khoản admin/nhân viên và khu `/admin`, `/staff`, để Realtime chỉ hiện khách thật.
-- Kiểm tra lỗi: DevTools → Network lọc `collect`, phải thấy request tới `google-analytics.com/g/collect` trạng thái 204.
+   ```bash
+   vercel env pull .env.production.local
+   npm run env:check -- --production
+   ```
 
-## 6. Giới hạn cần biết
+4. Deploy. The build log shows `prisma generate`, any environment warnings or errors, `prisma migrate deploy` (production only), then `next build`.
+5. Add your domain, set `NEXTAUTH_URL` to it and redeploy.
 
-- **Cron gói Hobby** chỉ chạy 1 lần/ngày và có thể lệch trong vòng một giờ. Ứng dụng vẫn tự hoàn tất đơn giao quá hạn và đánh dấu tiến trình xuất bị treo khi có người mở trang quản trị, cron chỉ bảo đảm việc này cả khi không ai vào.
-- **Body request tối đa 4,5 MB**: ảnh đánh giá và ảnh feedback được nén ở trình duyệt trước khi tải; thư viện media nhận tối đa 5 MB/ảnh nên ảnh gốc rất lớn cần nén trước.
-- **Thời gian chạy function**: gói Hobby tối đa 300 giây (Fluid compute). Xuất Excel đặt 120 giây; dữ liệu rất lớn nên chuyển sang hàng đợi (Vercel Queues/Workflow).
-- **Bộ nhớ đệm phiên đăng nhập** giữ thông tin tài khoản 15 giây trên mỗi instance: khóa tài khoản có hiệu lực ngay trên instance xử lý thao tác đó, các instance khác chậm tối đa 15 giây.
-- `npm audit` còn cảnh báo với `next@14.2.x` mà bản sửa nằm ở Next 16 — nên lên kế hoạch nâng cấp Next.js.
+## 5. Create the first administrator
 
-## 7. Tham khảo
+Admin accounts never come from environment variables. Point the command at the production database for one run, either by setting `DIRECT_URL` in the terminal session or by editing `.env` temporarily (the command uses `DIRECT_URL` when set, otherwise `CONNECTION_STRING`). In PowerShell:
 
-- Vercel: [vercel.json](https://vercel.com/docs/project-configuration/vercel-json), [giới hạn Functions](https://vercel.com/docs/functions/limitations), [Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [@vercel/functions](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package)
-- Prisma + Supabase: [Prisma docs](https://www.prisma.io/docs/orm/overview/databases/supabase), [Supabase docs](https://supabase.com/docs/guides/database/prisma), [Supavisor + Prisma](https://supabase.github.io/supavisor/orms/prisma/)
+```powershell
+$env:DIRECT_URL = "<production-session-pooler-url>"
+npm run admin:create
+Remove-Item Env:DIRECT_URL
+```
+
+The command prints the target host and schema, prompts for an email, username, display name and password (16–128 characters, hidden) and asks for confirmation before creating the account.
+
+Then sign in at `/login` and:
+
+- Enter the shipping fee at `/admin/settings`. Until it is saved, checkout returns an error.
+- Add collections and products, and the page content at `/admin/content`. The root product category is created automatically with the first product.
+- Create staff accounts at `/admin/staff`. Administrators change their own password at `/admin/account`.
+
+## 6. Post-deployment checks
+
+- `https://<your-domain>/api/products?limit=1` returns JSON with a `total` field.
+- An administrator can sign in at `/login` and open `/admin/orders` and `/admin/products`. A staff account lands on `/staff` and can open `/staff/orders`.
+- Place a test order on the storefront, move it through the statuses at `/admin/orders` (try "Chuyển tới…" and "Hoàn tác"), then cancel it.
+- The cron endpoint responds to an authorized call and returns `401` without the header:
+
+  ```bash
+  curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-domain>/api/cron/maintenance
+  ```
+
+  The JSON response contains `completedOrders`, `failedExports`, `purgedExports`, `expiredRateLimits` and `at`.
+- The Vercel logs contain no `Timed out fetching a new connection` errors and no `[database]` warnings about the session pooler.
+
+## 7. Operations notes
+
+- **Database access.** The app connects to PostgreSQL only through Prisma on the server; it does not use the Supabase Data API or anon keys. If you restrict network access to the database, make sure Vercel Functions can still connect.
+- **Connections.** With the transaction pooler, each function instance opens up to 5 connections and waits up to 20 seconds for a free one. With a session-pooler URL on Vercel the limit drops to 1 and a `[database]` warning is logged. Add `connection_limit` or `pool_timeout` to the URL to override the defaults.
+- **Database password.** After changing it, update both `CONNECTION_STRING` and `DIRECT_URL` in Vercel and redeploy.
+- **Session secret.** Changing `NEXTAUTH_SECRET` signs every user out.
+- **Images.** Images are served by Cloudinary's CDN. The `next/image` loader requests each image at the rendered width with automatic format and quality, so no CDN variable is needed. See [image-inventory.md](image-inventory.md).
+- **Idle databases.** Supabase can pause Free-plan projects after a period of inactivity; the daily cron queries the database every day.
+
+### Google Analytics 4
+
+- Production deployments on Vercel send data to the default property defined in `src/app/layout.tsx` unless `NEXT_PUBLIC_GA4_ID` is set. Local and preview builds send nothing unless `NEXT_PUBLIC_GA4_ID` is set. An ID that does not match `G-XXXXXXXXXX` is ignored.
+- To switch properties, set `NEXT_PUBLIC_GA4_ID` and redeploy: `NEXT_PUBLIC_` values are inlined at build time.
+- Back-office accounts and the `/admin` and `/staff` pages are never tracked.
+- Page views, including client-side navigation, rely on GA4 Enhanced measurement, so keep it enabled for the web data stream. Setting the property's currency to VND and its time zone to Vietnam keeps reports consistent with the shop.
+- The storefront also sends e-commerce events such as `view_item`, `add_to_cart`, `begin_checkout` and `purchase` (with the order code, revenue in VND and items), plus `login`, `select_size` and `open_size_guide`.
+- To verify, open the site in a private window without signing in and check **Reports → Realtime** in GA4, or filter the browser's network panel by `collect` and look for requests to `google-analytics.com/g/collect`.
+
+### Google sign-in
+
+Create an OAuth client of type *Web application* in Google Cloud with the authorized redirect URI `https://<your-domain>/api/auth/callback/google` (add `http://localhost:3000/api/auth/callback/google` for local development). Set `GOOGLE_CLIENT_ID` (it ends in `.apps.googleusercontent.com`) and `GOOGLE_CLIENT_SECRET`, then redeploy. The Google button appears only when both are set.
+
+## 8. Platform limits
+
+- **Cron frequency.** On the Hobby plan, Vercel runs cron jobs at most once a day and may trigger them at any time within the scheduled hour. Completing overdue orders and failing stalled exports also happen when the back office is used; deleting expired export files and rate-limit counters happens only in the cron.
+- **Request size.** Vercel Functions accept request bodies of up to 4.5 MB. Images are compressed in the browser before upload. Back-office uploads send one image per request, and the server accepts JPEG, PNG, WebP and AVIF files of up to 4 MB; review photos are sent together and are limited to 4 MB in total.
+- **Function duration.** The export route sets `maxDuration` to 120 seconds and the cron route to 60 seconds; both must fit within your plan's limit. For much larger exports, move the work to a background queue.
+- **Session cache.** Account changes, such as blocking a user, take effect immediately on the instance that handled them and within 15 seconds on the others.
+- **Dependency maintenance.** Run `npm audit` against the current lockfile before a release and review each advisory's affected versions and available fixes. Record unresolved advisories with the release checks.
+
+## 9. References
+
+- Vercel: [`vercel.json`](https://vercel.com/docs/project-configuration/vercel-json), [Functions limitations](https://vercel.com/docs/functions/limitations), [Managing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [Cron usage and pricing](https://vercel.com/docs/cron-jobs/usage-and-pricing), [`@vercel/functions`](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package)
+- Prisma and Supabase: [Prisma with Supabase](https://www.prisma.io/docs/orm/overview/databases/supabase), [Supabase guide for Prisma](https://supabase.com/docs/guides/database/prisma), [Supavisor and Prisma](https://supabase.github.io/supavisor/orms/prisma/)
+# SMTP email configuration
+
+Production requires SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, MAIL_FROM_ADDRESS and MAIL_SITE_URL. Configure MAIL_BRAND_NAME/MAIL_FROM_NAME for branding and optional MAIL_REPLY_TO for support. MAIL_SITE_URL must be the public HTTPS origin. Use an authorized sender mailbox/alias. The additive `20261005_smtp_email` migration is applied by the existing production migration workflow. See [SMTP operations](smtp-email.md) for diagnostics, retries and `npm run email:verify` (no message sent).

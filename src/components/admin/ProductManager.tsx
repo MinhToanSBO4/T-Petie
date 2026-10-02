@@ -8,7 +8,8 @@ import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MIN_PRICE, PRODUCT_TYPES } from '@/lib/content/product-input';
 import { slugify } from '@/lib/utils/formatters';
 import { PRODUCT_PHOTO_OPTIONS } from '@/client/image-compress';
-import { readJson, uploadMedia } from '@/client/media-upload';
+import { readJson, uploadMediaBatch } from '@/client/media-upload';
+import { errorText, toast } from '@/client/toast';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 type VariantRow = { id: string; size: string; stock: number; price: number; weightRange: string; ageRange: string; active: boolean };
@@ -49,9 +50,8 @@ const CONDITION_FILTER: TableFilter = { key: 'filter', label: 'Tình trạng', o
 export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean }) {
   const [view, setView] = useState<View>({ mode: 'list' });
   const [reloadKey, setReloadKey] = useState(0);
-  const [message, setMessage] = useState('');
   const [collections, setCollections] = useState(collectionOptions);
-  const back = useCallback((text?: string) => { if (text) setMessage(text); setView({ mode: 'list' }); setReloadKey((key) => key + 1); }, []);
+  const back = useCallback(() => { setView({ mode: 'list' }); setReloadKey((key) => key + 1); }, []);
   const fetchProducts = useCallback(async (query: TableQuery) => {
     const response = await fetch(`/api/admin/products?${tableParams(query)}`, { cache: 'no-store' });
     const data = await readJson(response);
@@ -61,8 +61,8 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   }, []);
 
   if (view.mode === 'create') {
-    return <ProductCreateForm onCancel={() => back()}
-      onCreated={(product) => { setMessage(''); setReloadKey((key) => key + 1); setView({ mode: 'edit', product }); }} />;
+    return <ProductCreateForm onCancel={back}
+      onCreated={(product) => { setReloadKey((key) => key + 1); setView({ mode: 'edit', product }); }} />;
   }
   if (view.mode === 'edit') return <ProductEditLoader key={view.product.id} product={view.product} onBack={back} />;
 
@@ -83,7 +83,6 @@ export function ProductManager({ canCreateProduct }: { canCreateProduct: boolean
   ];
 
   return <div className="space-y-4">
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     {/* Tồn kho đổi theo từng đơn hàng: luôn tải lại ngầm khi quay về bảng. */}
     <DataTable columns={columns} fetchPage={fetchProducts} reloadKey={reloadKey} alwaysRevalidate
       searchPlaceholder="Tìm theo tên, SKU hoặc slug"
@@ -128,13 +127,15 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
     const invalid = validationError();
     if (invalid) { setError(invalid); return; }
     setBusy(true); setError('');
+    const id = toast.loading('Đang tạo sản phẩm…');
     try {
       const response = await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...draft, sku: draft.sku.trim(), price: Number(draft.price), stock: Number(draft.stock) }) });
       const data = await readJson(response);
       if (!response.ok || !data.product) throw new Error(String(data.error || 'Không tạo được sản phẩm'));
+      toast.success(`Đã tạo sản phẩm ${draft.name.trim()}`, { id });
       onCreated(data.product as ProductRow);
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra'); }
+    } catch (submitError) { toast.error(errorText(submitError, 'Không tạo được sản phẩm'), { id }); }
     finally { setBusy(false); }
   };
 
@@ -188,26 +189,25 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
  * Mở form sửa với số liệu mới nhất của sản phẩm. Dòng trong bảng có thể đã cũ (bảng được lưu trong tab),
  * còn tồn kho đổi theo từng đơn hàng; dựng form từ dữ liệu cũ khiến lần lưu sau báo xung đột.
  */
-function ProductEditLoader({ product, onBack }: { product: ProductRow; onBack: (message?: string) => void }) {
+function ProductEditLoader({ product, onBack }: { product: ProductRow; onBack: () => void }) {
   const [fresh, setFresh] = useState<ProductRow | null>(null);
-  const [warning, setWarning] = useState('');
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/admin/products/${product.id}`, { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const data = await readJson(response);
-        if (!response.ok || !data.product) throw new Error(String(data.error || 'unavailable'));
+        if (!response.ok || !data.product) throw new Error(String(data.error || 'Không tải được sản phẩm'));
         setFresh(data.product as ProductRow);
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        setWarning(`Không tải được số liệu mới nhất (${error instanceof Error ? error.message : 'lỗi mạng'}); đang hiện dữ liệu trong bảng.`);
+        toast.warning('Không tải được số liệu mới nhất, đang hiện dữ liệu trong bảng', { description: errorText(error) });
         setFresh(product);
       });
     return () => controller.abort();
   }, [product]);
   if (!fresh) return <p role="status" className="rounded-2xl border border-cream-200 bg-white p-6 text-sm text-charcoal-600">Đang tải sản phẩm…</p>;
-  return <ProductEditForm product={fresh} onBack={onBack} initialWarning={warning} />;
+  return <ProductEditForm product={fresh} onBack={onBack} />;
 }
 
 type VariantDraft = { id: string; size: string; stock: string; price: string; weightRange: string; ageRange: string; active: boolean };
@@ -223,7 +223,7 @@ const toVariantDrafts = (product: ProductRow): VariantDraft[] => product.variant
  * khi bấm "Lưu thay đổi"; nút "Hủy thay đổi" khôi phục lại trạng thái ban đầu.
  * Chỉ trường đã đổi được gửi lên; tồn kho gửi kèm số lúc mở form để máy chủ không ghi đè đơn vừa đặt.
  */
-function ProductEditForm({ product, onBack, initialWarning }: { product: ProductRow; onBack: (message?: string) => void; initialWarning: string }) {
+function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () => void }) {
   const initial = {
     name: product.name, description: product.description,
     originalPrice: product.originalPrice === null ? '' : String(product.originalPrice),
@@ -240,9 +240,10 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
   const [newVariants, setNewVariants] = useState<NewVariantDraft[]>([]);
   const [collections, setCollections] = useState<CollectionOption[]>(collectionOptions || []);
   const [allPrice, setAllPrice] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [message, setMessage] = useState(initialWarning);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const busy = saving || uploading;
+  // Lỗi nhập liệu cần sửa trên form; kết quả lưu/tải ảnh hiện ở thông báo góc màn hình.
   const [error, setError] = useState('');
 
   // Nạp danh sách bộ sưu tập một lần để chọn cho sản phẩm.
@@ -250,9 +251,9 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
     if (collectionOptions) return;
     const controller = new AbortController();
     fetch('/api/admin/collections?limit=50', { cache: 'no-store', signal: controller.signal })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error('unavailable')))
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được danh sách bộ sưu tập')))
       .then((data) => setCollections(data.items || []))
-      .catch(() => {});
+      .catch((loadError) => { if (!controller.signal.aborted) toast.error(errorText(loadError, 'Không tải được danh sách bộ sưu tập')); });
     return () => controller.abort();
   }, []);
 
@@ -265,8 +266,8 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
     setVariants(initialVariants);
     setImages(initialImages);
     setNewVariants([]);
-    setMessage('Đã hủy các thay đổi chưa lưu.');
     setError('');
+    toast.info('Đã hủy các thay đổi chưa lưu');
   };
 
   const leave = () => {
@@ -276,28 +277,13 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
 
   /** Nén rồi tải từng ảnh một (mỗi request nhỏ hơn giới hạn 4,5 MB của Vercel); một ảnh lỗi không làm hỏng cả loạt. */
   const uploadImages = async (list: FileList) => {
-    const room = MAX_IMAGES - images.length;
-    const files = Array.from(list).slice(0, Math.max(0, room));
-    if (files.length === 0) { setError(`Mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh.`); return; }
-    setBusy(true); setMessage(''); setError('');
-    setProgress({ done: 0, total: files.length });
-    const failures: string[] = [];
-    let uploaded = 0;
-    for (const [index, file] of files.entries()) {
-      try {
-        const asset = await uploadMedia(file, PRODUCT_PHOTO_OPTIONS, draft.name);
-        setImages((current) => [...current, asset.url]);
-        uploaded += 1;
-      } catch (uploadError) { failures.push(uploadError instanceof Error ? uploadError.message : `${file.name}: lỗi`); }
-      setProgress({ done: index + 1, total: files.length });
-    }
-    setProgress(null); setBusy(false);
+    const files = Array.from(list).slice(0, Math.max(0, MAX_IMAGES - images.length));
     const skipped = list.length - files.length;
-    if (uploaded > 0) setMessage(`Đã tải ${uploaded} ảnh. Bấm "Lưu thay đổi" để ghi vào sản phẩm.`);
-    if (failures.length || skipped > 0) {
-      setError([failures.length ? `Không tải được ${failures.length} ảnh — ${failures.join('; ')}` : '',
-        skipped > 0 ? `Bỏ qua ${skipped} ảnh vì mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh.` : ''].filter(Boolean).join(' '));
-    }
+    if (skipped > 0) toast.warning(`Bỏ qua ${skipped} ảnh vì mỗi sản phẩm tối đa ${MAX_IMAGES} ảnh`);
+    if (files.length === 0) return;
+    setUploading(true);
+    try { await uploadMediaBatch(files, PRODUCT_PHOTO_OPTIONS, draft.name, (asset) => setImages((current) => [...current, asset.url])); }
+    finally { setUploading(false); }
   };
 
   const moveImage = (index: number, direction: -1 | 1) => {
@@ -370,16 +356,21 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
 
   const save = async () => {
     const invalid = validationError();
-    if (invalid) { setError(invalid); setMessage(''); return; }
-    setBusy(true); setMessage(''); setError('');
+    // Lỗi hiện ở đầu form, còn nút lưu nằm ở thanh dưới cùng: báo thêm ở góc màn hình để không bấm mà không thấy gì.
+    if (invalid) { setError(invalid); toast.error(invalid); return; }
+    setSaving(true); setError('');
+    const id = toast.loading('Đang lưu sản phẩm…');
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, { method: 'PATCH',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()) });
       const data = await readJson(response);
+      // 409: tồn kho vừa đổi ở nơi khác (đơn mới, người khác sửa) nên báo xung đột, không phải lỗi.
+      if (response.status === 409) { toast.warning(String(data.error || 'Sản phẩm vừa được cập nhật ở nơi khác'), { id }); return; }
       if (!response.ok) throw new Error(String(data.error || 'Không lưu được sản phẩm'));
-      onBack(`Đã lưu sản phẩm ${draft.name}.`);
-    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
-    finally { setBusy(false); }
+      toast.success(`Đã lưu sản phẩm ${draft.name}`, { id });
+      onBack();
+    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được sản phẩm'), { id }); }
+    finally { setSaving(false); }
   };
 
   const activePrices = [...variants.filter((variant) => variant.active).map((variant) => variant.price), ...newVariants.map((variant) => variant.price)]
@@ -395,7 +386,6 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
       </div>
       <button type="button" onClick={leave} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-4 text-sm">{message}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
 
     <section className="space-y-6 rounded-2xl border border-cream-200 bg-white p-6">
@@ -534,7 +524,7 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
         busy || images.length >= MAX_IMAGES ? 'border-cream-300 bg-cream-50 opacity-60' : 'border-honey-300 bg-honey-50 hover:border-honey-500'}`}>
         <Upload className="h-6 w-6 text-honey-600" />
         <span className="text-sm font-bold text-charcoal-900">
-          {progress ? `Đang tải ảnh ${Math.min(progress.done + 1, progress.total)}/${progress.total}…` : 'Tải ảnh lên (chọn được nhiều ảnh)'}
+          {uploading ? 'Đang tải ảnh…' : 'Tải ảnh lên (chọn được nhiều ảnh)'}
         </span>
         <span className="text-xs text-charcoal-500">JPEG, PNG, WebP · ảnh lớn được tự nén · tối đa {MAX_IMAGES} ảnh · thứ tự chọn được giữ nguyên</span>
         <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" disabled={busy || images.length >= MAX_IMAGES} className="hidden"
@@ -550,7 +540,7 @@ function ProductEditForm({ product, onBack, initialWarning }: { product: Product
           className="min-h-12 rounded-xl border border-cream-300 px-6 text-sm font-semibold disabled:opacity-50">Hủy thay đổi</button>
         <button type="button" disabled={!dirty || busy} onClick={() => void save()}
           className="min-h-12 rounded-xl bg-sage-700 px-8 text-sm font-bold text-white disabled:opacity-50">
-          {busy && !progress ? 'Đang lưu…' : 'Lưu thay đổi'}
+          {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
         </button>
       </div>
     </div>

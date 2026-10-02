@@ -53,7 +53,10 @@ export default function BuyNowPage() {
   };
 
   const handleCheckout = () => {
-    if (!quote) { showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info'); return; }
+    if (!quote) {
+      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
+      return;
+    }
     trackBeginCheckout(
       [{ item_id: item.productId, item_name: item.productName, price: item.price, quantity }],
       quote.total

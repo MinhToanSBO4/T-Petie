@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
 import { readJson } from '@/client/http';
 import { markAdminPagesStale } from '@/client/admin-freshness';
+import { errorText, toast } from '@/client/toast';
 
 type Settings = { shippingFee: number; freeShippingThreshold: number };
 type Coupon = {
@@ -63,27 +64,27 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
   const [editing, setEditing] = useState<{ mode: 'create' } | { mode: 'edit'; code: string; draft: CouponDraft } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   const saveSettings = async () => {
-    setBusy(true); setMessage(''); setError('');
+    setBusy(true);
+    const id = toast.loading('Đang lưu phí giao hàng…');
     try {
       const response = await fetch('/api/admin/commerce', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'settings', ...settings }) });
       const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được cấu hình');
-      setMessage('Đã lưu phí giao hàng.');
+      toast.success('Đã lưu phí giao hàng', { id });
       setConfigured(true);
       // Quay lại trang này sau khi sang trang khác sẽ được làm mới để thấy đúng giá trị mới (không làm mới ngay
-      // vì sẽ dựng lại trang và mất thông báo vừa lưu).
+      // vì sẽ dựng lại trang đang sửa).
       markAdminPagesStale();
-    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
+    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được cấu hình'), { id }); }
     finally { setBusy(false); }
   };
 
   const saveCoupon = async (draft: CouponDraft, isNew: boolean) => {
-    setBusy(true); setMessage(''); setError('');
+    setBusy(true);
+    const id = toast.loading(isNew ? `Đang thêm mã ${draft.code}…` : `Đang lưu mã ${draft.code}…`);
     try {
       const response = await fetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: isNew ? 'create' : 'update', code: draft.code, type: draft.type, value: Number(draft.value),
@@ -92,24 +93,26 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
           startsAt: toIsoDate(draft.startsAt), expiresAt: toIsoDate(draft.expiresAt) }) });
       const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không lưu được mã giảm giá');
-      setMessage(isNew ? `Đã thêm mã ${draft.code}.` : `Đã lưu mã ${draft.code}.`);
+      toast.success(isNew ? `Đã thêm mã ${draft.code}` : `Đã lưu mã ${draft.code}`, { id });
       setEditing(null);
       setReloadKey((key) => key + 1);
-    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Có lỗi xảy ra'); }
+    } catch (saveError) { toast.error(errorText(saveError, 'Không lưu được mã giảm giá'), { id }); }
     finally { setBusy(false); }
   };
 
   const removeCoupon = async (code: string) => {
     if (!window.confirm(`Xóa mã ${code}? Nếu mã đã được dùng cho đơn hàng, mã sẽ chuyển sang ngừng hoạt động để giữ lịch sử đơn.`)) return;
-    setBusy(true); setMessage(''); setError('');
+    setBusy(true);
+    const id = toast.loading(`Đang xóa mã ${code}…`);
     try {
       const response = await fetch(`/api/admin/coupons?code=${encodeURIComponent(code)}`, { method: 'DELETE' });
       const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Không xóa được mã giảm giá');
-      setMessage(data.archived ? 'Mã đã được dùng cho đơn hàng nên chuyển sang ngừng hoạt động.' : 'Đã xóa mã giảm giá.');
+      if (data.archived) toast.info(`Mã ${code} đã được dùng cho đơn hàng nên chuyển sang ngừng hoạt động`, { id });
+      else toast.success(`Đã xóa mã ${code}`, { id });
       setEditing(null);
       setReloadKey((key) => key + 1);
-    } catch (removeError) { setError(removeError instanceof Error ? removeError.message : 'Có lỗi xảy ra'); }
+    } catch (removeError) { toast.error(errorText(removeError, 'Không xóa được mã giảm giá'), { id }); }
     finally { setBusy(false); }
   };
 
@@ -130,9 +133,6 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
   ];
 
   return <div className="space-y-6">
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-
     <section className="rounded-2xl border border-cream-200 bg-white p-5">
       <h2 className="text-lg font-bold">Phí giao hàng</h2>
       {!configured && <p role="alert" className="mt-3 rounded-xl bg-honey-100 p-3 text-sm text-honey-800">

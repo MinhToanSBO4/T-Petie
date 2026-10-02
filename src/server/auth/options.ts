@@ -1,13 +1,18 @@
 import 'server-only';
 import type { NextAuthOptions } from 'next-auth';
+import type { AdapterAccount } from 'next-auth/adapters';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { prisma } from '@/server/db/client';
 import { allowAttempt } from '@/server/security/rate-limit';
 import { parseLoginIdentifier } from '@/lib/auth-identity';
+import { requiresEmailVerification } from '@/lib/email/tokens';
+import { AUTH_NOTICE_TTL_MS, googleNoticeKind, googleSignInVerdict } from '@/lib/auth-google';
 import { credentialFingerprint } from '@/server/security/password-reset';
+import { linkOAuthAccount } from '@/server/auth/google-link';
 import { readUserSnapshot } from '@/server/auth/user-snapshot';
 import { toBabyProfile } from '@/lib/baby-profile';
 import type { UserRole, UserStatus } from '@/types/auth';
@@ -22,8 +27,15 @@ const googleProviders = googleClientId && googleClientSecret
   ? [GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })]
   : [];
 
+/**
+ * Kết quả gắn Google vào tài khoản khách sẵn có trong lần đăng nhập đang xử lý: ghi ở signIn(), đọc ở jwt() cùng
+ * request để báo cho khách. Khóa là object `account` mà NextAuth truyền cho cả hai callback.
+ */
+const googleLinks = new WeakMap<object, { passwordRemoved: boolean }>();
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Tài khoản mới tạo từ Google cũng được ghi nhận email đã xác minh (server/auth/google-link.ts).
+  adapter: { ...PrismaAdapter(prisma), linkAccount: async (account: AdapterAccount) => { await linkOAuthAccount(account); } },
   session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
   pages: { signIn: '/login', error: '/login' },
@@ -53,6 +65,8 @@ export const authOptions: NextAuthOptions = {
         // Luôn chạy bcrypt (với mã băm giả khi không có tài khoản) để thời gian phản hồi không lộ email nào đã đăng ký.
         const valid = await bcrypt.compare(password, user?.password || DUMMY_HASH);
         if (!user?.password || user.status !== 'active' || !valid) return null;
+        if (user.deletedAt) return null;
+        if (requiresEmailVerification(user)) throw new Error('EmailVerificationRequired');
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         return {
           id: user.id,
@@ -69,12 +83,33 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (!user.email) return false;
+      const stored = await prisma.user.findUnique({
+        where: { email: user.email.toLowerCase() }, select: { id: true, role: true, status: true },
+      });
+      if (account?.provider !== 'google') return !stored || stored.status === 'active';
       // Chỉ nhận email Google đã được Google xác minh: email chưa xác minh có thể là của người khác.
-      if (account?.provider === 'google' && (profile as { email_verified?: boolean } | undefined)?.email_verified !== true) return false;
-      const stored = await prisma.user.findUnique({ where: { email: user.email.toLowerCase() } });
-      return !stored || stored.status === 'active';
+      const verdict = googleSignInVerdict({
+        emailVerified: (profile as { email_verified?: unknown } | undefined)?.email_verified, stored, userId: user.id,
+      });
+      if (verdict === 'deny') return false;
+      if (verdict === 'staff-password-only') return '/login?error=GoogleStaffAccount';
+      if (verdict === 'link' && stored) {
+        // Khách đã đăng ký bằng email + mật khẩu: gắn Google vào tài khoản đó ngay sau các bước kiểm tra trên, NextAuth
+        // tìm thấy tài khoản qua liên kết vừa tạo thay vì báo OAuthAccountNotLinked. Không bật cơ chế tự gắn theo email
+        // của NextAuth: cơ chế đó không phân biệt khách với admin/nhân viên (tests/security.test.mjs).
+        try {
+          googleLinks.set(account, await linkOAuthAccount({ ...account, type: 'oauth', userId: stored.id }));
+        } catch (error) {
+          // P2002: một lần đăng nhập khác cùng lúc vừa gắn xong, đi tiếp như tài khoản đã liên kết.
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
+            console.error('Google account link failed:', error instanceof Error ? error.message.split('\n')[0] : error);
+            return '/login?error=Callback';
+          }
+        }
+      }
+      return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, isNewUser }) {
       if (user) token.id = user.id;
       if (!token.id) return token;
       let stored: Awaited<ReturnType<typeof readUserSnapshot>>;
@@ -100,9 +135,20 @@ export const authOptions: NextAuthOptions = {
       token.city = stored?.city;
       token.points = stored?.points;
       token.babyProfile = stored ? toBabyProfile(stored) : null;
+      if (user && account?.provider === 'google') {
+        const link = googleLinks.get(account);
+        token.notice = {
+          kind: googleNoticeKind({ linked: Boolean(link), passwordRemoved: Boolean(link?.passwordRemoved), isNewUser }),
+          at: Date.now(),
+        };
+      } else if (token.notice && Date.now() - token.notice.at > AUTH_NOTICE_TTL_MS) {
+        delete token.notice;
+      }
       return token;
     },
     async session({ session, token }) {
+      // Thông báo một lần sau khi quay về từ Google (đăng nhập, tạo tài khoản, liên kết); AuthNotice hiện thành toast.
+      if (token.notice) session.notice = token.notice;
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;

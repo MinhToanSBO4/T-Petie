@@ -8,7 +8,7 @@ import { useToast } from '@/context/ToastContext';
 import { safeCallbackPath } from '@/lib/auth-identity';
 import { landingPath } from '@/lib/admin/back-office';
 import { authErrorMessage } from '@/lib/auth-errors';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { GoogleSignInButton, useGoogleSignInEnabled } from '@/components/auth/GoogleSignInButton';
 import {
   Lock,
   Mail,
@@ -29,6 +29,7 @@ function LoginForm() {
 
   const { login, isLoading } = useAuth();
   const { showToast } = useToast();
+  const googleEnabled = useGoogleSignInEnabled();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,7 +70,10 @@ function LoginForm() {
       router.push(landingPath(result.role, callbackUrl));
     } else {
       setIsSubmitting(false);
-      setErrorMessage(result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      const message = result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
+      // Tài khoản đã liên kết Google có thể không còn mật khẩu (lib/auth-google.ts): nhắc lối đăng nhập còn lại.
+      setErrorMessage(result.reason === 'credentials' && googleEnabled
+        ? `${message} Nếu từng đăng nhập bằng Google, Mẹ bấm "Đăng nhập với Google" nhé.` : message);
     }
   };
 
@@ -170,14 +174,14 @@ function LoginForm() {
             >
               Đăng ký tài khoản mới
             </Link>
-            <button
-              type="button"
-              onClick={() => setErrorMessage('Mẹ nhắn shop qua Zalo/Messenger (nút chat góc màn hình) kèm email đã đăng ký: shop sẽ gửi mật khẩu tạm để mẹ đăng nhập rồi đổi trong mục Tài khoản → Mật khẩu. Nếu mẹ từng đăng nhập bằng Google, chỉ cần bấm "Đăng nhập với Google".')}
+            <a
+              href="/forgot-password"
               className="font-medium text-charcoal-900 hover:text-honey-600 transition-colors underline underline-offset-4"
             >
               Quên mật khẩu?
-            </button>
+            </a>
           </div>
+          <a href="/verify-email" className="block text-sm text-honey-700 underline">Gửi lại email xác thực</a>
 
         </div>
       </div>

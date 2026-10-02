@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { DataTable, tableParams, type Column, type TableFilter, type TableQuery } from '@/components/admin/DataTable';
+import { readJson } from '@/client/http';
+import { errorText, toast } from '@/client/toast';
 
 type Customer = {
   id: string; name: string | null; email: string | null; username: string | null;
@@ -23,7 +25,7 @@ const CUSTOMER_FILTERS: TableFilter[] = [
 
 async function fetchCustomers(query: TableQuery) {
   const response = await fetch(`/api/admin/users?${tableParams(query, { filter: 'user' })}`, { cache: 'no-store' });
-  const data = await response.json();
+  const data = await readJson(response);
   if (!response.ok) throw new Error(data.error || 'Không tải được khách hàng');
   return { items: data.items as Customer[], total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
@@ -32,27 +34,28 @@ export function CustomerManager() {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
 
   /** Khách quên mật khẩu (chưa có gửi email đặt lại): tạo mật khẩu tạm để shop gửi cho khách qua Zalo/điện thoại. */
   const resetPassword = async (customer: Customer) => {
     if (!window.confirm(`Tạo mật khẩu tạm mới cho ${customer.name || customer.email || 'khách này'}? Mật khẩu cũ và mọi phiên đăng nhập cũ sẽ hết hiệu lực.`)) return;
-    setBusy(true); setMessage(''); setError(''); setTemporaryPassword('');
+    setBusy(true); setTemporaryPassword('');
+    const id = toast.loading('Đang tạo mật khẩu tạm…');
     try {
       const response = await fetch(`/api/admin/users/${customer.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resetPassword: true }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.temporaryPassword) throw new Error(data.error || 'Không đặt lại được mật khẩu');
       setTemporaryPassword(data.temporaryPassword);
-    } catch (resetError) { setError(resetError instanceof Error ? resetError.message : 'Có lỗi xảy ra'); }
+      toast.success('Đã tạo mật khẩu tạm mới', { id });
+    } catch (resetError) { toast.error(errorText(resetError, 'Không đặt lại được mật khẩu'), { id }); }
     finally { setBusy(false); }
   };
 
   const change = async (customer: Customer, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete' && !window.confirm(`Xóa tài khoản của ${customer.name || customer.email || customer.id}? Đơn hàng cũ vẫn được giữ lại.`)) return;
-    setBusy(true); setMessage(''); setError('');
+    setBusy(true);
+    const id = toast.loading(action === 'delete' ? 'Đang xóa tài khoản…' : action === 'block' ? 'Đang khóa tài khoản…' : 'Đang mở khóa tài khoản…');
     try {
       const response = action === 'delete'
         ? await fetch(`/api/admin/users/${customer.id}`, { method: 'DELETE' })
@@ -60,11 +63,12 @@ export function CustomerManager() {
             body: JSON.stringify({ status: action === 'block' ? 'blocked' : 'active' }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Thao tác thất bại');
-      setMessage(action === 'delete' ? 'Đã xóa tài khoản khách hàng.'
-        : action === 'block' ? 'Đã khóa tài khoản; phiên đăng nhập cũ sẽ hết hiệu lực.' : 'Đã mở lại tài khoản.');
-      setSelected(null);
+      toast.success(action === 'delete' ? 'Đã xóa tài khoản khách hàng'
+        : action === 'block' ? 'Đã khóa tài khoản; phiên đăng nhập cũ sẽ hết hiệu lực' : 'Đã mở lại tài khoản', { id });
+      // Về danh sách: mật khẩu tạm của khách này không được hiện tiếp khi mở khách khác.
+      setSelected(null); setTemporaryPassword('');
       setReloadKey((key) => key + 1);
-    } catch (changeError) { setError(changeError instanceof Error ? changeError.message : 'Có lỗi xảy ra'); }
+    } catch (changeError) { toast.error(errorText(changeError, 'Thao tác thất bại'), { id }); }
     finally { setBusy(false); }
   };
 
@@ -76,8 +80,6 @@ export function CustomerManager() {
       </div>
       <button type="button" onClick={() => { setSelected(null); setTemporaryPassword(''); }} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
       Mật khẩu tạm mới: <strong className="select-all font-mono">{temporaryPassword}</strong> — chỉ hiện một lần. Gửi cho khách (Zalo/điện thoại),
       dặn khách đăng nhập rồi đổi mật khẩu trong trang Tài khoản.
@@ -128,7 +130,6 @@ export function CustomerManager() {
   ];
 
   return <div className="space-y-4">
-    {message && <p role="status" className="rounded-xl bg-cream-100 p-3 text-sm">{message}</p>}
     <DataTable columns={columns} fetchPage={fetchCustomers} reloadKey={reloadKey}
       searchPlaceholder="Tìm theo tên, email hoặc SĐT"
       sorts={CUSTOMER_SORTS} filters={CUSTOMER_FILTERS}

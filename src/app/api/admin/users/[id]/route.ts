@@ -168,6 +168,8 @@ export async function PATCH(req: Request, { params }: RouteContext) {
         return NextResponse.json({ error: 'Email không hợp lệ' }, { status: 400 });
       }
       updateData.email = email.trim().toLowerCase();
+      // Dấu "đã xác minh" thuộc về email cũ (đăng nhập Google dựa vào nó để quyết định giữ mật khẩu khi liên kết).
+      if (updateData.email !== targetUser.email) updateData.emailVerified = null;
     }
     if (phone !== undefined) {
       if (typeof phone !== 'string' || phone.length > 20) return NextResponse.json({ error: 'Số điện thoại không hợp lệ' }, { status: 400 });

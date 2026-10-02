@@ -5,7 +5,8 @@ import { getSession, signIn, signOut, useSession } from 'next-auth/react';
 import { AuthCredentials, BabyProfile, RegisterData, User, UserRole } from '@/types/auth';
 import { trackLogin, trackLogout } from '@/client/analytics/tracker';
 
-type Result = { success: boolean; error?: string; role?: UserRole };
+/** `reason: 'credentials'`: sai tên đăng nhập/email hoặc mật khẩu (hoặc tài khoản không có mật khẩu). */
+type Result = { success: boolean; error?: string; role?: UserRole; reason?: 'credentials' | 'verification'; requiresVerification?: boolean; emailSent?: boolean };
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -43,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: credentials.email.trim().toLowerCase(),
       password: credentials.password,
     });
-    if (!result || result.error) return { success: false, error: 'Tên đăng nhập, email hoặc mật khẩu không đúng.' };
+    if (result?.error === 'EmailVerificationRequired') return { success: false, error: 'Vui lòng xác thực email trước khi đăng nhập. Bạn có thể gửi lại thư xác thực bên dưới.', reason: 'verification' };
+    if (!result || result.error) return { success: false, error: 'Tên đăng nhập, email hoặc mật khẩu không đúng.', reason: 'credentials' };
     const fresh = await getSession();
     if (!fresh?.user || fresh.user.status !== 'active') return { success: false, error: 'Không thể xác thực tài khoản.' };
     // Mã tài khoản nội bộ, không gửi email: điều khoản Google Analytics cấm gửi thông tin nhận dạng cá nhân.
@@ -60,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) return { success: false, error: json.error || 'Đăng ký không thành công.' };
-      return login({ email: data.email, password: data.password });
+      return { success: true, requiresVerification: true, emailSent: json.emailSent === true };
     } catch {
       return { success: false, error: 'Không kết nối được máy chủ.' };
     }

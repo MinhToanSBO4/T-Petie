@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BadgeCheck, Camera, PenLine } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { errorText, toast } from '@/client/toast';
 import { StarRating } from '@/components/reviews/StarRating';
 import { ReviewDialog } from '@/components/reviews/ReviewDialog';
 import { PhotoLightbox } from '@/components/reviews/PhotoLightbox';
@@ -24,7 +24,6 @@ type ReviewPage = { summary: ReviewSummary; reviews: PublicReview[]; page: numbe
 export function ProductReviews({ productId, productName }: { productId: string; productName: string }) {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
-  const { showToast } = useToast();
   const [filter, setFilter] = useState<ReviewFilter>('all');
   const [data, setData] = useState<ReviewPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,15 +31,20 @@ export function ProductReviews({ productId, productName }: { productId: string; 
   const [writing, setWriting] = useState<ReviewTarget | null>(null);
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
+  const loaded = useRef(false);
   const load = useCallback(async (nextFilter: ReviewFilter, page: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ productId, filter: nextFilter, page: String(page) });
       const response = await fetch(`/api/reviews?${params}`, { cache: 'no-store' });
-      if (!response.ok) return;
+      if (!response.ok) throw new Error('Chưa tải được đánh giá, Mẹ thử lại nhé.');
       const result = await response.json() as ReviewPage;
+      loaded.current = true;
       setData((current) => page > 1 && current ? { ...result, reviews: [...current.reviews, ...result.reviews] } : result);
-    } catch { /* giữ nguyên danh sách đang có nếu mất mạng */ }
+    } catch (error) {
+      // Giữ nguyên danh sách đang có. Lần tải đầu lỗi thì khối đánh giá chỉ ẩn đi; lỗi khi khách đang lọc/xem thêm thì báo.
+      if (loaded.current) toast.error(errorText(error, 'Chưa tải được đánh giá, Mẹ thử lại nhé.'), { id: 'reviews-load' });
+    }
     finally { setLoading(false); }
   }, [productId]);
 
@@ -170,7 +174,7 @@ export function ProductReviews({ productId, productName }: { productId: string; 
       onSaved={(message) => {
         setTargets((current) => current.filter((item) => item.orderItemId !== writing.orderItemId));
         setWriting(null);
-        showToast(message, 'love');
+        toast.love(message);
         // Xóa bản Đơn mua đã lưu trong trình duyệt để nút "Đánh giá" của món này không còn hiện ở đó.
         router.refresh();
       }} />}

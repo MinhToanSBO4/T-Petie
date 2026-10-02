@@ -81,8 +81,8 @@ export default function RegisterPage() {
     setIsSubmitting(false);
 
     if (result.success) {
-      showToast('🎉 Đăng ký thành công! Chào mừng Mẹ đến với T\'Petie.');
-      router.push('/');
+      showToast(result.emailSent ? 'Tài khoản đã tạo. Vui lòng kiểm tra email xác thực.' : 'Tài khoản đã tạo. Chưa gửi được email, Mẹ chọn gửi lại nhé.');
+      window.location.assign(`/verify-email?email=${encodeURIComponent(email.trim())}&sent=${result.emailSent ? '1' : '0'}`);
     } else {
       setErrorMessage(result.error || 'Đăng ký thất bại. Vui lòng thử lại.');
     }

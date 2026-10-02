@@ -84,8 +84,9 @@ export default function CartPage() {
   };
 
   const handleStartCheckout = () => {
-    if (selectedItems.length === 0 || !quote) {
-      showToast(quoteError || 'Đang kiểm tra giá và tồn kho. Vui lòng chờ.', 'info');
+    if (selectedItems.length === 0) { showToast('Mẹ chọn ít nhất một sản phẩm để đặt hàng nhé.', 'warning'); return; }
+    if (!quote) {
+      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
       return;
     }
     trackBeginCheckout(

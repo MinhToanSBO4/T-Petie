@@ -23,7 +23,7 @@ import {
 import type { Product, ProductCardData, ProductSizeOption } from '@/types/product';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { SizeGuideModal } from '@/components/product/SizeGuideModal';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { StarRating } from '@/components/reviews/StarRating';
@@ -48,7 +48,6 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
     : [product.thumbnail || product.image]).filter((src): src is string => Boolean(src));
 
   const { addToCart } = useCart();
-  const { showToast } = useToast();
 
   // Reset image and size when route params change
   useEffect(() => {
@@ -67,16 +66,18 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
 
   const handleAddToCart = () => {
     if (selectedSize.stock < quantity || selectedSize.stock < 1) {
-      showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
+      toast.warning('Kích cỡ này đã hết hàng hoặc không đủ số lượng.');
       return;
     }
     addToCart(product, selectedSize, quantity);
-    showToast(`Đã thêm ${quantity} x "${product.name} (${selectedSize.size})" vào giỏ hàng!`, 'success');
+    toast.success(`Đã thêm ${quantity} x "${product.name} (${selectedSize.size})" vào giỏ hàng!`, {
+      action: { label: 'Xem giỏ hàng', href: '/cart' },
+    });
   };
 
   const handleBuyNow = () => {
     if (selectedSize.stock < quantity || selectedSize.stock < 1) {
-      showToast('Kích cỡ này đã hết hàng hoặc không đủ số lượng.', 'info');
+      toast.warning('Kích cỡ này đã hết hàng hoặc không đủ số lượng.');
       return;
     }
     const formattedSize = cartSizeLabel(selectedSize.size, selectedSize.weightRange);
@@ -170,8 +171,9 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             <div className="absolute top-3 right-3 flex space-x-2 z-10">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  showToast('Đã sao chép link sản phẩm để mẹ chia sẻ!', 'info');
+                  navigator.clipboard.writeText(window.location.href)
+                    .then(() => toast.success('Đã sao chép link sản phẩm để mẹ chia sẻ!'))
+                    .catch(() => toast.warning('Trình duyệt chưa cho sao chép. Mẹ sao chép link trên thanh địa chỉ giúp shop nhé.'));
                 }}
                 className="p-2 rounded-full bg-white/90 backdrop-blur-md text-charcoal-700 hover:text-honey-600 transition-colors shadow-sm"
                 title="Chia sẻ"

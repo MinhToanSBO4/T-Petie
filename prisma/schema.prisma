@@ -24,6 +24,7 @@ model User {
   // Thông tin mở rộng cho hồ sơ Mẹ & Bé
   name          String?
   emailVerified DateTime?
+  emailVerificationRequired Boolean @default(false)
   image         String?
   status        String    @default("active") // "active" | "blocked"
   phone         String?
@@ -412,4 +413,25 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+model EmailJob {
+  id String @id @default(cuid())
+  eventKey String @unique
+  orderId String
+  eventId String?
+  recipient String
+  kind String
+  payload Json
+  status String @default("pending")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  leaseOwner String?
+  errorCode String?
+  createdAt DateTime @default(now())
+  sentAt DateTime?
+  @@index([status, nextAttemptAt])
+  @@index([orderId, eventId])
+  @@map("email_jobs")
 }

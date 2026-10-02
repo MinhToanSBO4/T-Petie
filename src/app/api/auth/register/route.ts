@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
@@ -8,8 +9,9 @@ import { allowAttempt } from '@/server/security/rate-limit';
 import { clientIp } from '@/server/security/client-ip';
 import { isSameOrigin } from '@/server/security/origin';
 import { normalizePhone } from '@/lib/account/account-input';
+import { readMailConfig, normalizeEmail } from '@/lib/email/config';
+import { issueAccountEmail } from '@/server/auth/email-tokens';
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_TAKEN = 'Địa chỉ Email này đã được đăng ký. Mẹ vui lòng chọn Đăng nhập nhé!';
 
 /** Kiểm tra form đăng ký; trả về thông báo cho đúng ô bị sai (trước đây mọi lỗi đều báo "Mật khẩu cần 12–128 ký tự"). */
@@ -18,7 +20,7 @@ function inputError(body: Record<string, unknown>): string | null {
   if (typeof name !== 'string' || !name.trim()) return 'Vui lòng nhập Họ tên.';
   if (name.trim().length > 100) return 'Họ tên tối đa 100 ký tự.';
   if (typeof email !== 'string' || !email.trim()) return 'Vui lòng nhập Email.';
-  if (email.trim().length > 254 || !EMAIL.test(email.trim().toLowerCase())) return 'Email không đúng định dạng (VD: mebe@gmail.com)!';
+  if (!normalizeEmail(email)) return 'Email không đúng định dạng (VD: mebe@gmail.com)!';
   if (typeof password !== 'string' || password.length < 12 || password.length > 128) return 'Mật khẩu cần 12–128 ký tự.';
   if (phone !== undefined && phone !== null && (typeof phone !== 'string' || (phone.trim() && !normalizePhone(phone)))) {
     return 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09 (có thể bỏ trống).';
@@ -46,6 +48,8 @@ export async function POST(req: Request) {
     }
 
     const cleanEmail = String(body.email).trim().toLowerCase();
+    try { readMailConfig(process.env); }
+    catch { return NextResponse.json({ error: 'Dịch vụ email chưa sẵn sàng. Vui lòng thử lại sau.' }, { status: 503 }); }
     const phone = typeof body.phone === 'string' && body.phone.trim() ? normalizePhone(body.phone) : null;
     if (await prisma.user.findUnique({ where: { email: cleanEmail }, select: { id: true } })) {
       return NextResponse.json({ error: EMAIL_TAKEN }, { status: 409 });
@@ -59,6 +63,7 @@ export async function POST(req: Request) {
       data: {
         name: String(body.name).trim().replace(/\s+/g, ' '),
         email: cleanEmail,
+        emailVerificationRequired: true,
         password: hashedPassword,
         phone,
         role: 'user',
@@ -69,7 +74,9 @@ export async function POST(req: Request) {
       select: { id: true, name: true, email: true, role: true, status: true, phone: true, points: true, createdAt: true },
     });
 
-    return NextResponse.json({ success: true, message: 'Đăng ký tài khoản thành công!', user: newUser }, { status: 201 });
+    const emailSent = await issueAccountEmail(cleanEmail, 'verify').catch(() => false);
+    return NextResponse.json({ success: true, requiresVerification: true, emailSent,
+      message: emailSent ? 'Vui lòng kiểm tra email để xác thực tài khoản.' : 'Tài khoản đã tạo. Chưa gửi được thư xác thực, vui lòng gửi lại.', user: newUser }, { status: 201 });
   } catch (error) {
     // Hai lần bấm đăng ký cùng email gần như đồng thời: lần sau gặp khóa duy nhất của email.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

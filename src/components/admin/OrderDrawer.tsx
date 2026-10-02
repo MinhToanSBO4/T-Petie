@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, FastForward, Loader2, Phone, X } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { OrderStatusBadge } from '@/components/admin/OrderStatusBadge';
 import { ADMIN_NEXT_STEP, ADMIN_TARGET_LABELS, MAIN_FLOW, orderStatusLabel, type OrderStatus } from '@/lib/orders/status';
 import {
@@ -37,7 +37,6 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose, onPrevi
   onAdvance: (to: OrderStatus) => void; onCancel: () => void; onClose: () => void;
   onPrevious?: () => void; onNext?: () => void;
 }) {
-  const { showToast } = useToast();
   const closeButton = useRef<HTMLButtonElement>(null);
   const next = ADMIN_NEXT_STEP[order.orderStatus];
   const cancelled = order.orderStatus === 'CANCELLED';
@@ -58,8 +57,8 @@ export function OrderDrawer({ order, busy, onAdvance, onCancel, onClose, onPrevi
   }, [onClose]);
 
   const copy = async (text: string, label: string) => {
-    try { await navigator.clipboard.writeText(text); showToast(`Đã sao chép ${label}`, 'success'); }
-    catch { showToast('Không sao chép được, vui lòng chọn và sao chép thủ công', 'info'); }
+    try { await navigator.clipboard.writeText(text); toast.success(`Đã sao chép ${label}`); }
+    catch { toast.error('Không sao chép được, vui lòng chọn và sao chép thủ công'); }
   };
   const shippingLabel = `${order.customerName}\n${order.customerPhone}\n${fullAddress(order)}`
     + (order.paymentMethod === 'COD' && order.paymentStatus !== 'PAID' ? `\nThu hộ: ${formatPrice(order.totalAmount)}` : '');

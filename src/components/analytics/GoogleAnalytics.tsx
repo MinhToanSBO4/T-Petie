@@ -20,7 +20,7 @@ const BACK_OFFICE_PATH = /^\/(admin|staff)(\/|$)/;
 export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
-  const internal = isBackOfficeRole(session?.user?.role) || BACK_OFFICE_PATH.test(pathname);
+  const internal = isBackOfficeRole(session?.user?.role) || BACK_OFFICE_PATH.test(pathname) || /^\/(verify-email|reset-password|forgot-password)(\/|$)/.test(pathname);
   const ready = status !== 'loading' && !internal;
 
   useEffect(() => {

@@ -5,8 +5,10 @@ import { allowAttempt } from '@/server/security/rate-limit';
 import { createOrder, IdempotencyConflictError, type CheckoutInput } from '@/server/orders/create-order';
 import { clientIp } from '@/server/security/client-ip';
 import { normalizePhone } from '@/lib/account/account-input';
+import { normalizeEmail } from '@/lib/email/config';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const validText = (value: unknown, max: number) => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= max;
 
@@ -31,6 +33,7 @@ export async function POST(request: Request) {
     (body.ward !== undefined && (typeof body.ward !== 'string' || body.ward.length > 100)) ||
     (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 1000)) ||
     (body.source !== undefined && (typeof body.source !== 'string' || body.source.length > 100)) ||
+    (body.email !== undefined && (typeof body.email !== 'string' || (body.email.trim() !== '' && !normalizeEmail(body.email)))) ||
     (body.couponCode !== undefined && (typeof body.couponCode !== 'string' || body.couponCode.length > 30)) ||
     !Array.isArray(body.items) || body.items.length < 1 || body.items.length > 30 ||
     body.items.some((item) => !item || typeof item !== 'object' ||
@@ -57,6 +60,7 @@ export async function POST(request: Request) {
       city: input.city.trim(), district: input.district.trim(), ward: input.ward?.trim(),
       note: input.note?.slice(0, 1000), couponCode: input.couponCode?.slice(0, 30),
       source: input.source?.trim().slice(0, 100) || undefined, items: input.items,
+      email: input.email?.trim().toLowerCase(),
     }, session?.user?.status === 'active' ? session.user.id : undefined, idempotencyKey);
     return NextResponse.json({ status: 'success', ...result }, { status: 201 });
   } catch (error) {
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
       console.error('Checkout blocked: commerce_settings row "default" is missing');
       return NextResponse.json({ message: 'Shop đang cập nhật phí giao hàng, mẹ vui lòng đặt lại sau ít phút hoặc nhắn shop nhé.' }, { status: 503 });
     }
-    if (/giỏ hàng|sản phẩm|số lượng|tồn kho|giá|mã giảm|tổng tiền/i.test(message)) {
+    if (/giỏ hàng|sản phẩm|số lượng|tồn kho|giá|mã giảm|tổng tiền|email đặt hàng/i.test(message)) {
       return NextResponse.json({ message }, { status: 400 });
     }
     console.error('Checkout failed:', error);

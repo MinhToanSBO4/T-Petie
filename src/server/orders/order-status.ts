@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db/client';
 import { table } from '@/server/db/sql';
 import { DASHBOARD_TAG } from '@/server/admin/dashboard';
+import { enqueueOrderEmail, scheduleEmailDispatch } from '@/server/email/outbox';
 import {
   AUTO_COMPLETE_DAYS, canTransition, forwardPath, isShopActor, PREVIOUS_STATUS, restocksOnCancel, UNDO_WINDOW_MS, UNDOABLE_STATUSES,
   type OrderStatus, type StatusActor,
@@ -50,7 +51,8 @@ async function moveForward(order: OrderHead, path: OrderStatus[], actor: StatusA
   const completion = target === 'COMPLETED'
     ? Prisma.sql`, "completedAt" = ${at}::timestamp${order.paymentMethod === 'COD' ? Prisma.sql`, "paymentStatus" = 'PAID'` : Prisma.empty}`
     : Prisma.empty;
-  const inserted = await prisma.$executeRaw`
+  await prisma.$transaction(async (tx) => {
+  const inserted = await tx.$executeRaw`
     WITH moved AS (
       UPDATE ${table('orders')} SET "orderStatus" = ${target}, "updatedAt" = ${at}::timestamp ${completion}
       WHERE "id" = ${order.id} AND "orderStatus" = ${order.orderStatus}
@@ -60,6 +62,9 @@ async function moveForward(order: OrderHead, path: OrderStatus[], actor: StatusA
     SELECT step.id, moved."id", step.status, ${actor}::text, ${note}::text, step.at
     FROM moved, unnest(${ids}::text[], ${path}::text[], ${times}::timestamp[]) AS step(id, status, at)`;
   if (inserted !== path.length) throw new OrderStatusError(CONCURRENT_UPDATE);
+  const eventId = ids[ids.length - 1];
+  await enqueueOrderEmail(tx, order.id, `status:${eventId}`, 'status', target, note, isShopActor(actor) ? UNDO_WINDOW_MS + 1000 : 0, eventId);
+  });
 }
 
 /**
@@ -72,7 +77,8 @@ async function cancelOrder(order: OrderHead, actor: StatusActor | null, note: st
     if (updated.count !== 1) throw new OrderStatusError(CONCURRENT_UPDATE);
     const current = await tx.order.findUniqueOrThrow({ where: { id: order.id },
       select: { couponCode: true, items: { select: { variantId: true, quantity: true } } } });
-    await tx.orderStatusEvent.create({ data: { orderId: order.id, status: 'CANCELLED', actor, note } });
+    const event = await tx.orderStatusEvent.create({ data: { orderId: order.id, status: 'CANCELLED', actor, note } });
+    await enqueueOrderEmail(tx, order.id, `status:${event.id}`, 'status', 'CANCELLED', note, 0, event.id);
     // Cùng thứ tự khóa với lúc đặt hàng (theo mã size) để không khóa chéo với đơn đang tạo.
     if (restocksOnCancel(note)) {
       for (const item of [...current.items].sort((a, b) => a.variantId.localeCompare(b.variantId))) {
@@ -118,6 +124,7 @@ export async function changeOrderStatus(orderCode: string, next: OrderStatus, op
   const order = await prisma.order.findUnique({ where: { orderCode }, select: headSelect });
   if (!order || (options.ownerId !== undefined && order.userId !== options.ownerId)) throw new OrderStatusError(ORDER_NOT_FOUND);
   await applyChange(order, next, options);
+  scheduleEmailDispatch(isShopActor(options.actor ?? null) && next !== 'CANCELLED' ? UNDO_WINDOW_MS + 1000 : 0);
   if (options.revalidate !== false) afterChange([next]);
 }
 
@@ -160,6 +167,7 @@ export async function bulkChangeOrderStatus(codes: string[], next: OrderStatus, 
     }
   });
   if (results.some((result) => result.ok)) afterChange([next]);
+  if (results.some((result) => result.ok)) scheduleEmailDispatch(isShopActor(options.actor ?? null) && next !== 'CANCELLED' ? UNDO_WINDOW_MS + 1000 : 0);
   return results;
 }
 
@@ -191,7 +199,8 @@ async function undoOne(orderCode: string, current: OrderStatus, to: OrderStatus 
     : Prisma.empty;
   const eventIds = order.statusEvents.map((event) => event.id);
   // Đổi trạng thái và xóa lịch sử trong cùng một câu lệnh: không có trạng thái nửa vời nếu đơn vừa bị người khác đổi.
-  const deleted = await prisma.$executeRaw`
+  await prisma.$transaction(async (tx) => {
+  const deleted = await tx.$executeRaw`
     WITH reverted AS (
       UPDATE ${table('orders')} SET "orderStatus" = ${target}, "updatedAt" = ${new Date(now).toISOString()}::timestamp ${reopen}
       WHERE "id" = ${order.id} AND "orderStatus" = ${current}
@@ -199,6 +208,17 @@ async function undoOne(orderCode: string, current: OrderStatus, to: OrderStatus 
     )
     DELETE FROM ${table('order_status_events')} WHERE "id" = ANY(${eventIds}::text[]) AND "orderId" IN (SELECT "id" FROM reverted)`;
   if (deleted !== path.length) throw new OrderStatusError(CONCURRENT_UPDATE);
+  // Serialize classification/cancellation with the worker's job claim, so a pending job cannot
+  // be claimed between checking whether it was communicated and cancelling it.
+  const affected = await tx.$queryRaw<{ status: string }[]>`
+    SELECT "status" FROM ${table('email_jobs')}
+    WHERE "orderId" = ${order.id} AND "eventId" = ANY(${eventIds}::text[]) FOR UPDATE`;
+  const communicated = affected.some((job) => job.status === 'sent' || job.status === 'processing');
+  await tx.emailJob.updateMany({ where: { orderId: order.id, eventId: { in: eventIds }, status: { in: ['pending', 'processing'] } },
+    data: { status: 'cancelled', leaseUntil: null, leaseOwner: null } });
+  if (communicated) await enqueueOrderEmail(tx, order.id, `undo:${eventIds[0]}`, 'status', target, 'Shop đã điều chỉnh lại trạng thái đơn hàng.', affected.some((job) => job.status === 'processing') ? 21000 : 0);
+  });
+  scheduleEmailDispatch();
   return target;
 }
 
@@ -231,17 +251,18 @@ let lastSweep = 0;
  * "Đã nhận được hàng" thì hệ thống tự hoàn tất. Được gọi khi mở danh sách đơn, trang tổng quan, trang đơn của khách
  * và cron bảo trì hằng ngày; tự giới hạn tối đa một lần mỗi 10 phút trên mỗi máy chủ (`force` bỏ qua giới hạn này).
  */
-export async function autoCompleteShippedOrders(now = new Date(), { force = false } = {}): Promise<number> {
+export async function autoCompleteShippedOrders(now = new Date(), { force = false, limit = 100, deadline = Infinity } = {}): Promise<number> {
   if (!force && now.getTime() - lastSweep < SWEEP_INTERVAL_MS) return 0;
   lastSweep = now.getTime();
   const cutoff = new Date(now.getTime() - AUTO_COMPLETE_DAYS * DAY_MS);
   try {
     const due = await prisma.order.findMany({
       where: { orderStatus: 'SHIPPING', statusEvents: { some: { status: 'SHIPPING', createdAt: { lt: cutoff } } } },
-      select: headSelect, take: 100,
+      select: headSelect, take: Math.max(1, Math.min(limit, 100)),
     });
     let completed = 0;
     for (const order of due) {
+      if (Date.now() >= deadline) break;
       try {
         await moveForward(order, ['COMPLETED'], 'system', `Tự động hoàn tất sau ${AUTO_COMPLETE_DAYS} ngày giao hàng`);
         completed += 1;
