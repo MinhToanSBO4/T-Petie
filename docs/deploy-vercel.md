@@ -7,7 +7,7 @@ Frontend và backend nằm chung một ứng dụng Next.js: trang và API (`src
 | Tệp | Nội dung |
 | --- | --- |
 | `vercel.json` | Framework Next.js, `npm ci`, `npm run build`, region **`icn1` (Seoul)** cạnh database Supabase, cron bảo trì `/api/cron/maintenance` lúc 20:00 UTC (03:00 giờ Việt Nam) mỗi ngày. |
-| `scripts/build.cjs` | Trên Vercel, kiểm tra biến môi trường trước tiên (`scripts/lib/deploy-env.cjs`): production thiếu/sai cấu hình thì dừng build và in rõ biến nào cần sửa, preview chỉ cảnh báo. Sau đó bản **production** tự chạy `prisma migrate deploy` (qua `DIRECT_URL`); lỗi migration thì dừng build. Bản preview không tự migrate. |
+| `scripts/build.cjs` | Trên Vercel, kiểm tra biến môi trường trước tiên (`scripts/lib/deploy-env.cjs`): thiếu/sai cấu hình thì dừng build và in rõ biến nào cần sửa (production cần đủ mọi biến; preview chỉ bắt buộc `CONNECTION_STRING` và `NEXTAUTH_SECRET` vì lúc build các trang đã đọc database). Sau đó bản **production** tự chạy `prisma migrate deploy` (qua `DIRECT_URL`); lỗi migration thì dừng build. Bản preview không tự migrate. |
 | `package.json` → `engines.node` | Node **22.x** trên Vercel (bản LTS Prisma 5.22 hỗ trợ chính thức). |
 | `.vercelignore` | Khi deploy bằng Vercel CLI từ máy local, không gửi `.env`, `.next`, `node_modules` lên Vercel. |
 | `src/lib/db/connection-url.ts` | Tự chọn số kết nối Prisma theo môi trường: Vercel + transaction pooler 5 kết nối/instance, session pooler 1 kết nối (kèm cảnh báo), máy chủ chạy lâu 5 kết nối; tự thêm `pgbouncer=true` khi dùng cổng 6543. Ghi `connection_limit`/`pool_timeout` trong chuỗi kết nối để ghi đè. |
