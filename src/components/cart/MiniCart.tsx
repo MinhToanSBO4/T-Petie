@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,10 +8,12 @@ import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles } from 'lucid
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
+import { DialogBehavior } from '@/components/layout/DialogBehavior';
 
 export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: number | null }) {
   const { items, isMiniCartOpen, closeMiniCart, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
   const { isAuthenticated, user } = useAuth();
+  const panelRef = useRef<HTMLDivElement>(null);
   // Lối sang đơn đã đặt ngay trong giỏ, để khách không tìm đơn đã mua trong giỏ hàng.
   const ordersLink = isAuthenticated && user?.role === 'user' && (
     <Link href="/orders" onClick={closeMiniCart} className="block text-center text-[11px] font-semibold text-sage-700 hover:underline">
@@ -34,11 +36,17 @@ export function MiniCart({ freeShippingThreshold }: { freeShippingThreshold: num
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             onClick={closeMiniCart}
+            aria-hidden
             className="fixed inset-0 z-50 bg-charcoal-900/40 backdrop-blur-sm"
           />
+          <DialogBehavior target={panelRef} onClose={closeMiniCart} />
 
           {/* Drawer trượt từ bên phải */}
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Giỏ hàng"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

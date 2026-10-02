@@ -36,7 +36,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* Toast Container Floating */}
-      <div className="fixed bottom-20 sm:bottom-6 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full px-2">
+      {/* aria-live: trình đọc màn hình đọc thông báo "Đã thêm vào giỏ"… mà không cần chuyển focus. */}
+      <div role="status" aria-live="polite" className="fixed bottom-20 sm:bottom-6 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full px-2">
         <AnimatePresence>
           {toasts.map((toast) => (
             <motion.div

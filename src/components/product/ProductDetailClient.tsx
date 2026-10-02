@@ -326,13 +326,18 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
             <span className="text-xs font-bold text-charcoal-900 uppercase tracking-wider">Số Lượng:</span>
             <div className="flex items-center border border-cream-300 rounded-xl bg-white">
               <button
+                type="button"
+                aria-label="Giảm số lượng"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                disabled={quantity <= 1}
                 className="p-2 hover:bg-cream-100 rounded-l-xl transition-colors text-charcoal-600"
               >
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="px-4 text-sm font-bold text-charcoal-900">{quantity}</span>
+              <span className="px-4 text-sm font-bold text-charcoal-900" aria-live="polite" aria-label={`Số lượng ${quantity}`}>{quantity}</span>
               <button
+                type="button"
+                aria-label="Tăng số lượng"
                 onClick={() => setQuantity((q) => Math.min(99, selectedSize.stock, q + 1))}
                 disabled={selectedSize.stock < 1 || quantity >= Math.min(99, selectedSize.stock)}
                 className="p-2 hover:bg-cream-100 rounded-r-xl transition-colors text-charcoal-600"

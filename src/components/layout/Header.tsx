@@ -18,7 +18,10 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MAIN_NAV_ITEMS, type SubNavItem } from '@/lib/constants/navigation';
 import { UserAvatar } from '@/components/layout/UserAvatar';
-import { SearchDialog } from '@/components/layout/SearchDialog';
+import dynamic from 'next/dynamic';
+
+// Hộp tìm kiếm chỉ tải khi khách bấm mở, không nằm trong gói JavaScript của mọi trang.
+const SearchDialog = dynamic(() => import('@/components/layout/SearchDialog').then((module) => module.SearchDialog), { ssr: false });
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { backOfficeHome } from '@/lib/admin/back-office';
 
@@ -265,6 +268,7 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
             ) : (
               <Link
                 href="/login"
+                aria-label="Đăng nhập tài khoản"
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-cream-300 hover:border-honey-300 bg-white hover:bg-cream-50 text-xs font-bold text-charcoal-700 transition-all active:scale-95 shadow-2xs"
               >
                 <UserIcon className="w-3.5 h-3.5 text-honey-600" />

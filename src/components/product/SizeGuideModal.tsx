@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ruler, Sparkles, HelpCircle } from 'lucide-react';
 import type { SizeGuide } from '@/lib/content/site-content';
+import { DialogBehavior } from '@/components/layout/DialogBehavior';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface SizeGuideModalProps {
 }
 
 export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'kids' | 'baby'>('kids');
   const [guide, setGuide] = useState<SizeGuide | null>(null);
   const [error, setError] = useState('');
@@ -35,7 +37,12 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal-900/40 backdrop-blur-sm">
+          <DialogBehavior target={panelRef} onClose={onClose} />
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Bảng chọn size"
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
