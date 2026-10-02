@@ -1,4 +1,7 @@
+import type { Metadata } from 'next';
 import { MapPin } from 'lucide-react';
+
+export const metadata: Metadata = { title: "Hệ thống cửa hàng | T'Petie", alternates: { canonical: '/stores' } };
 
 export default function StoresPage() {
   return <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-8">

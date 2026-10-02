@@ -59,17 +59,11 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
     setQuantity(1);
   }, [product]);
 
-  // Track view item on mount
+  // Ghi một lần mỗi sản phẩm (chọn size khác giá không tính thêm lượt xem); giá là size được chọn sẵn khi mở trang.
   useEffect(() => {
-    if (product) {
-      trackViewItem({
-        id: product.id,
-        name: product.name,
-        category: product.categoryName,
-        price: selectedSize.price,
-      });
-    }
-  }, [product, selectedSize.price]);
+    const initial = product.sizes.find((size) => size.stock > 0) || product.sizes[0];
+    trackViewItem({ id: product.id, name: product.name, category: product.categoryName, price: initial?.price ?? product.basePrice });
+  }, [product]);
 
   const handleAddToCart = () => {
     if (selectedSize.stock < quantity || selectedSize.stock < 1) {
