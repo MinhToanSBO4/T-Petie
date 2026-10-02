@@ -18,15 +18,32 @@ export async function linkOAuthAccount(account: AdapterAccount): Promise<{ passw
   const result = await prisma.$transaction(async (tx) => {
     // Cùng dữ liệu PrismaAdapter vẫn ghi (`account.create({ data })`).
     await tx.account.create({ data: account as Prisma.AccountUncheckedCreateInput });
-    if (!verifiedEmail) return null;
-    const user = await tx.user.findUnique({
-      where: { id: account.userId }, select: { email: true, emailVerified: true, password: true },
-    });
-    const update = user && googleLinkUpdate(user, verifiedEmail, new Date());
-    if (!update) return null;
-    await tx.user.update({ where: { id: account.userId }, data: update });
-    return update;
+    return applyGoogleVerification(tx, account.userId, verifiedEmail);
   });
   if (result) forgetUserSnapshot(account.userId);
   return { passwordRemoved: result?.password === null };
+}
+
+/**
+ * Đăng nhập Google vào tài khoản đã liên kết từ trước: Google vừa xác minh email nên tài khoản cũng được xác thực
+ * (ví dụ email chưa từng được ghi nhận, hoặc admin vừa đổi email). Cùng quy tắc với lúc liên kết.
+ */
+export async function verifyByGoogleSignIn(userId: string, idToken: unknown): Promise<{ passwordRemoved: boolean } | null> {
+  const verifiedEmail = verifiedEmailFromIdToken(idToken);
+  if (!verifiedEmail) return null;
+  const result = await prisma.$transaction((tx) => applyGoogleVerification(tx, userId, verifiedEmail));
+  if (!result) return null;
+  forgetUserSnapshot(userId);
+  return { passwordRemoved: result.password === null };
+}
+
+/** Ghi nhận email đã xác minh và bỏ các liên kết xác thực email còn treo (không còn cần nữa). */
+async function applyGoogleVerification(tx: Prisma.TransactionClient, userId: string, verifiedEmail: string | null) {
+  if (!verifiedEmail) return null;
+  const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true, password: true } });
+  const update = user && googleLinkUpdate(user, verifiedEmail, new Date());
+  if (!update) return null;
+  await tx.user.update({ where: { id: userId }, data: update });
+  await tx.verificationToken.deleteMany({ where: { identifier: `verify:${userId}` } });
+  return update;
 }

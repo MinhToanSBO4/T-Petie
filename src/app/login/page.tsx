@@ -68,7 +68,7 @@ function LoginForm() {
       if (result.emailVerified === false) {
         toast.warning('Mẹ chưa xác thực email', {
           description: 'Mẹ vẫn xem và thêm vào giỏ được; xác thực email để đặt hàng nhé.',
-          action: { label: 'Xác thực ngay', href: '/verify-email' }, duration: 10_000,
+          action: { label: 'Xác thực ngay', href: '/verify-email' }, duration: 7_000,
         });
       } else {
         toast.success(`Chào mừng bạn trở lại với T'Petie! 🌸`);

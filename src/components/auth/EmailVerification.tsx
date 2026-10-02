@@ -230,6 +230,68 @@ function VerifyEmailDialog({ open, email, onClose, onCheck }: {
   );
 }
 
+/** Huy hiệu nhỏ cạnh email (thẻ tài khoản, danh sách). */
+export function EmailStatusBadge({ verified }: { verified: boolean }) {
+  return verified ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sage-50 px-2 py-0.5 text-[11px] font-bold text-sage-700 ring-1 ring-sage-200">
+      <CheckCircle2 className="size-3" aria-hidden /> Đã xác thực
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-honey-50 px-2 py-0.5 text-[11px] font-bold text-honey-700 ring-1 ring-honey-200">
+      <MailCheck className="size-3" aria-hidden /> Chưa xác thực
+    </span>
+  );
+}
+
+/**
+ * Ô email trong Thông tin cá nhân: trạng thái xác thực ngay tại chỗ; chưa xác thực thì có nút gửi lại (đếm ngược theo
+ * máy chủ) và nút kiểm tra lại sau khi đã bấm link trong thư. Dùng type="button" vì nằm trong form hồ sơ.
+ */
+export function EmailStatusField({ email }: { email?: string }) {
+  const { needsVerification, checkVerification } = useEmailVerification();
+  const { busy, secondsLeft, resend } = useResendVerification();
+  const [checking, setChecking] = useState(false);
+
+  const recheck = async () => {
+    setChecking(true);
+    const verified = await checkVerification();
+    setChecking(false);
+    if (verified) toast.success('Email đã được xác thực');
+    else toast.info('Email chưa được xác thực', { description: 'Mẹ mở thư từ T\'Petie và bấm "Xác thực email" nhé.' });
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold text-charcoal-800">Địa chỉ Email</span>
+        <EmailStatusBadge verified={!needsVerification} />
+      </div>
+      <div className={`rounded-2xl border px-4 py-2.5 text-xs text-charcoal-600 sm:text-sm ${
+        needsVerification ? 'border-honey-200 bg-honey-50/60' : 'border-cream-200 bg-cream-50'}`}>
+        <span className="break-all">{email}</span>
+      </div>
+      {needsVerification ? (
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] leading-relaxed text-charcoal-600">Xác thực email để đặt hàng và nhận thông báo đơn hàng.</p>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={() => void resend()} disabled={busy || secondsLeft > 0} aria-live="polite"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-honey-500 px-3 text-xs font-bold text-white transition-colors hover:bg-honey-600 disabled:cursor-not-allowed disabled:bg-cream-200 disabled:text-charcoal-500">
+              {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RefreshCw className="size-3.5" aria-hidden />}
+              {busy ? 'Đang gửi…' : secondsLeft > 0 ? `Gửi lại sau ${formatCountdown(secondsLeft)}` : 'Gửi email xác thực'}
+            </button>
+            <button type="button" onClick={recheck} disabled={checking}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-cream-300 bg-white px-3 text-xs font-bold text-charcoal-700 transition-colors hover:bg-cream-50 disabled:opacity-60">
+              {checking && <Loader2 className="size-3.5 animate-spin" aria-hidden />} Tôi đã xác thực
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[11px] text-charcoal-400">Email dùng để đăng nhập và nhận thông báo đơn hàng, không thể thay đổi.</p>
+      )}
+    </div>
+  );
+}
+
 /** Dải nhắc xác thực đặt ở đầu trang tài khoản và trang thanh toán. */
 export function EmailVerificationBanner({ className = '' }: { className?: string }) {
   const { needsVerification, openVerificationDialog } = useEmailVerification();

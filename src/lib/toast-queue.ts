@@ -38,13 +38,15 @@ export const MAX_VISIBLE_TOASTS = 4;
 export const LOADING_TIMEOUT_MS = 120_000;
 
 const MIN_DURATION: Record<Exclude<ToastType, 'loading'>, number> = {
-  success: 3_500, info: 3_500, love: 3_500, warning: 5_000, error: 6_000,
+  success: 2_500, info: 3_000, love: 2_500, warning: 4_000, error: 5_000,
 };
+/** Thông báo dài nhất cũng tự đóng sau chừng này; thông báo kèm nút tải file tự đặt duration riêng. */
+export const MAX_TOAST_DURATION_MS = 7_000;
 
-/** Đủ thời gian để đọc: khoảng 55 ms mỗi ký tự, tối đa 12 giây. Lỗi hiện lâu hơn thông báo thành công. */
+/** Đủ thời gian để đọc (khoảng 40 ms mỗi ký tự) nhưng không đọng màn hình. Lỗi hiện lâu hơn thông báo thành công. */
 export function toastDuration(type: ToastType, message: string, description = ''): number {
   if (type === 'loading') return LOADING_TIMEOUT_MS;
-  return Math.min(12_000, Math.max(MIN_DURATION[type], 1_500 + (message.length + description.length) * 55));
+  return Math.min(MAX_TOAST_DURATION_MS, Math.max(MIN_DURATION[type], 1_000 + (message.length + description.length) * 40));
 }
 
 export function clampProgress(value: number | null | undefined): number | null {

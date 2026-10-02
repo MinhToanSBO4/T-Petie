@@ -28,14 +28,14 @@ function show(kind: AuthNoticeKind) {
       break;
     case 'google-linked':
       toast.success('Đã liên kết Google với tài khoản của Mẹ', {
-        description: 'Lần sau Mẹ chỉ cần bấm "Đăng nhập với Google".',
+        description: 'Email đã được xác thực, Mẹ đặt hàng được ngay. Lần sau chỉ cần bấm "Đăng nhập với Google".',
       });
       break;
     case 'google-linked-password-removed':
       toast.success('Đã liên kết Google với tài khoản của Mẹ', {
         description: 'Để giữ an toàn, mật khẩu cũ không còn dùng được. Từ nay Mẹ đăng nhập bằng Google, hoặc đặt mật khẩu mới trong Tài khoản.',
         action: { label: 'Đặt mật khẩu mới', href: '/dashboard?tab=security' },
-        duration: 12_000,
+        duration: 7_000,
       });
       break;
     default:

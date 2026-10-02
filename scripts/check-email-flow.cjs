@@ -113,6 +113,19 @@ async function main() {
     assert.ok(await login(googleOnly.email, 'google-password-123'));
     console.log('PASS: registration never waits for SMTP, failed link is released, unverified login allowed, legacy access and Google-only password setup');
 
+    const { verifyByGoogleSignIn } = require('../src/server/auth/google-link.ts');
+    const idToken = (claims) => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+    const linked = await db.user.create({ data: { email: 'linked@example.invalid', role: 'user', emailVerificationRequired: true } });
+    await tokens.issueAccountEmail({ id: linked.id }, 'verify');
+    assert.equal(await verifyByGoogleSignIn(linked.id, idToken({ email: 'linked@example.invalid', email_verified: false })), null);
+    assert.equal(await verifyByGoogleSignIn(linked.id, idToken({ email: 'other@example.invalid', email_verified: true })), null);
+    assert.equal((await tokens.emailVerificationState(linked.id)).verified, false);
+    assert.deepEqual(await verifyByGoogleSignIn(linked.id, idToken({ email: 'Linked@example.invalid', email_verified: true })), { passwordRemoved: false });
+    assert.equal((await tokens.emailVerificationState(linked.id)).verified, true);
+    assert.equal(await db.verificationToken.count({ where: { identifier: `verify:${linked.id}` } }), 0);
+    assert.equal(await verifyByGoogleSignIn(linked.id, idToken({ email: 'linked@example.invalid', email_verified: true })), null);
+    console.log('PASS: Google sign-in verifies a linked account only for the same Google-verified email');
+
     const product = await db.product.create({ data: { sku: 'SMTP-TEST', slug: 'smtp-test', name: 'Áo <test>', basePrice: 100000n,
       variants: { create: { sku: 'SMTP-TEST-2', size: '2', price: 100000n, stock: 10 } } }, include: { variants: true } });
     await db.commerceSetting.upsert({ where: { id: 'default' }, create: { id: 'default', shippingFee: 25000n, freeShippingThreshold: 500000n }, update: { shippingFee: 25000n, freeShippingThreshold: 500000n } });

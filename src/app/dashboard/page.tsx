@@ -36,7 +36,7 @@ import { formatDateVN } from '@/lib/utils/formatters';
 import type { CustomerOrderList } from '@/types/order';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
-import { EmailVerificationBanner } from '@/components/auth/EmailVerification';
+import { EmailStatusBadge, EmailStatusField, EmailVerificationBanner } from '@/components/auth/EmailVerification';
 
 export default function UserDashboardPage() {
   return (
@@ -151,7 +151,8 @@ function DashboardContent() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
-      <EmailVerificationBanner />
+      {/* Ở mục Thông tin cá nhân, trạng thái đã hiện ngay tại ô email. */}
+      {activeTab !== 'profile' && <EmailVerificationBanner />}
 
       {/* 1. TOP USER CARD (Warm & Sweet) */}
       <div className="bg-gradient-to-r from-cream-100 via-blush-50 to-honey-100 rounded-3xl p-6 sm:p-8 border border-cream-200 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -173,9 +174,10 @@ function DashboardContent() {
                 Thành viên T&apos;Petie ⭐
               </span>
             </div>
-            <p className="text-xs text-charcoal-600 flex items-center space-x-2">
-              <span>{user?.email}</span>
-              <span>•</span>
+            <p className="text-xs text-charcoal-600 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="break-all">{user?.email}</span>
+              {user && <EmailStatusBadge verified={user.emailVerified} />}
+              <span aria-hidden>•</span>
               <span className="font-bold text-honey-700">{user?.points ?? 0} Điểm thưởng</span>
             </p>
           </div>
@@ -270,16 +272,7 @@ function DashboardContent() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-charcoal-800">Địa chỉ Email (Định danh)</label>
-                  <input
-                    type="email"
-                    value={user?.email}
-                    disabled
-                    className="w-full px-4 py-2.5 rounded-2xl border border-cream-200 bg-cream-50 text-charcoal-500 text-xs sm:text-sm cursor-not-allowed"
-                  />
-                  <p className="text-[10px] text-charcoal-400">Email dùng để nhận thông báo đơn hàng và không thể thay đổi.</p>
-                </div>
+                <EmailStatusField email={user?.email} />
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-charcoal-800">Địa chỉ giao hàng mặc định</label>

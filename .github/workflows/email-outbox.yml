@@ -27,6 +27,12 @@ jobs:
           if [ -z "$CRON_SECRET" ] || [ -z "$SITE_URL" ]; then
             echo "::warning::CRON_SECRET hoặc SITE_URL chưa được cấu hình"; exit 0
           fi
-          curl --fail-with-body --silent --show-error --max-time 70 \
-            --retry 2 --retry-delay 20 --retry-all-errors \
-            -H "Authorization: Bearer $CRON_SECRET" "${SITE_URL%/}/api/cron/email"
+          # Chỉ thử lại lỗi tạm thời (mạng, timeout, 429, 5xx); 401 nghĩa là CRON_SECRET khác Vercel, thử lại vô ích.
+          status=$(curl --silent --show-error --max-time 70 --retry 2 --retry-delay 20 \
+            -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" "${SITE_URL%/}/api/cron/email") || true
+          cat response.json 2>/dev/null; echo
+          if [ "$status" = "401" ]; then
+            echo "::error::401 Unauthorized: secret CRON_SECRET trên GitHub phải trùng CRON_SECRET trên Vercel (đổi xong cần Redeploy Vercel)."; exit 1
+          fi
+          [ "$status" = "200" ] || { echo "::error::Endpoint trả HTTP $status"; exit 1; }
