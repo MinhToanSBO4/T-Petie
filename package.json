@@ -16,7 +16,9 @@
     "media:migrate": "node scripts/migrate-media.cjs",
     "content:check": "node scripts/check-content-management.cjs",
     "admin:create": "node scripts/create-admin.cjs",
-    "env:check": "node scripts/check-env.cjs"
+    "env:check": "node scripts/check-env.cjs",
+    "db:clone-structure": "node scripts/clone-db-structure.cjs",
+    "db:verify-structure": "node scripts/verify-db-structure.cjs"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
