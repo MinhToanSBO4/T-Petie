@@ -93,6 +93,11 @@ function checkDeployEnvironment(env, { production = false, vercel = false } = {}
     (production ? errors : warnings).push('CRON_SECRET cần chuỗi ngẫu nhiên ≥ 16 ký tự, nếu không cron /api/cron/maintenance luôn bị từ chối.');
   }
 
+  // Analytics: mã sai định dạng bị layout bỏ qua, website chạy bình thường nhưng không đo được gì.
+  if (has('NEXT_PUBLIC_GA4_ID') && !/^G-[A-Z0-9]+$/.test(env.NEXT_PUBLIC_GA4_ID)) {
+    warnings.push('NEXT_PUBLIC_GA4_ID phải là Measurement ID dạng G-XXXXXXXXXX (GA4 → Quản trị → Luồng dữ liệu), nếu không GA4 không được tải.');
+  }
+
   if (has('GOOGLE_CLIENT_ID') !== has('GOOGLE_CLIENT_SECRET')) {
     warnings.push('Đăng nhập Google cần đủ cả GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET.');
   }

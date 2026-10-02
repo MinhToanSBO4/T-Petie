@@ -48,7 +48,7 @@ Chạy `npm run build` trên máy local không thay đổi schema hay dữ liệ
 
 ## Triển khai lên Vercel
 
-Frontend và backend cùng chạy trong một project Vercel; cấu hình nằm sẵn trong `vercel.json` (region `icn1` Seoul cạnh Supabase, cron bảo trì hằng ngày). Làm theo [hướng dẫn triển khai Vercel](docs/deploy-vercel.md): `CONNECTION_STRING` dùng **transaction pooler** (cổng 6543, `?schema=tpetie_app&pgbouncer=true`), `DIRECT_URL` dùng session pooler (cổng 5432) cho migration; bản production tự chạy `prisma migrate deploy` khi build, bản preview không tự migrate. Số kết nối Prisma được chọn tự động theo môi trường (xem `src/lib/db/connection-url.ts`). `NEXT_PUBLIC_GA4_ID` và `NEXT_PUBLIC_CLARITY_PROJECT_ID` chỉ điền khi đã có tài khoản đo lường của chính dự án. Không tải `.env` hoặc `.env.local` lên Git/Vercel dưới dạng file.
+Frontend và backend cùng chạy trong một project Vercel; cấu hình nằm sẵn trong `vercel.json` (region `icn1` Seoul cạnh Supabase, cron bảo trì hằng ngày). Làm theo [hướng dẫn triển khai Vercel](docs/deploy-vercel.md): `CONNECTION_STRING` dùng **transaction pooler** (cổng 6543, `?schema=tpetie_app&pgbouncer=true`), `DIRECT_URL` dùng session pooler (cổng 5432) cho migration; bản production tự chạy `prisma migrate deploy` khi build, bản preview không tự migrate. Số kết nối Prisma được chọn tự động theo môi trường (xem `src/lib/db/connection-url.ts`). Google Analytics 4 tự bật ở bản production (property mặc định `G-LF9P82Z9QM`, đổi bằng `NEXT_PUBLIC_GA4_ID`), không đo admin/nhân viên; `NEXT_PUBLIC_CLARITY_PROJECT_ID` chỉ điền khi có tài khoản Microsoft Clarity. Không tải `.env` hoặc `.env.local` lên Git/Vercel dưới dạng file.
 
 ## Xem dữ liệu trên Supabase
 
