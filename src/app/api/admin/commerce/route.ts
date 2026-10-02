@@ -24,7 +24,8 @@ export async function PATCH(request: Request) {
   try {
     if (body.kind === 'settings') {
       const data = parseCommerceSettings(body);
-      await prisma.commerceSetting.update({ where: { id: 'default' }, data });
+      // Database mới chưa có dòng cấu hình: lần lưu đầu tiên tạo dòng này.
+      await prisma.commerceSetting.upsert({ where: { id: 'default' }, update: data, create: { id: 'default', ...data } });
     } else return NextResponse.json({ error: 'Thao tác không hợp lệ' }, { status: 400 });
     // Phí giao hàng và ngưỡng miễn phí hiển thị ở mini-cart nên cần làm mới cache.
     revalidateTag(COMMERCE_TAG);

@@ -49,8 +49,9 @@ async function fetchCoupons(query: TableQuery) {
   return { items, total: data.total as number, page: data.page as number, pages: data.pages as number };
 }
 
-export function CommerceManager({ initialSettings }: { initialSettings: Settings }) {
-  const [settings, setSettings] = useState(initialSettings);
+export function CommerceManager({ initialSettings }: { initialSettings: Settings | null }) {
+  const [settings, setSettings] = useState<Settings>(initialSettings ?? { shippingFee: 0, freeShippingThreshold: 0 });
+  const [configured, setConfigured] = useState(initialSettings !== null);
   const [editing, setEditing] = useState<{ mode: 'create' } | { mode: 'edit'; code: string; draft: CouponDraft } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -65,6 +66,7 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không lưu được cấu hình');
       setMessage('Đã lưu phí giao hàng.');
+      setConfigured(true);
       // Quay lại trang này sau khi sang trang khác sẽ được làm mới để thấy đúng giá trị mới (không làm mới ngay
       // vì sẽ dựng lại trang và mất thông báo vừa lưu).
       markAdminPagesStale();
@@ -125,6 +127,8 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
 
     <section className="rounded-2xl border border-cream-200 bg-white p-5">
       <h2 className="text-lg font-bold">Phí giao hàng</h2>
+      {!configured && <p role="alert" className="mt-3 rounded-xl bg-honey-100 p-3 text-sm text-honey-800">
+        Chưa có cấu hình phí giao hàng: khách chưa đặt hàng được cho tới khi bạn nhập và lưu phí giao hàng.</p>}
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-semibold">Phí giao hàng (đ)
           <input type="number" min="0" max="1000000" className={`${field} mt-2`} value={settings.shippingFee}

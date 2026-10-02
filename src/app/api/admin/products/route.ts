@@ -103,7 +103,9 @@ export async function POST(request: Request) {
   try {
     const product = await prisma.product.create({ data: {
       name: name.trim(), sku: sku.trim(), slug: slug.trim(), basePrice: BigInt(Number(price)),
-      categoryId: 'girls', categoryName: 'Thời trang bé gái',
+      categoryName: 'Thời trang bé gái',
+      // Database mới chưa có danh mục: tạo danh mục gốc ở lần thêm sản phẩm đầu tiên.
+      category: { connectOrCreate: { where: { id: 'girls' }, create: { id: 'girls', name: 'Thời trang bé gái', slug: 'girls' } } },
       variants: { create: [{ sku: `${sku.trim()}-${size.trim()}`, size: size.trim(), stock: Number(stock), price: BigInt(Number(price)) }] },
       ...(typeof imageUrl === 'string' && imageUrl ? { images: { create: [{ url: imageUrl, isPrimary: true, altText: name.trim() }] } } : {}),
     } });

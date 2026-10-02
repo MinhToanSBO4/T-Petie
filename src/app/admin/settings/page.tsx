@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function CommercePage() {
   await requireAdminPage('/admin/settings');
   const settings = await prisma.commerceSetting.findUnique({ where: { id: 'default' } });
-  if (!settings) throw new Error('Chưa có cấu hình bán hàng');
-  return <CommerceManager initialSettings={{ shippingFee: Number(settings.shippingFee),
+  // Database mới chưa có cấu hình: hiện form trống để admin nhập lần đầu.
+  return <CommerceManager initialSettings={settings && { shippingFee: Number(settings.shippingFee),
     freeShippingThreshold: Number(settings.freeShippingThreshold) }} />;
 }
