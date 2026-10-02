@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CANCEL_REASON_MAX, CANCEL_REASONS } from '@/lib/orders/status';
+import { CANCEL_REASON_MAX, CANCEL_REASONS, restocksOnCancel } from '@/lib/orders/status';
 
 const OTHER = '__other__';
 
@@ -37,7 +37,9 @@ export function CancelOrderDialog({ count, shipping, busy, onConfirm, onClose }:
       <div>
         <h2 id={titleId} className="text-lg font-bold text-charcoal-900">{title}</h2>
         <p className="mt-1 text-sm text-charcoal-600">
-          {shipping ? 'Đơn sẽ chuyển sang Đã hủy, hàng hoàn về được cộng lại vào kho.' : 'Tồn kho và lượt dùng mã giảm giá sẽ được hoàn lại.'}
+          {reason && !restocksOnCancel(reason)
+            ? 'Với lý do này, tồn kho KHÔNG được cộng lại (hàng không còn bán được); lượt dùng mã giảm giá vẫn được hoàn.'
+            : shipping ? 'Đơn sẽ chuyển sang Đã hủy, hàng hoàn về được cộng lại vào kho.' : 'Tồn kho và lượt dùng mã giảm giá sẽ được hoàn lại.'}
           {' '}Thao tác này không hoàn tác được.
         </p>
       </div>

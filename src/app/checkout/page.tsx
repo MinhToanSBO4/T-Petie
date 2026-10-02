@@ -9,6 +9,7 @@ import { useToast } from '@/context/ToastContext';
 import { useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
 import { trackPurchase } from '@/client/analytics/tracker';
+import { normalizePhone } from '@/lib/account/account-input';
 
 interface CheckoutData {
   items: {
@@ -24,6 +25,22 @@ interface CheckoutData {
   shippingFee: number;
   finalTotal: number;
   couponCode: string;
+  /** "buy-now": món mua ngay không nằm trong giỏ, đặt xong không được xóa món trùng trong giỏ. */
+  source?: 'cart' | 'buy-now';
+}
+
+/**
+ * Mã chống tạo đơn trùng (bấm hai lần, mất mạng lúc chờ). Gắn với đúng nội dung đơn: khách sửa giỏ, số điện thoại
+ * hay mã giảm giá thì dùng mã mới, không bị máy chủ trả lại đơn cũ hoặc báo "mã đã được sử dụng" mãi.
+ */
+function idempotencyKeyFor(fingerprint: string) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('checkout_idempotency') || 'null');
+    if (saved && saved.fingerprint === fingerprint && typeof saved.key === 'string') return saved.key as string;
+  } catch { /* giá trị cũ dạng chuỗi hoặc hỏng: tạo mã mới */ }
+  const key = crypto.randomUUID();
+  sessionStorage.setItem('checkout_idempotency', JSON.stringify({ key, fingerprint }));
+  return key;
 }
 
 export default function CheckoutPage() {
@@ -76,8 +93,10 @@ export default function CheckoutPage() {
       return;
     }
     
-    if (!/^(0[3|5|7|8|9])+([0-9]{8})\b/.test(formData.phone)) {
-      showToast('Số điện thoại không hợp lệ!', 'info');
+    // Cùng quy tắc với máy chủ; chấp nhận "0912 345 678", "+84 912 345 678".
+    const phone = normalizePhone(formData.phone);
+    if (!phone) {
+      showToast('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.', 'info');
       return;
     }
 
@@ -89,19 +108,20 @@ export default function CheckoutPage() {
     try {
       const payload = {
         ...formData,
+        phone,
         items: checkoutData.items,
         couponCode: checkoutData.couponCode
       };
 
-      const key = sessionStorage.getItem('checkout_idempotency') || crypto.randomUUID();
-      sessionStorage.setItem('checkout_idempotency', key);
+      const key = idempotencyKeyFor(JSON.stringify({ items: checkoutData.items.map((item) => [item.productId, item.selectedSize, item.quantity]),
+        couponCode: checkoutData.couponCode || '', phone }));
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify(payload)
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => ({ message: 'Máy chủ không phản hồi, vui lòng thử lại.' }));
 
       if (res.ok && result.status === 'success' && result.orderId) {
         // Lưu thông tin để hiển thị ở trang thành công
@@ -114,7 +134,8 @@ export default function CheckoutPage() {
           item_id: item.productId, item_name: item.productName, item_variant: item.selectedSize, quantity: item.quantity,
           price: quote.items.find((priced) => priced.productId === item.productId && priced.selectedSize === item.selectedSize)?.unitPrice ?? item.price,
         })));
-        checkoutData.items.forEach((item) => removeFromCart(item.productId, item.selectedSize));
+        // Chỉ bỏ khỏi giỏ những món vừa đặt từ giỏ; "Mua ngay" không đụng tới giỏ hàng.
+        if (checkoutData.source !== 'buy-now') checkoutData.items.forEach((item) => removeFromCart(item.productId, item.selectedSize));
         
         // Thành công -> chuyển trang
         completed = true;

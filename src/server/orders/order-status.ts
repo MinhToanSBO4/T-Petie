@@ -6,7 +6,7 @@ import { prisma } from '@/server/db/client';
 import { table } from '@/server/db/sql';
 import { DASHBOARD_TAG } from '@/server/admin/dashboard';
 import {
-  AUTO_COMPLETE_DAYS, canTransition, forwardPath, isShopActor, PREVIOUS_STATUS, UNDO_WINDOW_MS, UNDOABLE_STATUSES,
+  AUTO_COMPLETE_DAYS, canTransition, forwardPath, isShopActor, PREVIOUS_STATUS, restocksOnCancel, UNDO_WINDOW_MS, UNDOABLE_STATUSES,
   type OrderStatus, type StatusActor,
 } from '@/lib/orders/status';
 
@@ -62,7 +62,10 @@ async function moveForward(order: OrderHead, path: OrderStatus[], actor: StatusA
   if (inserted !== path.length) throw new OrderStatusError(CONCURRENT_UPDATE);
 }
 
-/** Hủy đơn: cập nhật có điều kiện, ghi lịch sử (kèm lý do), hoàn kho và trả lượt dùng mã giảm giá trong một transaction. */
+/**
+ * Hủy đơn: cập nhật có điều kiện, ghi lịch sử (kèm lý do), hoàn kho và trả lượt dùng mã giảm giá trong một transaction.
+ * Lý do "hết hàng" hay "hàng hư khi vận chuyển" không hoàn kho (xem restocksOnCancel).
+ */
 async function cancelOrder(order: OrderHead, actor: StatusActor | null, note: string | null) {
   await prisma.$transaction(async (tx) => {
     const updated = await tx.order.updateMany({ where: { id: order.id, orderStatus: order.orderStatus }, data: { orderStatus: 'CANCELLED' } });
@@ -70,8 +73,11 @@ async function cancelOrder(order: OrderHead, actor: StatusActor | null, note: st
     const current = await tx.order.findUniqueOrThrow({ where: { id: order.id },
       select: { couponCode: true, items: { select: { variantId: true, quantity: true } } } });
     await tx.orderStatusEvent.create({ data: { orderId: order.id, status: 'CANCELLED', actor, note } });
-    for (const item of current.items) {
-      await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
+    // Cùng thứ tự khóa với lúc đặt hàng (theo mã size) để không khóa chéo với đơn đang tạo.
+    if (restocksOnCancel(note)) {
+      for (const item of [...current.items].sort((a, b) => a.variantId.localeCompare(b.variantId))) {
+        await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
+      }
     }
     if (current.couponCode) {
       await tx.coupon.update({ where: { code: current.couponCode }, data: { usedCount: { decrement: 1 } } });

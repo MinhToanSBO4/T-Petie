@@ -66,7 +66,8 @@ export default function BuyNowPage() {
       discountAmount: quote.discountAmount,
       shippingFee: quote.shippingFee,
       finalTotal: quote.total,
-      couponCode: appliedCoupon
+      couponCode: appliedCoupon,
+      source: 'buy-now'
     }));
     
     window.dispatchEvent(new Event('tpetie:navigation-start'));

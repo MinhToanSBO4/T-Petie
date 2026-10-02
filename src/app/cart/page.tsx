@@ -105,7 +105,8 @@ export default function CartPage() {
       discountAmount: quote.discountAmount,
       shippingFee: quote.shippingFee,
       finalTotal: quote.total,
-      couponCode: appliedCoupon
+      couponCode: appliedCoupon,
+      source: 'cart'
     }));
     
     window.dispatchEvent(new Event('tpetie:navigation-start'));

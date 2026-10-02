@@ -3,18 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle, Package, ShoppingBag } from 'lucide-react';
-import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function CheckoutSuccessPage() {
-  const { clearCart } = useCart();
   const { isAuthenticated } = useAuth();
   const [orderId, setOrderId] = useState<string>('');
 
   useEffect(() => {
-    // Xóa giỏ hàng khi vào trang này
-    clearCart();
-
+    // Không xóa cả giỏ: trang thanh toán đã bỏ đúng các món vừa đặt; món chưa chọn hoặc giỏ khi "Mua ngay" vẫn giữ.
     // Lấy mã đơn hàng từ session
     const id = sessionStorage.getItem('order_success_id');
     if (id) {
@@ -24,7 +20,7 @@ export default function CheckoutSuccessPage() {
       sessionStorage.removeItem('tpetie_buy_now');
       sessionStorage.removeItem('order_success_id');
     }
-  }, [clearCart]);
+  }, []);
 
   // Khách đăng nhập theo dõi đơn trong mục Đơn mua; khách vãng lai tra cứu bằng mã đơn và số điện thoại.
   const trackHref = orderId

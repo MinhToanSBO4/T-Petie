@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/options';
 import { prisma } from '@/server/db/client';
 import { forgetUserSnapshot } from '@/server/auth/user-snapshot';
+import { normalizePhone } from '@/lib/account/account-input';
 
 // GET: Lấy thông tin chi tiết hồ sơ cá nhân và hồ sơ bé của user hiện tại
 export async function GET() {
@@ -59,7 +60,10 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Dữ liệu không hợp lệ' }, { status: 400 });
+    }
     const { name, phone, address, city, babyProfile } = body;
 
     for (const [value, max] of [[name, 100], [phone, 20], [address, 300], [city, 100]] as const) {
@@ -68,21 +72,28 @@ export async function PATCH(req: Request) {
       }
     }
     if (name !== undefined && !name.trim()) return NextResponse.json({ error: 'Tên không được để trống' }, { status: 400 });
+    // Cùng quy tắc với lúc đặt hàng: số di động Việt Nam 10 số (chấp nhận khoảng trắng, dấu chấm, +84), hoặc để trống.
+    const cleanPhone = typeof phone === 'string' && phone.trim() ? normalizePhone(phone) : null;
+    if (typeof phone === 'string' && phone.trim() && !cleanPhone) {
+      return NextResponse.json({ error: 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09' }, { status: 400 });
+    }
+    // Cân nặng/chiều cao phải là số thật: Number(true) = 1 lọt qua kiểm tra nhưng parseFloat(true) lưu NaN.
+    const measure = (value: unknown) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
     if (babyProfile !== undefined && (!babyProfile || typeof babyProfile !== 'object' || Array.isArray(babyProfile) ||
       (babyProfile.name !== undefined && (typeof babyProfile.name !== 'string' || babyProfile.name.length > 100)) ||
       (babyProfile.birthDate !== undefined && babyProfile.birthDate !== '' &&
         (typeof babyProfile.birthDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(babyProfile.birthDate) || Number.isNaN(Date.parse(babyProfile.birthDate)))) ||
       (babyProfile.gender !== undefined && babyProfile.gender !== 'girl') ||
       (babyProfile.recommendedSize !== undefined && (typeof babyProfile.recommendedSize !== 'string' || babyProfile.recommendedSize.length > 100)) ||
-      (babyProfile.weight !== undefined && (!Number.isFinite(Number(babyProfile.weight)) || Number(babyProfile.weight) <= 0 || Number(babyProfile.weight) > 100)) ||
-      (babyProfile.height !== undefined && (!Number.isFinite(Number(babyProfile.height)) || Number(babyProfile.height) <= 0 || Number(babyProfile.height) > 250)))) {
+      (babyProfile.weight !== undefined && (!measure(babyProfile.weight) || !Number.isFinite(Number(babyProfile.weight)) || Number(babyProfile.weight) <= 0 || Number(babyProfile.weight) > 100)) ||
+      (babyProfile.height !== undefined && (!measure(babyProfile.height) || !Number.isFinite(Number(babyProfile.height)) || Number(babyProfile.height) <= 0 || Number(babyProfile.height) > 250)))) {
       return NextResponse.json({ error: 'Hồ sơ bé không hợp lệ' }, { status: 400 });
     }
 
     const updateData: Record<string, unknown> = {};
 
     if (name !== undefined) updateData.name = name.trim();
-    if (phone !== undefined) updateData.phone = phone.trim();
+    if (phone !== undefined) updateData.phone = cleanPhone;
     if (address !== undefined) updateData.address = address.trim();
     if (city !== undefined) updateData.city = city.trim();
 
@@ -90,8 +101,8 @@ export async function PATCH(req: Request) {
     if (babyProfile) {
       if (babyProfile.name !== undefined) updateData.babyName = babyProfile.name;
       if (babyProfile.birthDate !== undefined) updateData.babyBirthDate = babyProfile.birthDate ? new Date(babyProfile.birthDate) : null;
-      if (babyProfile.weight !== undefined) updateData.babyWeight = parseFloat(babyProfile.weight);
-      if (babyProfile.height !== undefined) updateData.babyHeight = parseFloat(babyProfile.height);
+      if (babyProfile.weight !== undefined) updateData.babyWeight = Number(babyProfile.weight);
+      if (babyProfile.height !== undefined) updateData.babyHeight = Number(babyProfile.height);
       if (babyProfile.gender !== undefined) updateData.babyGender = babyProfile.gender;
       if (babyProfile.recommendedSize !== undefined) updateData.recommendedSize = babyProfile.recommendedSize;
     }

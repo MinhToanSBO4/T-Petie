@@ -1,5 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/server/db/client';
 import { quoteOrder, type QuoteItem } from './quote-order';
@@ -10,32 +11,49 @@ export type CheckoutInput = {
   note?: string; couponCode?: string; source?: string; items: QuoteItem[];
 };
 
+/** Mã chống trùng đã dùng cho một đơn của người khác/số điện thoại khác: trả 409, không phải lỗi máy chủ. */
+export class IdempotencyConflictError extends Error {
+  constructor() { super('Yêu cầu đặt hàng này đã được dùng cho một đơn khác. Vui lòng tải lại trang rồi đặt lại.'); }
+}
+
+/** Đơn đã tạo với mã chống trùng (khách bấm lại sau khi mất kết nối): trả lại đúng đơn đó thay vì tạo đơn mới. */
+async function existingOrder(idempotencyKey: string, phone: string, userId: string | undefined) {
+  const existing = await prisma.order.findUnique({ where: { idempotencyKey },
+    select: { orderCode: true, totalAmount: true, customerPhone: true, userId: true } });
+  if (!existing) return null;
+  if (existing.customerPhone !== phone || existing.userId !== (userId || null)) throw new IdempotencyConflictError();
+  return { orderId: existing.orderCode, totalAmount: Number(existing.totalAmount) };
+}
+
 export async function createOrder(input: CheckoutInput, userId: string | undefined, idempotencyKey: string | null) {
   if (idempotencyKey) {
-    const existing = await prisma.order.findUnique({ where: { idempotencyKey } });
-    if (existing) {
-      if (existing.customerPhone !== input.phone || existing.userId !== (userId || null)) {
-        throw new Error('Mã yêu cầu đã được sử dụng');
-      }
-      return { orderId: existing.orderCode, totalAmount: Number(existing.totalAmount) };
-    }
+    const existing = await existingOrder(idempotencyKey, input.phone, userId);
+    if (existing) return existing;
   }
   const quote = await quoteOrder(input.items, input.couponCode, !!userId);
+  // Khóa các dòng tồn kho theo cùng một thứ tự ở mọi đơn: hai đơn [A, B] và [B, A] cùng lúc không khóa chéo nhau (deadlock).
+  const stockUpdates = [...quote.items].sort((a, b) => a.variantId.localeCompare(b.variantId));
+  const skuByVariant = new Map(quote.variants.map((variant) => [variant.id, variant.sku]));
 
-  const order = await prisma.$transaction(async (tx) => {
+  let order;
+  try {
+    order = await prisma.$transaction(async (tx) => {
     if (quote.coupon) {
+      // Giành một lượt dùng mã khi mã còn lượt (không so đúng số lượt đã dùng như trước: hai khách dùng cùng mã một lúc
+      // thì một người bị báo "mã đã thay đổi" dù mã vẫn còn lượt).
       const claimed = await tx.coupon.updateMany({
-        where: { code: quote.coupon.code, usedCount: quote.coupon.usedCount, active: true },
+        where: { code: quote.coupon.code, active: true,
+          OR: [{ usageLimit: null }, { usedCount: { lt: prisma.coupon.fields.usageLimit } }] },
         data: { usedCount: { increment: 1 } },
       });
-      if (claimed.count !== 1) throw new Error('Mã giảm giá đã thay đổi, vui lòng thử lại');
+      if (claimed.count !== 1) throw new Error('Mã giảm giá đã hết lượt sử dụng hoặc vừa ngừng áp dụng');
     }
-    for (const item of quote.items) {
+    for (const item of stockUpdates) {
       const updated = await tx.productVariant.updateMany({
         where: { id: item.variantId, stock: { gte: item.quantity }, isActive: true },
         data: { stock: { decrement: item.quantity } },
       });
-      if (updated.count !== 1) throw new Error('Số lượng vượt quá tồn kho');
+      if (updated.count !== 1) throw new Error(`Sản phẩm "${item.productName}" (${item.size}) vừa hết hoặc không đủ số lượng`);
     }
     return tx.order.create({
       data: {
@@ -57,7 +75,7 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
           productId: item.productId,
           variantId: item.variantId,
           productName: item.productName,
-          sku: quote.variants.find((variant) => variant.id === item.variantId)!.sku,
+          sku: skuByVariant.get(item.variantId)!,
           size: item.size,
           quantity: item.quantity,
           unitPrice: BigInt(item.unitPrice),
@@ -67,7 +85,15 @@ export async function createOrder(input: CheckoutInput, userId: string | undefin
         statusEvents: { create: { status: 'PENDING' } },
       },
     });
-  });
+    });
+  } catch (error) {
+    // Hai lần gửi cùng mã chống trùng gần như đồng thời: lần sau gặp khóa duy nhất, trả lại đơn của lần trước.
+    if (idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const existing = await existingOrder(idempotencyKey, input.phone, userId);
+      if (existing) return existing;
+    }
+    throw error;
+  }
   revalidateTag('products');
   // Đơn mới làm thay đổi doanh thu, số đơn chờ và tồn kho trên trang Tổng quan.
   revalidateTag(DASHBOARD_TAG);

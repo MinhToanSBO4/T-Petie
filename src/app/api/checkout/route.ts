@@ -2,7 +2,9 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/server/auth/options';
 import { allowAttempt } from '@/server/security/rate-limit';
-import { createOrder, type CheckoutInput } from '@/server/orders/create-order';
+import { createOrder, IdempotencyConflictError, type CheckoutInput } from '@/server/orders/create-order';
+import { clientIp } from '@/server/security/client-ip';
+import { normalizePhone } from '@/lib/account/account-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,8 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = JSON.parse(raw); }
   catch { return NextResponse.json({ message: 'Dữ liệu không hợp lệ' }, { status: 400 }); }
+  // Số điện thoại chuẩn hóa trước khi kiểm tra: "0912 345 678" hay "+84912345678" đều hợp lệ.
+  if (body && typeof body === 'object' && typeof body.phone === 'string') body.phone = normalizePhone(body.phone) ?? body.phone;
   if (!body || typeof body !== 'object' || !validText(body.fullName, 100) ||
     !validText(body.address, 300) || !validText(body.city, 100) || !validText(body.district, 100) ||
     typeof body.phone !== 'string' || !/^0[35789]\d{8}$/.test(body.phone) ||
@@ -38,10 +42,11 @@ export async function POST(request: Request) {
   if (idempotencyKey && !/^[A-Za-z0-9-]{16,128}$/.test(idempotencyKey)) {
     return NextResponse.json({ message: 'Mã yêu cầu không hợp lệ' }, { status: 400 });
   }
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+  const ip = clientIp(request);
   try {
-    for (const identity of [`ip:${ip}`, `phone:${body.phone}`]) {
-      if (!(await allowAttempt(`checkout:${identity}`, 5))) {
+    // Theo IP nới rộng (nhà mạng di động dùng chung IP cho nhiều khách), theo số điện thoại giữ chặt.
+    for (const [identity, limit] of [[`ip:${ip}`, 20], [`phone:${body.phone}`, 5]] as const) {
+      if (!(await allowAttempt(`checkout:${identity}`, limit))) {
         return NextResponse.json({ message: 'Bạn đã thử quá nhiều lần. Vui lòng chờ 10 phút.' }, { status: 429 });
       }
     }
@@ -55,7 +60,12 @@ export async function POST(request: Request) {
     }, session?.user?.status === 'active' ? session.user.id : undefined, idempotencyKey);
     return NextResponse.json({ status: 'success', ...result }, { status: 201 });
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) return NextResponse.json({ message: error.message }, { status: 409 });
     const message = error instanceof Error ? error.message : '';
+    if (message === 'Chưa cấu hình phí giao hàng') {
+      console.error('Checkout blocked: commerce_settings row "default" is missing');
+      return NextResponse.json({ message: 'Shop đang cập nhật phí giao hàng, mẹ vui lòng đặt lại sau ít phút hoặc nhắn shop nhé.' }, { status: 503 });
+    }
     if (/giỏ hàng|sản phẩm|số lượng|tồn kho|giá|mã giảm|tổng tiền/i.test(message)) {
       return NextResponse.json({ message }, { status: 400 });
     }
