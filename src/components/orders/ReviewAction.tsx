@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Star } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { ReviewDialog } from '@/components/reviews/ReviewDialog';
 import { StarRating } from '@/components/reviews/StarRating';
 import type { CustomerOrderItem } from '@/types/order';
@@ -19,12 +19,11 @@ export function ReviewAction({ item, orderCode, showWaiting = false }: {
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { showToast } = useToast();
   const { user } = useAuth();
 
   const saved = (message: string) => {
     setOpen(false);
-    showToast(message, 'love');
+    toast.love(message);
     router.refresh();
   };
 

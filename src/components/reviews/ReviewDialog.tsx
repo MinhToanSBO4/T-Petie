@@ -42,7 +42,6 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
   const [photos, setPhotos] = useState<NewPhoto[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const dirty = rating !== (review?.rating ?? 5) || content !== (review?.content ?? '') || photos.length > 0 ||
     sizeFit !== (review?.sizeFit ?? '') || keptImages.length !== (review?.imageUrls.length ?? 0);
 
@@ -65,7 +64,7 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
   const addPhotos = async (files: FileList) => {
     const chosen = Array.from(files).slice(0, Math.max(0, room));
     if (chosen.length === 0) return;
-    setPreparing(true); setError('');
+    setPreparing(true);
     const prepared: NewPhoto[] = [];
     for (const file of chosen) {
       try {
@@ -73,10 +72,10 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
         const preview = URL.createObjectURL(compressed);
         previews.current.push(preview);
         prepared.push({ key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`, file: compressed, preview });
-      } catch (compressError) { setError(errorText(compressError, 'Không đọc được ảnh')); }
+      } catch (compressError) { toast.error(errorText(compressError, 'Không đọc được ảnh')); }
     }
     setPhotos((current) => [...current, ...prepared]);
-    if (files.length > chosen.length) setError(`Mỗi đánh giá tối đa ${REVIEW_MAX_IMAGES} ảnh.`);
+    if (files.length > chosen.length) toast.warning(`Mỗi đánh giá tối đa ${REVIEW_MAX_IMAGES} ảnh.`);
     setPreparing(false);
   };
 
@@ -89,15 +88,15 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (photos.reduce((sum, photo) => sum + photo.file.size, 0) > MAX_UPLOAD_BYTES) {
-      setError('Ảnh quá nặng, mẹ bớt 1–2 ảnh rồi gửi lại giúp shop nhé.');
+      toast.warning('Ảnh quá nặng, mẹ bớt 1–2 ảnh rồi gửi lại giúp shop nhé.');
       return;
     }
-    setBusy(true); setError('');
+    setBusy(true);
     const fields: Record<string, string> = { rating: String(rating), content, sizeFit, isAnonymous: String(isAnonymous) };
     if (!editing) fields.orderItemId = target.orderItemId;
     const url = editing ? `/api/reviews/${review!.id}` : '/api/reviews';
     const method = editing ? 'PATCH' : 'POST';
-    // Có ảnh: báo tiến độ tải lên ở góc màn hình (mạng điện thoại chậm có thể mất vài giây); lỗi vẫn hiện trong hộp thoại.
+    // Có ảnh: báo tiến độ tải lên ở góc màn hình (mạng điện thoại chậm có thể mất vài giây); lỗi thay thông báo tiến độ tại chỗ.
     // Id riêng mỗi lần gửi: khách tự đóng thông báo lần trước thì lần gửi sau vẫn hiện tiến độ.
     const upload = photos.length > 0
       ? toast.loading(`Đang tải ${photos.length} ảnh đánh giá…`, { id: `review-upload-${Date.now()}`, progress: 0 }) : null;
@@ -120,8 +119,7 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
       onSaved(editing ? 'Đã lưu đánh giá.'
         : 'Cảm ơn mẹ đã đánh giá! 🌸');
     } catch (submitError) {
-      if (upload) toast.dismiss(upload);
-      setError(errorText(submitError, 'Có lỗi xảy ra'));
+      toast.error(errorText(submitError, 'Có lỗi xảy ra'), { id: upload ?? undefined });
       setBusy(false);
     }
   };
@@ -225,7 +223,6 @@ export function ReviewDialog({ target, customerName, review, onClose, onSaved }:
             Đánh giá hiển thị ngay trên trang sản phẩm. {editing ? 'Đây là lần sửa duy nhất của đánh giá này.'
               : `Mẹ có thể sửa đánh giá 1 lần trong ${REVIEW_EDIT_WINDOW_DAYS} ngày.`}
           </p>
-          {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         </div>
 
         <footer className="flex gap-3 border-t border-cream-200 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

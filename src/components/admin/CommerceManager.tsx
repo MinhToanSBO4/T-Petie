@@ -64,13 +64,10 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
   const [editing, setEditing] = useState<{ mode: 'create' } | { mode: 'edit'; code: string; draft: CouponDraft } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  // Lỗi lưu hiện ngay cạnh nút lưu (thông báo góc màn hình tự ẩn sau vài giây).
-  const [settingsError, setSettingsError] = useState('');
-  const [couponError, setCouponError] = useState('');
-  const openEditor = (next: typeof editing) => { setCouponError(''); setEditing(next); };
+  const openEditor = (next: typeof editing) => setEditing(next);
 
   const saveSettings = async () => {
-    setBusy(true); setSettingsError('');
+    setBusy(true);
     const id = toast.loading('Đang lưu phí giao hàng…');
     try {
       const response = await fetch('/api/admin/commerce', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -84,13 +81,13 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       markAdminPagesStale();
     } catch (saveError) {
       const text = errorText(saveError, 'Không lưu được cấu hình');
-      setSettingsError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
 
   const saveCoupon = async (draft: CouponDraft, isNew: boolean) => {
-    setBusy(true); setCouponError('');
+    setBusy(true);
     const id = toast.loading(isNew ? `Đang thêm mã ${draft.code}…` : `Đang lưu mã ${draft.code}…`);
     try {
       const response = await fetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -105,14 +102,14 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       setReloadKey((key) => key + 1);
     } catch (saveError) {
       const text = errorText(saveError, 'Không lưu được mã giảm giá');
-      setCouponError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
 
   const removeCoupon = async (code: string) => {
     if (!window.confirm(`Xóa mã ${code}? Nếu mã đã được dùng cho đơn hàng, mã sẽ chuyển sang ngừng hoạt động để giữ lịch sử đơn.`)) return;
-    setBusy(true); setCouponError('');
+    setBusy(true);
     const id = toast.loading(`Đang xóa mã ${code}…`);
     try {
       const response = await fetch(`/api/admin/coupons?code=${encodeURIComponent(code)}`, { method: 'DELETE' });
@@ -124,7 +121,7 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       setReloadKey((key) => key + 1);
     } catch (removeError) {
       const text = errorText(removeError, 'Không xóa được mã giảm giá');
-      setCouponError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -160,7 +157,6 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       </div>
       <button type="button" disabled={busy} onClick={() => void saveSettings()}
         className="mt-4 min-h-11 rounded-xl bg-honey-600 px-5 text-sm font-bold text-white disabled:opacity-50">Lưu phí giao hàng</button>
-      {settingsError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{settingsError}</p>}
     </section>
 
     <section className="space-y-4">
@@ -182,7 +178,6 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
       draft={editing.mode === 'edit' ? editing.draft : emptyDraft()}
       isNew={editing.mode === 'create'}
       busy={busy}
-      error={couponError}
       onCancel={() => openEditor(null)}
       onSave={(draft) => void saveCoupon(draft, editing.mode === 'create')}
       onDelete={editing.mode === 'edit' ? () => void removeCoupon(editing.code) : undefined} />}
@@ -190,8 +185,8 @@ export function CommerceManager({ initialSettings }: { initialSettings: Settings
 }
 
 /** Form thêm mới hoặc chỉnh sửa một mã giảm giá. */
-function CouponForm({ draft: initial, isNew, busy, error, onSave, onCancel, onDelete }: {
-  draft: CouponDraft; isNew: boolean; busy: boolean; error: string;
+function CouponForm({ draft: initial, isNew, busy, onSave, onCancel, onDelete }: {
+  draft: CouponDraft; isNew: boolean; busy: boolean;
   onSave: (draft: CouponDraft) => void; onCancel: () => void; onDelete?: () => void;
 }) {
   const [draft, setDraft] = useState(initial);
@@ -234,7 +229,6 @@ function CouponForm({ draft: initial, isNew, busy, error, onSave, onCancel, onDe
           </label>
         </div>
       </div>
-      {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" disabled={busy || !draft.code} onClick={() => onSave(draft)}
           className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">

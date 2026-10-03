@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ruler, Sparkles, HelpCircle } from 'lucide-react';
 import type { SizeGuide } from '@/lib/content/site-content';
 import { DialogBehavior } from '@/components/layout/DialogBehavior';
+import { errorText, toast } from '@/client/toast';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -15,12 +16,12 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'kids' | 'baby'>('kids');
   const [guide, setGuide] = useState<SizeGuide | null>(null);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!isOpen || guide) return;
     const controller = new AbortController();
-    setError('');
+    setFailed(false);
     fetch('/api/site-content/size-guide', { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('Không tải được bảng chọn size. Vui lòng thử lại.');
@@ -28,7 +29,10 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
       })
       .then(setGuide)
       .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được bảng chọn size.');
+        if (controller.signal.aborted) return;
+        // Chi tiết ở thông báo góc màn hình; khung bảng chỉ ghi ngắn gọn để không trống trơn.
+        setFailed(true);
+        toast.error(errorText(reason, 'Không tải được bảng chọn size.'), { id: 'size-guide' });
       });
     return () => controller.abort();
   }, [isOpen, guide]);
@@ -118,7 +122,7 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
                 </tbody>
               </table>
               {!guide && <p role="status" className="p-4 text-center text-xs text-charcoal-600">
-                {error || 'Đang tải bảng chọn size…'}
+                {failed ? 'Chưa tải được bảng chọn size.' : 'Đang tải bảng chọn size…'}
               </p>}
             </div>
 

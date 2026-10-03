@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, MailCheck, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, MailCheck, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { errorText, toast } from '@/client/toast';
 import { PASSWORD_MIN } from '@/lib/account/account-input';
 import { VERIFIED_EVENT, formatCountdown, inboxUrl, useResendVerification } from '@/components/auth/EmailVerification';
 
@@ -32,17 +33,6 @@ function Card({ icon, title, children }: { icon: React.ReactNode; title: string;
         <div className="mt-3 space-y-5 text-sm leading-relaxed text-charcoal-600">{children}</div>
       </div>
     </div>
-  );
-}
-
-function Alert({ tone, children }: { tone: 'error' | 'success'; children: React.ReactNode }) {
-  const error = tone === 'error';
-  return (
-    <p role={error ? 'alert' : 'status'} className={`flex items-start gap-2.5 rounded-2xl border p-3.5 text-sm ${
-      error ? 'border-blush-200 bg-blush-50 text-blush-700' : 'border-sage-200 bg-sage-50 text-sage-700'}`}>
-      {error ? <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />}
-      <span>{children}</span>
-    </p>
   );
 }
 
@@ -76,8 +66,8 @@ function VerifyToken({ token }: { token: string }) {
       window.dispatchEvent(new Event(VERIFIED_EVENT));
       await refreshSession().catch(() => {});
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không kết nối được máy chủ.');
       setState('error');
+      toast.error(errorText(error, 'Không kết nối được máy chủ.'), { id: 'verify-email' });
     }
   };
 
@@ -98,7 +88,7 @@ function VerifyToken({ token }: { token: string }) {
   }
   return (
     <Card icon={<MailCheck className="size-6" aria-hidden />} title="Xác thực email">
-      {state === 'error' ? <Alert tone="error">{message}</Alert> : <p>Đang xác thực email của bạn, vui lòng đợi trong giây lát…</p>}
+      <p>{state === 'error' ? 'Chưa xác thực được email. Bạn bấm "Thử lại" hoặc gửi liên kết mới nhé.' : 'Đang xác thực email của bạn, vui lòng đợi trong giây lát…'}</p>
       <form onSubmit={(event) => { event.preventDefault(); void verify(); }} className="space-y-3">
         <button type="submit" className={primary} disabled={state === 'working'}>
           {state === 'working' ? <><Loader2 className="size-4 animate-spin" aria-hidden /> Đang xác thực…</> : 'Thử lại'}
@@ -131,7 +121,7 @@ function CheckInbox({ initialEmail, sent }: { initialEmail?: string; sent?: stri
   return (
     <Card icon={<MailCheck className="size-6" aria-hidden />} title="Kiểm tra hộp thư của bạn">
       {sent === '0'
-        ? <Alert tone="error">Tài khoản đã được tạo nhưng shop chưa gửi được email xác thực. Bạn bấm &quot;Gửi lại email xác thực&quot; bên dưới nhé.</Alert>
+        ? <p>Tài khoản đã được tạo nhưng shop chưa gửi được email xác thực. Bạn bấm &quot;Gửi lại email xác thực&quot; bên dưới nhé.</p>
         : <p>Shop đã gửi liên kết xác thực tới {target ? <strong className="break-all text-charcoal-900">{target}</strong> : 'email đăng ký của bạn'}. Mở thư và bấm <strong>&quot;Xác thực email&quot;</strong> để bắt đầu đặt hàng. Liên kết có hiệu lực 24 giờ.</p>}
       <form onSubmit={(event) => event.preventDefault()} className="space-y-3">
         {!signedInUnverified && (
@@ -157,8 +147,7 @@ function CheckInbox({ initialEmail, sent }: { initialEmail?: string; sent?: stri
 function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
   const [until, setUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const secondsLeft = Math.max(0, Math.ceil((until - now) / 1000));
@@ -172,22 +161,21 @@ function ForgotPassword() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy || secondsLeft > 0) return;
-    setError(''); setBusy(true);
+    setBusy(true);
     try {
       const result = await post('forgot', { email: email.trim() });
-      setMessage(result.message);
+      toast.success('Đã gửi yêu cầu đặt lại mật khẩu', { id: 'forgot-password', description: result.message });
+      setSent(true);
       setUntil(Date.now() + (result.retryAfter || 60) * 1000);
       setNow(Date.now());
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Không kết nối được máy chủ.');
+      toast.error(errorText(submitError, 'Không kết nối được máy chủ.'), { id: 'forgot-password' });
     } finally { setBusy(false); }
   };
 
   return (
     <Card icon={<KeyRound className="size-6" aria-hidden />} title="Quên mật khẩu">
       <p>Nhập email đã đăng ký, shop sẽ gửi liên kết để bạn đặt mật khẩu mới. Liên kết có hiệu lực trong 30 phút.</p>
-      {message && <Alert tone="success">{message}</Alert>}
-      {error && <Alert tone="error">{error}</Alert>}
       <form onSubmit={submit} className="space-y-3">
         <label className="block space-y-1.5">
           <span className="text-xs font-bold text-charcoal-800">Email đăng ký</span>
@@ -196,7 +184,7 @@ function ForgotPassword() {
         </label>
         <button type="submit" className={primary} disabled={busy || secondsLeft > 0}>
           {busy ? <><Loader2 className="size-4 animate-spin" aria-hidden /> Đang gửi…</>
-            : secondsLeft > 0 ? `Gửi lại sau ${formatCountdown(secondsLeft)}` : message ? 'Gửi lại liên kết' : 'Gửi liên kết đặt lại mật khẩu'}
+            : secondsLeft > 0 ? `Gửi lại sau ${formatCountdown(secondsLeft)}` : sent ? 'Gửi lại liên kết' : 'Gửi liên kết đặt lại mật khẩu'}
         </button>
       </form>
       <div className="border-t border-cream-200 pt-4 text-sm font-semibold">
@@ -211,21 +199,24 @@ function ResetPassword({ token }: { token: string }) {
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const [done, setDone] = useState('');
+
+  // Mở trang không kèm liên kết hợp lệ: báo ngay thay vì để khách điền xong mới bị từ chối.
+  useEffect(() => {
+    if (!token) toast.error('Liên kết không hợp lệ hoặc đã hết hạn', { id: 'reset-password', description: 'Vui lòng yêu cầu liên kết mới.' });
+  }, [token]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError('');
-    if (password.length < PASSWORD_MIN) { setError(`Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự.`); return; }
-    if (password !== confirm) { setError('Mật khẩu xác nhận không khớp.'); return; }
+    if (password.length < PASSWORD_MIN) { toast.warning(`Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự.`, { id: 'reset-password' }); return; }
+    if (password !== confirm) { toast.warning('Mật khẩu xác nhận không khớp.', { id: 'reset-password' }); return; }
     setBusy(true);
     try {
       const result = await post('reset', { token, password });
       setDone(result.message);
       setPassword(''); setConfirm('');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Không kết nối được máy chủ.');
+      toast.error(errorText(submitError, 'Không kết nối được máy chủ.'), { id: 'reset-password' });
     } finally { setBusy(false); }
   };
 
@@ -239,8 +230,6 @@ function ResetPassword({ token }: { token: string }) {
   }
   return (
     <Card icon={<KeyRound className="size-6" aria-hidden />} title="Đặt lại mật khẩu">
-      {!token && <Alert tone="error">Liên kết không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới.</Alert>}
-      {error && <Alert tone="error">{error}</Alert>}
       <form onSubmit={submit} className="space-y-3" noValidate>
         <label className="block space-y-1.5">
           <span className="text-xs font-bold text-charcoal-800">Mật khẩu mới</span>

@@ -105,7 +105,6 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
   // Đường dẫn tự sinh theo tên cho tới khi người dùng tự sửa ô đường dẫn.
   const [slugEdited, setSlugEdited] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const dirty = Boolean(draft.name || draft.sku || draft.price);
   useUnsavedChangesGuard(dirty && !busy);
 
@@ -125,8 +124,8 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const invalid = validationError();
-    if (invalid) { setError(invalid); return; }
-    setBusy(true); setError('');
+    if (invalid) { toast.error(invalid); return; }
+    setBusy(true);
     const id = toast.loading('Đang tạo sản phẩm…');
     try {
       const response = await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -137,7 +136,7 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
       onCreated(data.product as ProductRow);
     } catch (submitError) {
       const text = errorText(submitError, 'Không tạo được sản phẩm');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -181,7 +180,6 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
         <input className={field} type="number" inputMode="numeric" min="0" value={draft.stock}
           onChange={(event) => setDraft({ ...draft, stock: event.target.value })} /></label>
     </div>
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <button disabled={busy} className="min-h-12 rounded-xl bg-honey-600 px-8 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang tạo…' : 'Tạo sản phẩm'}
     </button>
@@ -247,7 +245,6 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
   const [uploading, setUploading] = useState(false);
   const busy = saving || uploading;
   // Lỗi nhập liệu và lỗi lưu hiện trên form (thông báo góc màn hình tự ẩn); tiến độ tải ảnh hiện ở góc màn hình.
-  const [error, setError] = useState('');
 
   // Nạp danh sách bộ sưu tập một lần để chọn cho sản phẩm.
   useEffect(() => {
@@ -269,7 +266,6 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
     setVariants(initialVariants);
     setImages(initialImages);
     setNewVariants([]);
-    setError('');
     toast.info('Đã hủy các thay đổi chưa lưu');
   };
 
@@ -363,8 +359,8 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
   const save = async () => {
     const invalid = validationError();
     // Lỗi hiện ở đầu form, còn nút lưu nằm ở thanh dưới cùng: báo thêm ở góc màn hình để không bấm mà không thấy gì.
-    if (invalid) { setError(invalid); toast.error(invalid); return; }
-    setSaving(true); setError('');
+    if (invalid) { toast.error(invalid); return; }
+    setSaving(true);
     const id = toast.loading('Đang lưu sản phẩm…');
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, { method: 'PATCH',
@@ -377,7 +373,7 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
       onBack();
     } catch (saveError) {
       const text = errorText(saveError, 'Không lưu được sản phẩm');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setSaving(false); }
   };
@@ -395,7 +391,6 @@ function ProductEditForm({ product, onBack }: { product: ProductRow; onBack: () 
       </div>
       <button type="button" onClick={leave} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
 
     <section className="space-y-6 rounded-2xl border border-cream-200 bg-white p-6">
       <h3 className="border-b border-cream-100 pb-3 text-xl font-bold text-charcoal-900">Thông tin sản phẩm</h3>

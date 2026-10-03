@@ -65,11 +65,10 @@ export function StaffManager() {
 function StaffCreateForm({ onDone }: { onDone: () => void }) {
   const [draft, setDraft] = useState({ name: '', username: '', email: '', password: '' });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setError('');
+    setBusy(true);
     const id = toast.loading('Đang tạo tài khoản…');
     try {
       const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
@@ -79,7 +78,7 @@ function StaffCreateForm({ onDone }: { onDone: () => void }) {
       onDone();
     } catch (submitError) {
       const text = errorText(submitError, 'Không tạo được tài khoản');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -100,7 +99,6 @@ function StaffCreateForm({ onDone }: { onDone: () => void }) {
         <input className={`${field} mt-1`} type="text" required minLength={PASSWORD_MIN} value={draft.password}
           onChange={(event) => setDraft({ ...draft, password: event.target.value })} /></label>
     </div>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy} className="min-h-11 rounded-xl bg-honey-600 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang tạo…' : 'Tạo tài khoản'}
     </button>
@@ -112,14 +110,13 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
   const [staff, setStaff] = useState(initial);
   const [draft, setDraft] = useState({ name: initial.name, email: initial.email, phone: initial.phone || '' });
   const [busy, setBusy] = useState(false);
-  // Lỗi nhập liệu và lỗi thao tác hiện trên form (thông báo góc màn hình tự ẩn); kết quả thành công hiện ở góc màn hình.
-  const [error, setError] = useState('');
+  // Mọi kết quả (thành công, lỗi nhập liệu, lỗi thao tác) hiện bằng thông báo ở góc màn hình.
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const dirty = draft.name.trim() !== staff.name || draft.email.trim().toLowerCase() !== staff.email.toLowerCase()
     || draft.phone.trim() !== (staff.phone || '');
 
   const update = async (body: Record<string, unknown>, pending: string, okMessage: string) => {
-    setBusy(true); setError('');
+    setBusy(true);
     const id = toast.loading(pending);
     try {
       const response = await fetch(`/api/admin/users/${staff.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -131,7 +128,7 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
       if (data.temporaryPassword) setTemporaryPassword(data.temporaryPassword);
     } catch (updateError) {
       const text = errorText(updateError, 'Thao tác thất bại');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -139,7 +136,10 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
   const saveContact = (event: React.FormEvent) => {
     event.preventDefault();
     const phone = draft.phone.trim() ? normalizePhone(draft.phone) : '';
-    if (phone === null) { setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
+    if (phone === null) {
+      const text = 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09';
+      toast.error(text); return;
+    }
     setDraft({ ...draft, phone });
     void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đang lưu thông tin…', 'Đã lưu thông tin nhân viên');
   };
@@ -152,7 +152,6 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
       </div>
       <button type="button" onClick={() => onBack()} className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">← Về danh sách</button>
     </header>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {temporaryPassword && <p className="rounded-xl bg-honey-50 p-3 text-sm">
       Mật khẩu tạm thời mới: <strong className="font-mono">{temporaryPassword}</strong> — hãy gửi cho nhân viên và yêu cầu đổi ngay sau khi đăng nhập.
     </p>}

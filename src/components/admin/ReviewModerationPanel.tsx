@@ -42,7 +42,6 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
   const [search, setSearch] = useState('');
   const [data, setData] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [replying, setReplying] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -56,7 +55,7 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
 
   const load = useCallback(async (page: number, append: boolean) => {
     const request = ++latest.current;
-    setLoading(true); setError('');
+    setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: '10', q: search, filter });
     if (productId) params.set('productId', productId);
     try {
@@ -64,7 +63,9 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
       if (request !== latest.current) return;
       setData((current) => append && current ? { ...result, items: [...current.items, ...result.items] } : result);
     } catch (loadError) {
-      if (request === latest.current) setError(errorText(loadError, 'Không tải được đánh giá'));
+      if (request === latest.current) {
+        toast.error(errorText(loadError, 'Không tải được đánh giá'), { id: 'admin-reviews-load' });
+      }
     } finally { if (request === latest.current) setLoading(false); }
   }, [filter, search, productId]);
 
@@ -132,7 +133,6 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
       </label>}
     </div>
 
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!data && loading && <div className="space-y-3" role="status" aria-label="Đang tải đánh giá">
       {[1, 2, 3].map((item) => <div key={item} className="shimmer h-28 rounded-2xl" />)}
     </div>}
