@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ArrowLeft, CheckCircle2, Loader2, MapPin, CreditCard, Phone, User, Search, ImageIcon } from 'lucide-react';
 import { formatPriceCompact } from '@/lib/utils/formatters';
 import { errorText, toast } from '@/client/toast';
-import { useOrderQuote } from '@/hooks/useOrderQuote';
+import { QUOTE_NOTICE_ID, useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
 import { trackPurchase } from '@/client/analytics/tracker';
 import { normalizePhone } from '@/lib/account/account-input';
@@ -112,7 +112,7 @@ export default function CheckoutPage() {
     }
 
     if (!checkoutData || !quote) {
-      if (quoteError) toast.error(quoteError); else toast.info('Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.');
+      if (quoteError) toast.error(quoteError, { id: QUOTE_NOTICE_ID }); else toast.info('Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.');
       return;
     }
 
@@ -425,7 +425,8 @@ export default function CheckoutPage() {
             <button
               type="submit"
               form="checkout-form"
-              disabled={isSubmitting || quoteLoading || !quote}
+              // Báo giá lỗi vẫn bấm được: bấm thì hiện lại lý do (mã giảm giá, tồn kho…) thay vì nút xám không lời giải thích.
+              disabled={isSubmitting || quoteLoading}
               className="w-full mt-6 py-4 rounded-full bg-honey-500 hover:bg-honey-600 disabled:bg-cream-300 disabled:cursor-not-allowed text-white font-bold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
             >
               {isSubmitting ? (
@@ -437,7 +438,6 @@ export default function CheckoutPage() {
                 <span>Xác Nhận Đặt Hàng</span>
               )}
             </button>
-            {quoteError && <p role="alert" className="mt-3 text-center text-xs text-red-600">{quoteError}</p>}
             {quoteLoading && <p role="status" className="mt-3 text-center text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
             <p className="text-xs text-center text-charcoal-400 mt-3 flex items-center justify-center space-x-1">
               <span>Bảo mật thông tin khách hàng tuyệt đối</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -14,9 +14,11 @@ import {
   Mail,
   Eye,
   EyeOff,
-  ArrowRight,
-  AlertCircle
+  ArrowRight
 } from 'lucide-react';
+
+/** Thông báo của form đăng nhập dùng chung id: lỗi mới thay lỗi cũ, đăng nhập được thì lời chào thay lỗi còn đang hiện. */
+const NOTICE_ID = 'login';
 
 /**
  * Component xử lý logic và giao diện Form Đăng Nhập
@@ -33,23 +35,25 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // Lỗi NextAuth trả về qua URL (đăng nhập Google bị từ chối, tài khoản bị khóa…) hiện ngay khi mở trang.
-  const [errorMessage, setErrorMessage] = useState<string | null>(() => authErrorMessage(searchParams.get('error')));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Lỗi NextAuth trả về qua URL (đăng nhập Google bị từ chối, tài khoản bị khóa…) báo ngay khi mở trang.
+  const urlError = authErrorMessage(searchParams.get('error'));
+  useEffect(() => {
+    if (urlError) toast.error(urlError, { id: NOTICE_ID });
+  }, [urlError]);
 
   // Xử lý đăng nhập bằng Email / Mật khẩu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (!email.trim()) {
-      setErrorMessage('Vui lòng nhập email hoặc tên đăng nhập.');
+      toast.warning('Vui lòng nhập email hoặc tên đăng nhập.', { id: NOTICE_ID });
       return;
     }
 
     if (!password) {
-      setErrorMessage('Vui lòng nhập mật khẩu.');
+      toast.warning('Vui lòng nhập mật khẩu.', { id: NOTICE_ID });
       return;
     }
 
@@ -59,7 +63,7 @@ function LoginForm() {
       result = await login({ email, password });
     } catch {
       setIsSubmitting(false);
-      setErrorMessage('Không kết nối được máy chủ. Vui lòng thử lại.');
+      toast.error('Không kết nối được máy chủ. Vui lòng thử lại.', { id: NOTICE_ID });
       return;
     }
 
@@ -67,19 +71,20 @@ function LoginForm() {
       window.dispatchEvent(new Event('tpetie:navigation-start'));
       if (result.emailVerified === false) {
         toast.warning('Mẹ chưa xác thực email', {
+          id: NOTICE_ID,
           description: 'Mẹ vẫn xem và thêm vào giỏ được; xác thực email để đặt hàng nhé.',
           action: { label: 'Xác thực ngay', href: '/verify-email' }, duration: 7_000,
         });
       } else {
-        toast.success(`Chào mừng bạn trở lại với T'Petie! 🌸`);
+        toast.success(`Chào mừng bạn trở lại với T'Petie! 🌸`, { id: NOTICE_ID });
       }
       router.push(landingPath(result.role, callbackUrl));
     } else {
       setIsSubmitting(false);
       const message = result.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
       // Tài khoản đã liên kết Google có thể không còn mật khẩu (lib/auth-google.ts): nhắc lối đăng nhập còn lại.
-      setErrorMessage(result.reason === 'credentials' && googleEnabled
-        ? `${message} Nếu từng đăng nhập bằng Google, Mẹ bấm "Đăng nhập với Google" nhé.` : message);
+      toast.error(result.reason === 'credentials' && googleEnabled
+        ? `${message} Nếu từng đăng nhập bằng Google, Mẹ bấm "Đăng nhập với Google" nhé.` : message, { id: NOTICE_ID });
     }
   };
 
@@ -99,17 +104,9 @@ function LoginForm() {
             </p>
           </div>
 
-          {/* Error Alert Box */}
-          {errorMessage && (
-            <div className="p-3.5 rounded-2xl bg-blush-50 border border-blush-200 text-blush-700 text-sm flex items-start space-x-2.5 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span className="leading-relaxed font-medium">{errorMessage}</span>
-            </div>
-          )}
-
           {/* Google OAuth Login: chỉ hiện khi máy chủ đã cấu hình Google. */}
           <GoogleSignInButton callbackUrl={callbackUrl || '/'} label="Đăng nhập với Google" disabled={isSubmitting}
-            onStart={() => setErrorMessage(null)}
+            onStart={() => toast.dismiss(NOTICE_ID)}
             separator={<div className="relative flex items-center justify-center">
               <div className="border-t border-cream-200 w-full" />
               <span className="bg-white px-4 text-sm font-medium text-charcoal-600 absolute">
@@ -125,10 +122,7 @@ function LoginForm() {
                 type="text"
                 autoComplete="username"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email hoặc tên đăng nhập"
                 className="w-full px-5 py-4 rounded-2xl border-2 border-cream-200 focus:border-honey-500 focus:bg-honey-50/30 outline-none text-base text-charcoal-900 placeholder:text-charcoal-400 transition-all"
               />
@@ -139,10 +133,7 @@ function LoginForm() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mật khẩu"
                 className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 border-cream-200 focus:border-honey-500 focus:bg-honey-50/30 outline-none text-base text-charcoal-900 placeholder:text-charcoal-400 transition-all"
               />

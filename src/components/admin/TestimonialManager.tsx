@@ -146,7 +146,11 @@ function LibraryPicker({ room, exclude, onPick, onClose }: {
     fetch('/api/admin/media', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được thư viện ảnh')))
       .then((data) => setAssets(data.assets || []))
-      .catch((libraryError) => { if (!controller.signal.aborted) setError(errorText(libraryError, 'Không tải được thư viện ảnh')); });
+      .catch((libraryError) => {
+        if (controller.signal.aborted) return;
+        const text = errorText(libraryError, 'Không tải được thư viện ảnh');
+        setError(text); toast.error(text);
+      });
     return () => controller.abort();
   }, []);
   const available = (assets || []).filter((asset) => !exclude.includes(asset.url));
@@ -334,7 +338,11 @@ function FeedbackOrderEditor({ onDone }: { onDone: () => void }) {
     fetch('/api/admin/testimonials/order', { cache: 'no-store', signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Không tải được danh sách feedback')))
       .then((data) => setItems(data.items || []))
-      .catch((loadError) => { if (!controller.signal.aborted) setError(errorText(loadError, 'Không tải được danh sách feedback')); });
+      .catch((loadError) => {
+        if (controller.signal.aborted) return;
+        const text = errorText(loadError, 'Không tải được danh sách feedback');
+        setError(text); toast.error(text);
+      });
     return () => controller.abort();
   }, []);
 
@@ -420,7 +428,7 @@ function FeedbackEditor({ testimonial, products, onDone }: {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!draft.imageUrl) { setError('Cần chọn ảnh feedback'); return; }
+    if (!draft.imageUrl) { setError('Cần chọn ảnh feedback'); toast.error('Cần chọn ảnh feedback'); return; }
     setBusy(true); setError('');
     const id = toast.loading('Đang lưu feedback…');
     try {

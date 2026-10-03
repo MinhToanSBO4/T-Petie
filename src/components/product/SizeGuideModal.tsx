@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ruler, Sparkles, HelpCircle } from 'lucide-react';
 import type { SizeGuide } from '@/lib/content/site-content';
 import { DialogBehavior } from '@/components/layout/DialogBehavior';
+import { errorText, toast } from '@/client/toast';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -28,7 +29,11 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
       })
       .then(setGuide)
       .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được bảng chọn size.');
+        if (controller.signal.aborted) return;
+        // Báo bằng thông báo nổi; khung bảng vẫn ghi lỗi để không trống trơn.
+        const text = errorText(reason, 'Không tải được bảng chọn size.');
+        setError(text);
+        toast.error(text, { id: 'size-guide' });
       });
     return () => controller.abort();
   }, [isOpen, guide]);

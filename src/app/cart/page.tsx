@@ -15,10 +15,10 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatPriceCompact } from '@/lib/utils/formatters';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { trackBeginCheckout } from '@/client/analytics/tracker';
 import { useRouter } from 'next/navigation';
-import { useOrderQuote } from '@/hooks/useOrderQuote';
+import { QUOTE_NOTICE_ID, useOrderQuote } from '@/hooks/useOrderQuote';
 import { reconcileCartSelection } from '@/client/cart-selection';
 import { useEmailVerification } from '@/components/auth/EmailVerification';
 
@@ -33,7 +33,6 @@ export default function CartPage() {
   const { items, updateQuantity, removeFromCart, clearCart, totalItems } = useCart();
   const { isAuthenticated, user } = useAuth();
   const showOrdersLink = isAuthenticated && user?.role === 'user';
-  const { showToast } = useToast();
 
   // ── Checkbox state: mặc định tất cả được chọn ─────────────────
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
@@ -87,10 +86,11 @@ export default function CartPage() {
   };
 
   const handleStartCheckout = () => {
-    if (selectedItems.length === 0) { showToast('Mẹ chọn ít nhất một sản phẩm để đặt hàng nhé.', 'warning'); return; }
+    if (selectedItems.length === 0) { toast.warning('Mẹ chọn ít nhất một sản phẩm để đặt hàng nhé.'); return; }
     if (!requireVerifiedEmail()) return;
     if (!quote) {
-      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
+      if (quoteError) toast.error(quoteError, { id: QUOTE_NOTICE_ID });
+      else toast.info('Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.');
       return;
     }
     trackBeginCheckout(
@@ -322,7 +322,6 @@ export default function CartPage() {
                   </button>
                 </div>
               </div>
-              {quoteError && <p role="alert" className="text-xs text-red-600">{quoteError}</p>}
               {quoteLoading && selectedItems.length > 0 && <p role="status" className="text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
 
               <div className="space-y-2 text-xs text-charcoal-700 pt-2 border-t border-cream-100">
@@ -357,7 +356,8 @@ export default function CartPage() {
               <button
                 onClick={handleStartCheckout}
                 data-track="cart-proceed-checkout"
-                disabled={selectedItems.length === 0 || !quote || quoteLoading}
+                // Báo giá lỗi vẫn bấm được: bấm thì hiện lại lý do (mã giảm giá, tồn kho…) thay vì nút xám không lời giải thích.
+                disabled={selectedItems.length === 0 || quoteLoading}
                 className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 disabled:bg-cream-300 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
               >
                 <span>

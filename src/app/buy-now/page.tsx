@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
 import { formatPriceCompact } from '@/lib/utils/formatters';
-import { useToast } from '@/context/ToastContext';
+import { toast } from '@/client/toast';
 import { trackBeginCheckout } from '@/client/analytics/tracker';
-import { useOrderQuote } from '@/hooks/useOrderQuote';
+import { QUOTE_NOTICE_ID, useOrderQuote } from '@/hooks/useOrderQuote';
 import { useEmailVerification } from '@/components/auth/EmailVerification';
 
 
@@ -25,7 +25,6 @@ interface BuyNowItem {
 
 export default function BuyNowPage() {
   const router = useRouter();
-  const { showToast } = useToast();
   const { requireVerifiedEmail } = useEmailVerification();
   const [item, setItem] = useState<BuyNowItem | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -57,7 +56,8 @@ export default function BuyNowPage() {
   const handleCheckout = () => {
     if (!requireVerifiedEmail()) return;
     if (!quote) {
-      showToast(quoteError || 'Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.', quoteError ? 'error' : 'info');
+      if (quoteError) toast.error(quoteError, { id: QUOTE_NOTICE_ID });
+      else toast.info('Đang kiểm tra giá và tồn kho, Mẹ đợi giây lát nhé.');
       return;
     }
     trackBeginCheckout(
@@ -183,7 +183,6 @@ export default function BuyNowPage() {
               </button>
             </div>
           </div>
-          {quoteError && <p role="alert" className="text-xs text-red-600">{quoteError}</p>}
           {quoteLoading && <p role="status" className="text-xs text-charcoal-500">Đang kiểm tra giá và tồn kho…</p>}
 
           <div className="space-y-2 text-xs text-charcoal-700 pt-2 border-t border-cream-100">
@@ -227,7 +226,8 @@ export default function BuyNowPage() {
           <button
             onClick={handleCheckout}
             data-track="buy-now-checkout"
-            disabled={!quote || quoteLoading}
+            // Báo giá lỗi vẫn bấm được: bấm thì hiện lại lý do (mã giảm giá, tồn kho…) thay vì nút mờ không lời giải thích.
+            disabled={quoteLoading}
             className="w-full py-3.5 rounded-full bg-honey-500 hover:bg-honey-600 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2"
           >
             <span>Đặt Hàng Ngay</span>

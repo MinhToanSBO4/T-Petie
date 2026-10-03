@@ -125,7 +125,7 @@ function ProductCreateForm({ onCancel, onCreated }: { onCancel: () => void; onCr
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const invalid = validationError();
-    if (invalid) { setError(invalid); return; }
+    if (invalid) { setError(invalid); toast.error(invalid); return; }
     setBusy(true); setError('');
     const id = toast.loading('Đang tạo sản phẩm…');
     try {

@@ -14,13 +14,15 @@ import {
   Mail, 
   User as UserIcon, 
   Phone, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
-  AlertCircle,
+  Eye,
+  EyeOff,
+  ArrowRight,
   CheckCircle2,
   Gift
 } from 'lucide-react';
+
+/** Thông báo của form đăng ký dùng chung id: lỗi mới thay lỗi cũ thay vì xếp chồng. */
+const NOTICE_ID = 'register';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,45 +35,43 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(true);
-
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
+    const warn = (message: string) => toast.warning(message, { id: NOTICE_ID });
 
     if (!name.trim()) {
-      setErrorMessage('Vui lòng nhập họ và tên của Mẹ.');
+      warn('Vui lòng nhập họ và tên của Mẹ.');
       return;
     }
     if (!email.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ Email.');
+      warn('Vui lòng nhập địa chỉ Email.');
       return;
     }
     if (!normalizeEmail(email)) {
-      setErrorMessage('Email không hợp lệ. Vui lòng nhập đúng định dạng (VD: mebe@gmail.com).');
+      warn('Email không hợp lệ. Vui lòng nhập đúng định dạng (VD: mebe@gmail.com).');
       return;
     }
     // Số điện thoại không bắt buộc; nhập thì chấp nhận cả "0988 123 456" hay "+84 988 123 456".
     if (phone.trim() && !normalizePhone(phone)) {
-      setErrorMessage('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09 (có thể bỏ trống).');
+      warn('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09 (có thể bỏ trống).');
       return;
     }
     if (!password) {
-      setErrorMessage('Vui lòng tạo mật khẩu cho tài khoản.');
+      warn('Vui lòng tạo mật khẩu cho tài khoản.');
       return;
     }
     if (password.length < PASSWORD_MIN) {
-      setErrorMessage(`Mật khẩu phải có ít nhất ${PASSWORD_MIN} ký tự.`);
+      warn(`Mật khẩu phải có ít nhất ${PASSWORD_MIN} ký tự.`);
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMessage('Mật khẩu xác nhận không khớp.');
+      warn('Mật khẩu xác nhận không khớp.');
       return;
     }
     if (!acceptTerms) {
-      setErrorMessage('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật của T\'Petie.');
+      warn('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật của T\'Petie.');
       return;
     }
 
@@ -80,11 +80,11 @@ export default function RegisterPage() {
     setIsSubmitting(false);
 
     if (result.success) {
-      if (result.emailSent) toast.success('Tạo tài khoản thành công!', { description: 'Mẹ mở email và bấm "Xác thực email" để bắt đầu đặt hàng nhé.' });
-      else toast.warning('Tài khoản đã tạo nhưng chưa gửi được email xác thực', { description: 'Mẹ bấm "Gửi lại email" ở trang tiếp theo nhé.' });
+      if (result.emailSent) toast.success('Tạo tài khoản thành công!', { id: NOTICE_ID, description: 'Mẹ mở email và bấm "Xác thực email" để bắt đầu đặt hàng nhé.' });
+      else toast.warning('Tài khoản đã tạo nhưng chưa gửi được email xác thực', { id: NOTICE_ID, description: 'Mẹ bấm "Gửi lại email" ở trang tiếp theo nhé.' });
       router.replace(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&sent=${result.emailSent ? '1' : '0'}`);
     } else {
-      setErrorMessage(result.error || 'Đăng ký thất bại. Vui lòng thử lại.');
+      toast.error(result.error || 'Đăng ký thất bại. Vui lòng thử lại.', { id: NOTICE_ID });
     }
   };
 
@@ -146,17 +146,9 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Error Alert Box */}
-            {errorMessage && (
-              <div className="p-3.5 rounded-2xl bg-blush-50 border border-blush-200 text-blush-700 text-xs flex items-start space-x-2.5">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="leading-relaxed font-medium">{errorMessage}</span>
-              </div>
-            )}
-
             {/* Google Signup: chỉ hiện khi máy chủ đã cấu hình Google. */}
             <GoogleSignInButton callbackUrl="/" label="Đăng ký nhanh với Google"
-              onStart={() => setErrorMessage(null)}
+              onStart={() => toast.dismiss(NOTICE_ID)}
               separator={<div className="relative flex items-center justify-center">
                 <div className="border-t border-cream-200 w-full" />
                 <span className="bg-white px-3 text-[11px] font-medium text-charcoal-400 uppercase tracking-wider">

@@ -64,7 +64,10 @@ export function ReviewModerationPanel({ productId }: { productId?: string }) {
       if (request !== latest.current) return;
       setData((current) => append && current ? { ...result, items: [...current.items, ...result.items] } : result);
     } catch (loadError) {
-      if (request === latest.current) setError(errorText(loadError, 'Không tải được đánh giá'));
+      if (request === latest.current) {
+        const text = errorText(loadError, 'Không tải được đánh giá');
+        setError(text); toast.error(text, { id: 'admin-reviews-load' });
+      }
     } finally { if (request === latest.current) setLoading(false); }
   }, [filter, search, productId]);
 

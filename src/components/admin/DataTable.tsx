@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ArrowUpDown, ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { markAdminPagesStale } from '@/client/admin-freshness';
-import { errorText } from '@/client/toast';
+import { errorText, toast } from '@/client/toast';
 import { compactFilters, type TableFilter, type TableOption, type TableQuery } from '@/lib/admin/table-query';
 
 export { tableParams, type TableFilter, type TableOption, type TableQuery } from '@/lib/admin/table-query';
@@ -123,7 +123,10 @@ export function DataTable<T extends { id: string }>({
       setData(result); setLoadedAt(entry.loadedAt);
     } catch (loadError) {
       // Tải ngầm lỗi thì giữ nguyên dữ liệu đang hiện, không làm phiền người dùng.
-      if (request === latestRequest.current && !background) setError(errorText(loadError, 'Không tải được dữ liệu'));
+      if (request === latestRequest.current && !background) {
+        const text = errorText(loadError, 'Không tải được dữ liệu');
+        setError(text); toast.error(text, { id: `table-load:${key}` });
+      }
     } finally { if (request === latestRequest.current) setLoading(false); }
     // cacheId phụ thuộc đúng các giá trị trong danh sách bên dưới.
     // eslint-disable-next-line react-hooks/exhaustive-deps

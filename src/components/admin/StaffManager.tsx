@@ -139,7 +139,10 @@ function StaffDetail({ staff: initial, onBack }: { staff: Staff; onBack: () => v
   const saveContact = (event: React.FormEvent) => {
     event.preventDefault();
     const phone = draft.phone.trim() ? normalizePhone(draft.phone) : '';
-    if (phone === null) { setError('Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09'); return; }
+    if (phone === null) {
+      const text = 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09';
+      setError(text); toast.error(text); return;
+    }
     setDraft({ ...draft, phone });
     void update({ name: draft.name.trim(), email: draft.email.trim(), phone }, 'Đang lưu thông tin…', 'Đã lưu thông tin nhân viên');
   };
