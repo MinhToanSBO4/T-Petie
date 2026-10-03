@@ -83,7 +83,6 @@ export function DataTable<T extends { id: string }>({
   const [data, setData] = useState<TablePage<T> | null>((initial?.data as TablePage<T> | undefined) ?? null);
   const [loadedAt, setLoadedAt] = useState<number | null>(initial?.loadedAt ?? null);
   const [loading, setLoading] = useState(!initial);
-  const [error, setError] = useState('');
   // reloadKey = 0: vừa mở trang (dùng dữ liệu đã lưu). Khác lần trước: vừa sửa dữ liệu, phải tải mới.
   const handledReload = useRef(reloadKey === 0 ? 0 : saved?.reloadKey ?? reloadKey);
   const fetcher = useRef(fetchPage);
@@ -103,11 +102,11 @@ export function DataTable<T extends { id: string }>({
     const background = Boolean(cached && !force && alwaysRevalidate);
     if (cached && !force) {
       latestRequest.current += 1; // bỏ qua mọi phản hồi cũ còn đang chờ
-      setData(cached.data as TablePage<T>); setLoadedAt(cached.loadedAt); setLoading(false); setError('');
+      setData(cached.data as TablePage<T>); setLoadedAt(cached.loadedAt); setLoading(false);
       if (!background) return;
     }
     const request = ++latestRequest.current;
-    if (!background) { setLoading(true); setError(''); }
+    if (!background) setLoading(true);
     const inflightId = `${key}|${cacheId(page)}`;
     let pending = inflight.get(inflightId);
     if (!pending) {
@@ -124,8 +123,7 @@ export function DataTable<T extends { id: string }>({
     } catch (loadError) {
       // Tải ngầm lỗi thì giữ nguyên dữ liệu đang hiện, không làm phiền người dùng.
       if (request === latestRequest.current && !background) {
-        const text = errorText(loadError, 'Không tải được dữ liệu');
-        setError(text); toast.error(text, { id: `table-load:${key}` });
+        toast.error(errorText(loadError, 'Không tải được dữ liệu'), { id: `table-load:${key}` });
       }
     } finally { if (request === latestRequest.current) setLoading(false); }
     // cacheId phụ thuộc đúng các giá trị trong danh sách bên dưới.
@@ -202,7 +200,6 @@ export function DataTable<T extends { id: string }>({
       </div>}
     </div>
 
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
     <div className="overflow-x-auto rounded-2xl border border-cream-200 bg-white">
       <table className="w-full min-w-[640px] text-left text-sm">

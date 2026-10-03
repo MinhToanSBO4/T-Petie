@@ -122,7 +122,7 @@ export function Toaster() {
   useConnectionNotices();
 
   return (
-    <section aria-label="Thông báo"
+    <section aria-label="Thông báo" data-toaster
       className={`pointer-events-none fixed inset-x-3 top-[4.5rem] z-[90] md:inset-x-auto md:right-6 md:top-20 md:w-96 ${
         backOffice ? 'admin-theme' : ''}`}>
       {/* Mới nhất nằm trên cùng, sát mép trên; thông báo cũ trượt xuống dưới. */}

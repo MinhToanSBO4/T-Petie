@@ -33,7 +33,6 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
   const [dragging, setDragging] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [assets, setAssets] = useState<MediaAssetRow[] | null>(null);
-  const [error, setError] = useState('');
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
@@ -43,10 +42,10 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
   onChangeRef.current = onChange;
 
   const upload = useCallback(async (file: File) => {
-    setBusy(true); setError('');
+    setBusy(true);
     try {
       const result = await uploadMediaBatch([file], BANNER_PHOTO_OPTIONS, altText || label, (asset) => onChangeRef.current(asset.url));
-      if (result.error) { setError(result.error); onErrorRef.current?.(result.error); }
+      if (result.error) onErrorRef.current?.(result.error);
     } finally { setBusy(false); }
   }, [altText, label]);
 
@@ -106,7 +105,6 @@ export function MediaPicker({ value, onChange, label, altText, aspect = 'banner'
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" className="hidden"
         onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
     </div>
-    {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
     {libraryOpen && <div className="max-h-64 overflow-y-auto rounded-xl border border-cream-200 bg-white p-2">
       {!assets && <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{Array.from({ length: 5 }, (_, index) =>
         <div key={index} className="h-20 rounded-lg shimmer" />)}</div>}

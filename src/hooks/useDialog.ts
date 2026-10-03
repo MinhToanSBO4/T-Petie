@@ -4,6 +4,8 @@ import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const TOASTER_FOCUSABLE = 'section[data-toaster] button, section[data-toaster] a[href]';
+
 /**
  * Hành vi chung của hộp thoại toàn màn hình: khóa cuộn trang phía sau, Esc để đóng,
  * giữ Tab trong hộp thoại và trả focus về nút đã mở khi đóng.
@@ -21,7 +23,8 @@ export function useDialog(ref: RefObject<HTMLElement>, onClose: () => void, init
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); return; }
       if (event.key !== 'Tab' || !ref.current) return;
-      const focusable = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE))
+      // Thông báo nổi nằm ngoài hộp thoại nhưng vẫn phải với tới được bằng bàn phím (đóng, bấm nút, tạm dừng tự đóng).
+      const focusable = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE), ...document.querySelectorAll<HTMLElement>(TOASTER_FOCUSABLE)]
         .filter((element) => element.offsetParent !== null || element === document.activeElement);
       if (focusable.length === 0) return;
       const first = focusable[0];

@@ -18,6 +18,9 @@ export function useOrderQuote(items: QuoteInputItem[], couponCode = '') {
   const key = useMemo(() => JSON.stringify(items.map(({ productId, selectedSize, quantity }) => ({ productId, selectedSize, quantity }))), [items]);
   const [state, setState] = useState<{ quote: OrderQuote | null; error: string | null; loading: boolean }>({ quote: null, error: null, loading: true });
 
+  // Rời trang thì lỗi báo giá không còn liên quan: không để nó nằm lại trên trang khác.
+  useEffect(() => () => toast.dismiss(QUOTE_NOTICE_ID), []);
+
   useEffect(() => {
     const parsed: QuoteInputItem[] = JSON.parse(key);
     if (parsed.length === 0) {

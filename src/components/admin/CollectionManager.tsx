@@ -77,7 +77,6 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
     isActive: collection?.isActive ?? true, showInMenu: collection?.showInMenu ?? true, showOnHome: collection?.showOnHome ?? true,
   });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const [initialDraft] = useState(draft);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initialDraft);
   useUnsavedChangesGuard(dirty && !busy);
@@ -88,7 +87,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setBusy(true); setError('');
+    setBusy(true);
     const id = toast.loading(editing ? 'Đang lưu bộ sưu tập…' : 'Đang tạo bộ sưu tập…');
     try {
       const response = await fetch(editing ? `/api/admin/collections/${collection!.id}` : '/api/admin/collections', {
@@ -101,7 +100,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
       onDone();
     } catch (submitError) {
       const text = errorText(submitError, 'Không lưu được bộ sưu tập');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -152,7 +151,6 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
           <input type="checkbox" className="size-5" checked={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.checked })} /> {label}
         </label>)}
     </div>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy || !draft.bannerUrl} className="min-h-11 rounded-xl bg-sage-700 px-6 text-sm font-bold text-white disabled:opacity-50">
       {busy ? 'Đang lưu…' : editing ? 'Lưu bộ sưu tập' : 'Tạo bộ sưu tập'}
     </button>

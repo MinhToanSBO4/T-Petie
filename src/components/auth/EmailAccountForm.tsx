@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, MailCheck, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, MailCheck, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { errorText, toast } from '@/client/toast';
 import { PASSWORD_MIN } from '@/lib/account/account-input';
@@ -36,16 +36,6 @@ function Card({ icon, title, children }: { icon: React.ReactNode; title: string;
   );
 }
 
-/** Trạng thái của trang cần khách xử lý (liên kết hỏng, thư chưa gửi được); kết quả thao tác hiện bằng thông báo nổi. */
-function Alert({ children }: { children: React.ReactNode }) {
-  return (
-    <p role="alert" className="flex items-start gap-2.5 rounded-2xl border border-blush-200 bg-blush-50 p-3.5 text-sm text-blush-700">
-      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
-
 function ResendButton({ email, initialCooldown = 0, label = 'Gửi lại email xác thực', disabled = false }: {
   email?: string; initialCooldown?: number; label?: string; disabled?: boolean;
 }) {
@@ -71,16 +61,13 @@ function VerifyToken({ token }: { token: string }) {
       const result = await post('verify', { token });
       setMessage(result.message);
       setState('done');
-      toast.success('Xác thực email thành công', { id: 'verify-email' });
       // Báo cho các tab khác đang mở shop để mở khóa đặt hàng ngay.
       try { const channel = new BroadcastChannel(VERIFIED_EVENT); channel.postMessage('verified'); channel.close(); } catch { /* trình duyệt cũ */ }
       window.dispatchEvent(new Event(VERIFIED_EVENT));
       await refreshSession().catch(() => {});
     } catch (error) {
-      const text = errorText(error, 'Không kết nối được máy chủ.');
-      setMessage(text);
       setState('error');
-      toast.error(text, { id: 'verify-email' });
+      toast.error(errorText(error, 'Không kết nối được máy chủ.'), { id: 'verify-email' });
     }
   };
 
@@ -101,7 +88,7 @@ function VerifyToken({ token }: { token: string }) {
   }
   return (
     <Card icon={<MailCheck className="size-6" aria-hidden />} title="Xác thực email">
-      <p>{state === 'error' ? message : 'Đang xác thực email của bạn, vui lòng đợi trong giây lát…'}</p>
+      <p>{state === 'error' ? 'Chưa xác thực được email. Bạn bấm "Thử lại" hoặc gửi liên kết mới nhé.' : 'Đang xác thực email của bạn, vui lòng đợi trong giây lát…'}</p>
       <form onSubmit={(event) => { event.preventDefault(); void verify(); }} className="space-y-3">
         <button type="submit" className={primary} disabled={state === 'working'}>
           {state === 'working' ? <><Loader2 className="size-4 animate-spin" aria-hidden /> Đang xác thực…</> : 'Thử lại'}
@@ -134,7 +121,7 @@ function CheckInbox({ initialEmail, sent }: { initialEmail?: string; sent?: stri
   return (
     <Card icon={<MailCheck className="size-6" aria-hidden />} title="Kiểm tra hộp thư của bạn">
       {sent === '0'
-        ? <Alert>Tài khoản đã được tạo nhưng shop chưa gửi được email xác thực. Bạn bấm &quot;Gửi lại email xác thực&quot; bên dưới nhé.</Alert>
+        ? <p>Tài khoản đã được tạo nhưng shop chưa gửi được email xác thực. Bạn bấm &quot;Gửi lại email xác thực&quot; bên dưới nhé.</p>
         : <p>Shop đã gửi liên kết xác thực tới {target ? <strong className="break-all text-charcoal-900">{target}</strong> : 'email đăng ký của bạn'}. Mở thư và bấm <strong>&quot;Xác thực email&quot;</strong> để bắt đầu đặt hàng. Liên kết có hiệu lực 24 giờ.</p>}
       <form onSubmit={(event) => event.preventDefault()} className="space-y-3">
         {!signedInUnverified && (
@@ -214,6 +201,11 @@ function ResetPassword({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');
 
+  // Mở trang không kèm liên kết hợp lệ: báo ngay thay vì để khách điền xong mới bị từ chối.
+  useEffect(() => {
+    if (!token) toast.error('Liên kết không hợp lệ hoặc đã hết hạn', { id: 'reset-password', description: 'Vui lòng yêu cầu liên kết mới.' });
+  }, [token]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (password.length < PASSWORD_MIN) { toast.warning(`Mật khẩu cần ít nhất ${PASSWORD_MIN} ký tự.`, { id: 'reset-password' }); return; }
@@ -221,7 +213,6 @@ function ResetPassword({ token }: { token: string }) {
     setBusy(true);
     try {
       const result = await post('reset', { token, password });
-      toast.success('Đã đặt mật khẩu mới', { id: 'reset-password' });
       setDone(result.message);
       setPassword(''); setConfirm('');
     } catch (submitError) {
@@ -239,7 +230,6 @@ function ResetPassword({ token }: { token: string }) {
   }
   return (
     <Card icon={<KeyRound className="size-6" aria-hidden />} title="Đặt lại mật khẩu">
-      {!token && <Alert>Liên kết không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới.</Alert>}
       <form onSubmit={submit} className="space-y-3" noValidate>
         <label className="block space-y-1.5">
           <span className="text-xs font-bold text-charcoal-800">Mật khẩu mới</span>

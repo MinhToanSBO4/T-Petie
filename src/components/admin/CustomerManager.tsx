@@ -35,14 +35,12 @@ export function CustomerManager() {
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState('');
-  // Lỗi thao tác hiện ngay dưới các nút (thông báo góc màn hình tự ẩn sau vài giây).
-  const [error, setError] = useState('');
-  const open = (customer: Customer | null) => { setError(''); setTemporaryPassword(''); setSelected(customer); };
+  const open = (customer: Customer | null) => { setTemporaryPassword(''); setSelected(customer); };
 
   /** Khách quên mật khẩu (chưa có gửi email đặt lại): tạo mật khẩu tạm để shop gửi cho khách qua Zalo/điện thoại. */
   const resetPassword = async (customer: Customer) => {
     if (!window.confirm(`Tạo mật khẩu tạm mới cho ${customer.name || customer.email || 'khách này'}? Mật khẩu cũ và mọi phiên đăng nhập cũ sẽ hết hiệu lực.`)) return;
-    setBusy(true); setError(''); setTemporaryPassword('');
+    setBusy(true); setTemporaryPassword('');
     const id = toast.loading('Đang tạo mật khẩu tạm…');
     try {
       const response = await fetch(`/api/admin/users/${customer.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -53,14 +51,14 @@ export function CustomerManager() {
       toast.success('Đã tạo mật khẩu tạm mới', { id });
     } catch (resetError) {
       const text = errorText(resetError, 'Không đặt lại được mật khẩu');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
 
   const change = async (customer: Customer, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete' && !window.confirm(`Xóa tài khoản của ${customer.name || customer.email || customer.id}? Đơn hàng cũ vẫn được giữ lại.`)) return;
-    setBusy(true); setError('');
+    setBusy(true);
     const id = toast.loading(action === 'delete' ? 'Đang xóa tài khoản…' : action === 'block' ? 'Đang khóa tài khoản…' : 'Đang mở khóa tài khoản…');
     try {
       const response = action === 'delete'
@@ -76,7 +74,7 @@ export function CustomerManager() {
       setReloadKey((key) => key + 1);
     } catch (changeError) {
       const text = errorText(changeError, 'Thao tác thất bại');
-      setError(text); toast.error(text, { id });
+      toast.error(text, { id });
     }
     finally { setBusy(false); }
   };
@@ -117,7 +115,6 @@ export function CustomerManager() {
       <button type="button" disabled={busy} onClick={() => void change(selected, 'delete')}
         className="min-h-11 rounded-xl px-5 text-sm font-semibold text-red-700 disabled:opacity-50">Xóa tài khoản</button>
     </div>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
   </div>;
 
   const columns: Column<Customer>[] = [
