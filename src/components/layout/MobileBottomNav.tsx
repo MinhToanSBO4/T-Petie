@@ -3,18 +3,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Heart, Sparkles, Percent, ShoppingBag, Shirt } from 'lucide-react';
-import { useCart } from '@/context/CartContext';
+import { Home, Heart, Sparkles, Percent, Shirt } from 'lucide-react';
 
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const { totalItems, openMiniCart } = useCart();
 
   const navItems = [
     { label: 'Trang Chủ', href: '/', icon: Home },
     { label: 'Sản Phẩm', href: '/girls', icon: Shirt },
     { label: 'Bộ Sưu Tập', href: '/collections', icon: Sparkles, badge: 'Mới' },
     { label: 'Ưu Đãi', href: '/sale', icon: Percent, badge: 'Hot' },
+    { label: 'Về Chúng Tôi', href: '/about', icon: Heart },
   ];
 
   return (
@@ -28,7 +27,7 @@ export function MobileBottomNav() {
             key={item.href}
             href={item.href}
             data-track={`mobile-nav-${item.href.replace('/', '') || 'home'}`}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-2xl transition-all relative ${
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all relative min-w-0 ${
               isActive ? 'text-honey-600 font-bold' : 'text-charcoal-600 hover:text-honey-600 font-medium'
             }`}
           >
@@ -44,23 +43,6 @@ export function MobileBottomNav() {
           </Link>
         );
       })}
-
-      {/* Nút Giỏ Hàng Nổi Trên Mobile */}
-      <button
-        onClick={openMiniCart}
-        data-track="mobile-open-cart"
-        className="flex flex-col items-center justify-center py-1 px-2.5 rounded-2xl text-charcoal-600 hover:text-honey-600 font-medium relative"
-      >
-        <div className="relative">
-          <ShoppingBag className="w-5 h-5" />
-          {totalItems > 0 && (
-            <span className="absolute -top-1.5 -right-2 bg-honey-500 text-white text-[9px] font-bold min-w-4 h-4 rounded-full flex items-center justify-center px-1">
-              {totalItems}
-            </span>
-          )}
-        </div>
-        <span className="text-[10px] mt-0.5">Giỏ ({totalItems})</span>
-      </button>
     </div>
   );
 }
