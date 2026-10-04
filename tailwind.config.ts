@@ -10,8 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Nền/viền trung tính cũng đọc từ biến CSS: khu quản trị dùng tông trung tính ngả hồng
-        // để hover, viền, nền không còn ánh cam cạnh màu nhấn hồng.
+        // Nền/viền trung tính cũng đọc từ biến CSS: tông trung tính ngả hồng để hover, viền, nền
+        // không có ánh cam cạnh màu nhấn hồng.
         cream: Object.fromEntries([50, 100, 200, 300]
           .map((step) => [step, `rgb(var(--cream-${step}) / <alpha-value>)`])),
         // Shade nào được dùng trong code mà không khai báo ở đây sẽ không sinh CSS (class vô hiệu),
@@ -27,8 +27,8 @@ const config: Config = {
           700: '#4B834E',
           800: '#37613A',
         },
-        // Màu nhấn đọc từ biến CSS (khai báo trong globals.css): giao diện khách giữ màu mật ong,
-        // khu quản trị (.admin-theme) đổi sang hồng pastel mà không phải sửa từng class.
+        // Màu nhấn đọc từ biến CSS (khai báo trong globals.css) nên đổi tông giao diện không phải sửa từng class.
+        // Tên "honey" là tên cũ của thang màu; hiện là hồng pastel.
         honey: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
           .map((step) => [step, `rgb(var(--honey-${step}) / <alpha-value>)`])),
         blush: {
@@ -57,7 +57,7 @@ const config: Config = {
         serif: ['Playfair Display', 'Georgia', 'serif'],
       },
       boxShadow: {
-        soft: '0 4px 20px -2px rgba(220, 190, 160, 0.15)',
+        soft: '0 4px 20px -2px rgb(var(--honey-600) / 0.14)',
         card: '0 2px 10px rgba(0, 0, 0, 0.04)',
       },
       borderRadius: {

@@ -6,25 +6,9 @@
   :root {
     --font-be-vietnam-pro: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-quicksand: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    /* Giao diện chung: hồng pastel. */
-    --cream-50: 255 250 252; /* #FFFAFC */
-    --cream-100: 255 247 250; /* #FFF7FA */
-    --cream-200: 245 227 235; /* #F5E3EB */
-    --cream-300: 236 209 221; /* #ECD1DD */
-    --honey-50: 255 245 248; /* #FFF5F8 */
-    --honey-100: 253 232 239; /* #FDE8EF */
-    --honey-200: 249 210 224; /* #F9D2E0 */
-    --honey-300: 243 180 202; /* #F3B4CA */
-    --honey-400: 234 143 176; /* #EA8FB0 */
-    --honey-500: 220 110 151; /* #DC6E97 */
-    --honey-600: 190 76 123; /* #BE4C7B */
-    --honey-700: 166 62 105; /* #A63E69 */
-    --honey-800: 131 50 85; /* #833255 */
-    --honey-900: 102 40 69; /* #662845 */
-  }
-
-  /* Khu quản trị: giữ nguyên để dự phòng. */
-  .admin-theme {
+    /* Bảng màu hồng pastel dùng chung cho giao diện khách và khu quản trị (kênh R G B để Tailwind ghép độ trong suốt).
+       Chữ 700 trên nền trắng 5.98:1, chữ trắng trên nút 600 4.66:1, chữ 800 trên nền 100 7.04:1 — đạt WCAG 2.2 AA.
+       Đổi màu giao diện chỉ cần sửa các biến ở đây. */
     --cream-50: 255 250 252; /* #FFFAFC */
     --cream-100: 255 247 250; /* #FFF7FA */
     --cream-200: 245 227 235; /* #F5E3EB */

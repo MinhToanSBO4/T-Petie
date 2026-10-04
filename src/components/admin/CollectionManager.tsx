@@ -5,7 +5,7 @@ import { DataTable, tableParams, type Column, type TableFilter, type TableQuery 
 import { MediaPicker, MediaListPicker } from '@/components/admin/MediaPicker';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
-import { ACCENT_COLOR_PRESETS, THEME_COLOR_PRESETS } from '@/lib/content/collection-colors';
+import { ACCENT_COLOR_PRESETS, DEFAULT_ACCENT_COLOR, DEFAULT_THEME_COLOR, THEME_COLOR_PRESETS } from '@/lib/content/collection-colors';
 import type { AdminCollection } from '@/types/admin-content';
 import { readJson } from '@/client/http';
 import { errorText, toast } from '@/client/toast';
@@ -72,7 +72,7 @@ function CollectionForm({ collection, onDone }: { collection: AdminCollection | 
   const [draft, setDraft] = useState({
     title: collection?.title || '', slug: collection?.slug || '', subtitle: collection?.subtitle || '',
     story: collection?.story || '', bannerUrl: collection?.bannerUrl || '', lookbookUrls: collection?.lookbookUrls || [],
-    themeColor: collection?.themeColor || '#fff8ee', accentColor: collection?.accentColor || '#d97706',
+    themeColor: collection?.themeColor || DEFAULT_THEME_COLOR, accentColor: collection?.accentColor || DEFAULT_ACCENT_COLOR,
     season: collection?.season || '', badge: collection?.badge || '', sortOrder: String(collection?.sortOrder ?? 0),
     isActive: collection?.isActive ?? true, showInMenu: collection?.showInMenu ?? true, showOnHome: collection?.showOnHome ?? true,
   });

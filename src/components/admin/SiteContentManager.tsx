@@ -151,13 +151,16 @@ function ProductSelector({ products, selected, onChange, block }: {
   // Cùng cách trang chủ đọc danh sách đã chọn: sản phẩm đã ngừng bán bị bỏ qua, nên chọn/bỏ cũng dọn luôn mã cũ.
   const chosen = chosenHomeProducts(products, selected);
   const full = chosen.length >= limit;
+  // Danh sách lưu từ trước có thể dài hơn giới hạn hiện tại: trang chủ chỉ hiện phần đầu, phần dư được báo rõ để bỏ bớt.
+  const hidden = chosen.length - limit;
   return <div className="space-y-3 rounded-xl border border-cream-200 p-3">
-    <div><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}/{limit}</p>
-      {chosen.length === 0 && <p className="mt-1 text-xs text-charcoal-600">{AUTOMATIC_PRODUCTS[block]}</p>}</div>
+    <div><p className="text-sm font-bold">Sản phẩm đã chọn: {hidden > 0 ? chosen.length : `${chosen.length}/${limit}`}</p>
+      {chosen.length === 0 && <p className="mt-1 text-xs text-charcoal-600">{AUTOMATIC_PRODUCTS[block]}</p>}
+      {hidden > 0 && <p className="mt-1 text-xs text-honey-800">Trang chủ chỉ hiện {limit} sản phẩm đầu tiên; {hidden} sản phẩm cuối đang bị ẩn. Bỏ bớt để danh sách gọn lại.</p>}</div>
     <input value={query} disabled={full} onChange={(event) => setQuery(event.target.value)}
       placeholder={full ? `Đã đủ ${limit} sản phẩm` : 'Tìm sản phẩm theo tên…'} className="w-full rounded-lg border p-2 text-sm disabled:bg-cream-50" />
     {query && !full && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...chosen.map((item) => item.id), product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={cloudinaryImage(product.thumbnail, { width: 96 })} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
-    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={cloudinaryImage(product.thumbnail, { width: 80 })} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(chosen.filter((item) => item.id !== product.id).map((item) => item.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
+    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className={`flex items-center gap-3 rounded-xl bg-cream-50 p-2 ${index >= limit ? 'opacity-60' : ''}`}><span className="text-sm font-bold">{index + 1}</span><img src={cloudinaryImage(product.thumbnail, { width: 80 })} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span>{index >= limit && <span className="rounded-full bg-honey-100 px-2 py-0.5 text-[11px] font-semibold text-honey-800">Đang ẩn</span>}<button type="button" onClick={() => onChange(chosen.filter((item) => item.id !== product.id).map((item) => item.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
   </div>;
 }
 

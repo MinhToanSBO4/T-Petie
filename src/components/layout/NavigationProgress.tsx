@@ -51,7 +51,7 @@ export function NavigationProgress() {
       className="pointer-events-none fixed inset-x-0 top-0 z-[999] h-[3px] bg-transparent"
     >
       <div className="h-full w-full overflow-hidden bg-honey-100/60">
-        <div className="h-full w-full origin-left bg-gradient-to-r from-honey-400 via-honey-500 to-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.6)] animate-indeterminate-progress" />
+        <div className="h-full w-full origin-left bg-gradient-to-r from-honey-300 via-honey-500 to-honey-700 shadow-[0_0_10px_rgb(var(--honey-500)/0.55)] animate-indeterminate-progress" />
       </div>
     </div>
   );

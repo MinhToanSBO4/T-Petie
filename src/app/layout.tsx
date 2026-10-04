@@ -41,7 +41,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   // Không chặn phóng to: khách cần zoom xem chất vải, chữ nhỏ (WCAG 1.4.4).
-  themeColor: '#FFF8EE',
+  // Thanh trình duyệt trên điện thoại cùng màu nền trang (cream-50 trong globals.css).
+  themeColor: '#FFFAFC',
 };
 
 export default async function RootLayout({

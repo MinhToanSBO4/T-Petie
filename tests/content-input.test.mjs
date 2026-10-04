@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCollectionInput } from '../src/lib/content/collection-input.ts';
-import { ACCENT_COLOR_PRESETS, THEME_COLOR_PRESETS, readableAccent } from '../src/lib/content/collection-colors.ts';
+import { ACCENT_COLOR_PRESETS, DEFAULT_ACCENT_COLOR, THEME_COLOR_PRESETS, readableAccent } from '../src/lib/content/collection-colors.ts';
 import { parseTestimonialBatch, parseTestimonialInput } from '../src/lib/content/testimonial-input.ts';
 
 const collection = { title: 'Mùa Hạ', slug: 'mua-ha', bannerUrl: 'https://res.cloudinary.com/demo/image/upload/hero-banner.jpg',
@@ -22,7 +22,8 @@ test('suggested collection colors save as-is and accent suggestions are never sw
     assert.equal(parseCollectionInput({ ...collection, themeColor: preset.value, accentColor: preset.value }).accentColor, preset.value);
   }
   for (const preset of ACCENT_COLOR_PRESETS) assert.equal(readableAccent(preset.value), preset.value, preset.name);
-  assert.equal(readableAccent('#fff2d6'), '#B45309', 'a pale accent falls back to the dark honey');
+  assert.equal(readableAccent('#fff2d6'), '#A63E69', 'a pale accent falls back to the dark honey');
+  assert.equal(readableAccent(DEFAULT_ACCENT_COLOR), DEFAULT_ACCENT_COLOR, 'the default accent is readable on the default page color');
 });
 
 const screenshot = 'https://res.cloudinary.com/demo/image/upload/v1/tpetie/site/chat-1.png';

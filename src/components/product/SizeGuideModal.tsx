@@ -127,9 +127,9 @@ export function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
             </div>
 
             {/* Lưu ý khi chọn size */}
-            <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200 rounded-2xl text-[11px] text-charcoal-700 space-y-1 overflow-y-auto max-h-32">
-              <div className="flex items-center space-x-1.5 font-bold text-amber-800 mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <div className="mt-3 p-3 bg-honey-50 border border-honey-200 rounded-2xl text-[11px] text-charcoal-700 space-y-1 overflow-y-auto max-h-32">
+              <div className="flex items-center space-x-1.5 font-bold text-honey-800 mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-honey-600 shrink-0" />
                 <span>Lưu ý khi chọn size cho bé:</span>
               </div>
               <ul className="space-y-1 list-disc pl-4 text-charcoal-600 leading-relaxed text-[11px]">
