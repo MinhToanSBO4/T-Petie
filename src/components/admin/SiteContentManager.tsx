@@ -8,12 +8,11 @@ import { errorText, toast } from '@/client/toast';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MediaPicker } from '@/components/admin/MediaPicker';
-import { HeroCarousel } from '@/components/home/HeroCarousel';
-import { LookbookCarousel } from '@/components/collection/LookbookCarousel';
-import { FeatureCarousel } from '@/components/home/FeatureCarousel';
-import { TestimonialsSection } from '@/components/home/TestimonialsSection';
-import { ProductGrid } from '@/components/product/ProductGrid';
-import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, type HomeBlockId } from '@/lib/content/site-content';
+import { renderHomeBlocks } from '@/components/home/HomeBlocks';
+import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, HOME_BLOCK_LABELS, orderHomeBlocks,
+  type HomeBlockId, type SiteContentKey } from '@/lib/content/site-content';
+import { HOME_PRODUCT_LIMITS, chosenHomeProducts, homeBlockProducts, homeBlockVisibility,
+  type HomeProductBlockId, type HomeSectionId } from '@/lib/content/home-blocks';
 import type { Collection } from '@/types/collection';
 import type { Product, ProductCardData } from '@/types/product';
 import type { PublicFeedback } from '@/types/testimonial';
@@ -38,14 +37,41 @@ type ContentDraft = {
   size_guide: { baby: SizeGuideRow[]; kids: SizeGuideRow[]; tips: string[] };
 };
 type ContentKey = keyof ContentDraft;
+/** Phần đang sửa: một khóa nội dung, hoặc riêng một khối trong home_sections (Bán chạy / Ưu đãi / Bộ sưu tập). */
+type EditTarget = ContentKey | HomeSectionId;
 
-/** Các khối nằm ngay trên trang chủ nên được sửa trong bảng trượt bên phải. */
-const HOME_SECTION_KEYS: ContentKey[] = ['home_hero', 'home_sections', 'home_features', 'testimonials_section'];
-const HOME_SECTION_TITLES: Partial<Record<ContentKey, string>> = {
+/** Các khối nằm ngay trên trang chủ được sửa trong bảng trượt bên phải; nút Sửa của khối nào chỉ mở phần của khối đó. */
+const DRAWER_TITLES: Partial<Record<EditTarget, string>> = {
   home_hero: 'Sửa hero trang chủ',
-  home_sections: 'Sửa tiêu đề các khối',
+  bestSellers: 'Sửa khối sản phẩm bán chạy',
+  sale: 'Sửa khối sản phẩm ưu đãi',
+  collections: 'Sửa khối bộ sưu tập nổi bật',
   home_features: 'Sửa ảnh chủ đề',
   testimonials_section: 'Sửa khối feedback khách hàng',
+};
+const BLOCK_EDIT_TARGETS: Record<HomeBlockId, EditTarget> = {
+  hero: 'home_hero', bestSellers: 'bestSellers', sale: 'sale', collections: 'collections',
+  features: 'home_features', testimonials: 'testimonials_section',
+};
+/** Lý do khối không có trên trang chủ, hiện ngay tại khối trong bản xem trước. */
+const HIDDEN_REASONS: Record<HomeBlockId, string> = {
+  hero: 'Chưa có ảnh Hero và chưa có bộ sưu tập nào bật "Hiện ở trang chủ".',
+  bestSellers: 'Chưa chọn sản phẩm và chưa có sản phẩm nào gắn nhãn Bán chạy.',
+  sale: 'Chưa chọn sản phẩm và chưa có sản phẩm nào đang giảm giá.',
+  collections: 'Chưa có bộ sưu tập nào bật "Hiện ở trang chủ".',
+  features: 'Chưa có ảnh chủ đề.',
+  testimonials: 'Chưa có feedback nào được công bố.',
+};
+/** Nguồn sản phẩm khi quản trị viên chưa chọn sản phẩm cho khối (cùng quy tắc homeBlockProducts). */
+const AUTOMATIC_PRODUCTS: Record<HomeProductBlockId, string> = {
+  bestSellers: 'Chưa chọn: khối tự lấy sản phẩm gắn nhãn Bán chạy, mới nhất trước.',
+  sale: 'Chưa chọn: khối tự lấy sản phẩm đang giảm giá, giảm nhiều nhất trước (như trang Ưu đãi).',
+};
+const CONTENT_KEY_LABELS: Record<SiteContentKey, string> = {
+  home_hero: 'Hero trang chủ', home_sections: 'Các khối sản phẩm & bộ sưu tập', home_layout: 'Thứ tự các khối trang chủ',
+  home_features: 'Ảnh chủ đề', brand_assets: 'Nhận diện thương hiệu', contact_info: 'Liên hệ & mạng xã hội',
+  sale_page: 'Banner trang Ưu đãi', about_page: 'Trang Về Chúng Tôi', category_pages: 'Ảnh chủ đề trang danh mục',
+  testimonials_section: 'Khối feedback khách hàng', size_guide: 'Bảng hướng dẫn chọn size',
 };
 
 const emptyLink = (): LinkDraft => ({ title: '', linkLabel: '', linkHref: '', productIds: [], imageUrl: '', imageAlt: '' });
@@ -113,22 +139,32 @@ function DestinationField({ label, value, onChange }: { label: string; value: st
   return <label className="text-sm font-semibold">{label}<select value={DESTINATIONS.some((item) => item.value === value) ? value : ''} onChange={(event) => onChange(event.target.value)} className={field}>{DESTINATIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-/** Ô chọn sản phẩm chỉ cần các trường này; trang chỉ gửi đúng chừng đó xuống trình duyệt. */
+/** Các trường ô chọn sản phẩm cần (trang gửi đủ dữ liệu thẻ sản phẩm vì bản xem trước dùng chung danh sách). */
 export type ProductOption = Pick<Product, 'id' | 'name' | 'thumbnail' | 'basePrice'>;
 
-function ProductSelector({ products, selected, onChange }: { products: ProductOption[]; selected: string[]; onChange: (ids: string[]) => void }) {
+function ProductSelector({ products, selected, onChange, block }: {
+  products: ProductOption[]; selected: string[]; onChange: (ids: string[]) => void; block: HomeProductBlockId;
+}) {
   const [query, setQuery] = useState('');
+  const limit = HOME_PRODUCT_LIMITS[block];
   const matches = products.filter((product) => product.name.toLocaleLowerCase('vi-VN').includes(query.toLocaleLowerCase('vi-VN')));
-  const chosen = selected.map((id) => products.find((product) => product.id === id)).filter((product): product is ProductOption => Boolean(product));
-  return <div className="space-y-3 rounded-xl border border-cream-200 p-3"><div className="flex items-center justify-between"><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}</p></div>
-    <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm sản phẩm theo tên…" className="w-full rounded-lg border p-2 text-sm" />
-    {query && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...selected, product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={cloudinaryImage(product.thumbnail, { width: 96 })} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
-    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={cloudinaryImage(product.thumbnail, { width: 80 })} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(selected.filter((id) => id !== product.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
+  // Cùng cách trang chủ đọc danh sách đã chọn: sản phẩm đã ngừng bán bị bỏ qua, nên chọn/bỏ cũng dọn luôn mã cũ.
+  const chosen = chosenHomeProducts(products, selected);
+  const full = chosen.length >= limit;
+  return <div className="space-y-3 rounded-xl border border-cream-200 p-3">
+    <div><p className="text-sm font-bold">Sản phẩm đã chọn: {chosen.length}/{limit}</p>
+      {chosen.length === 0 && <p className="mt-1 text-xs text-charcoal-600">{AUTOMATIC_PRODUCTS[block]}</p>}</div>
+    <input value={query} disabled={full} onChange={(event) => setQuery(event.target.value)}
+      placeholder={full ? `Đã đủ ${limit} sản phẩm` : 'Tìm sản phẩm theo tên…'} className="w-full rounded-lg border p-2 text-sm disabled:bg-cream-50" />
+    {query && !full && <div className="max-h-56 space-y-2 overflow-y-auto">{matches.filter((product) => !selected.includes(product.id)).map((product) => <button key={product.id} type="button" onClick={() => { onChange([...chosen.map((item) => item.id), product.id]); setQuery(''); }} className="flex w-full items-center gap-3 rounded-xl border border-cream-200 p-2 text-left hover:border-honey-500"><img src={cloudinaryImage(product.thumbnail, { width: 96 })} alt="" className="size-12 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><span className="text-sm font-bold text-honey-700">{product.basePrice.toLocaleString('vi-VN')}đ</span><span className="rounded-lg bg-honey-600 px-2 py-1 text-xs font-bold text-white">Chọn</span></button>)}</div>}
+    <div className="space-y-2">{chosen.map((product, index) => <div key={product.id} className="flex items-center gap-3 rounded-xl bg-cream-50 p-2"><span className="text-sm font-bold">{index + 1}</span><img src={cloudinaryImage(product.thumbnail, { width: 80 })} alt="" className="size-10 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{product.name}</span><button type="button" onClick={() => onChange(chosen.filter((item) => item.id !== product.id).map((item) => item.id))} className="text-sm font-semibold text-red-700">Bỏ</button></div>)}</div>
   </div>;
 }
 
-function LinkFields({ legend, value, onChange, eyebrow, products }: {
-  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean; products: ProductOption[];
+function LinkFields({ legend, value, onChange, eyebrow, products, block }: {
+  legend: string; value: LinkDraft & { eyebrow?: string }; onChange: (value: LinkDraft & { eyebrow?: string }) => void; eyebrow?: boolean;
+  /** Khối sản phẩm thì có ô chọn sản phẩm; khối bộ sưu tập hiện các bộ sưu tập bật "Hiện ở trang chủ" nên không có. */
+  products?: ProductOption[]; block?: HomeProductBlockId;
 }) {
   return <fieldset className="space-y-3 rounded-2xl border border-cream-200 p-4">
     <legend className="px-2 text-sm font-bold">{legend}</legend>
@@ -144,23 +180,30 @@ function LinkFields({ legend, value, onChange, eyebrow, products }: {
       <DestinationField label="Nút sẽ mở" value={value.linkHref}
         onChange={(linkHref) => onChange({ ...value, linkHref })} />
     </div>
-    <ProductSelector products={products} selected={value.productIds} onChange={(productIds) => onChange({ ...value, productIds })} />
+    {products && block && <ProductSelector products={products} selected={value.productIds} block={block}
+      onChange={(productIds) => onChange({ ...value, productIds })} />}
   </fieldset>;
 }
 
-/** Bọc một khối thật của trang khách hàng và gắn nút Sửa ở góc. */
-function EditableSection({ label, active, onEdit, children, style }: {
-  label: string; active: boolean; onEdit: () => void; children: React.ReactNode; style?: React.CSSProperties;
+/**
+ * Bọc một khối thật của trang khách hàng và gắn nút Sửa ở góc. Khối không có gì để hiện vẫn được giữ chỗ
+ * (kèm lý do) để quản trị viên thấy và sửa được, thay vì biến mất khỏi trình sửa như trên trang chủ.
+ */
+function EditableSection({ label, active, onEdit, children, hiddenReason }: {
+  label: string; active: boolean; onEdit: () => void; children: React.ReactNode; hiddenReason?: string;
 }) {
-  return <section style={style} className={`relative rounded-3xl transition-shadow ${active ? 'ring-2 ring-honey-500' : 'hover:ring-2 hover:ring-honey-300'}`}>
+  return <section className={`relative rounded-3xl transition-shadow ${active ? 'ring-2 ring-honey-500' : 'hover:ring-2 hover:ring-honey-300'}`}>
     <div className="pointer-events-none absolute -top-3 left-3 z-20 rounded-full bg-charcoal-900/85 px-3 py-1 text-[11px] font-bold text-white">
-      {label}
+      {label}{hiddenReason && ' · Đang ẩn trên trang chủ'}
     </div>
     <button type="button" onClick={onEdit}
       className="absolute -top-3 right-3 z-20 min-h-9 rounded-full bg-honey-600 px-4 text-xs font-bold text-white shadow-md hover:bg-honey-700">
       {active ? 'Đang sửa' : 'Sửa'}
     </button>
-    {children}
+    {/* Chừa chỗ cho nhãn và nút Sửa để không che tiêu đề, liên kết của khối. */}
+    {hiddenReason
+      ? <p className="rounded-3xl border border-dashed border-cream-300 bg-cream-50 px-4 pb-5 pt-7 text-sm text-charcoal-600">{hiddenReason}</p>
+      : <div className="pt-7">{children}</div>}
   </section>;
 }
 
@@ -188,13 +231,10 @@ const previewImage = (url: string, label: string) => url
   ? <img src={cloudinaryImage(url, { width: 640 })} alt={label} className="h-24 w-full rounded-lg object-cover" />
   : <p className="text-xs text-charcoal-500">Chưa cấu hình ảnh</p>;
 
-const HOME_BLOCK_LABELS: Record<HomeBlockId, string> = {
-  hero: 'Hero trang chủ', bestSellers: 'Sản phẩm bán chạy', sale: 'Sản phẩm ưu đãi',
-  collections: 'Bộ sưu tập nổi bật', features: 'Ảnh chủ đề', testimonials: 'Feedback khách hàng',
-};
-
 /** Danh sách kéo-thả dùng HTML Drag and Drop, chỉ đổi thứ tự chứ không làm mất khối. */
-function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: (order: HomeBlockId[]) => void }) {
+function HomeOrderEditor({ order, onChange, visible }: {
+  order: HomeBlockId[]; onChange: (order: HomeBlockId[]) => void; visible: Record<HomeBlockId, boolean>;
+}) {
   const [dragged, setDragged] = useState<HomeBlockId | null>(null);
   const move = (target: HomeBlockId) => {
     if (!dragged || dragged === target) return;
@@ -210,24 +250,28 @@ function HomeOrderEditor({ order, onChange }: { order: HomeBlockId[]; onChange: 
       onDragStart={() => setDragged(id)} onDragEnd={() => setDragged(null)} onDragOver={(event) => event.preventDefault()}
       onDrop={() => move(id)} className={`flex cursor-grab items-center gap-3 rounded-xl border bg-white px-3 py-3 text-sm font-semibold active:cursor-grabbing ${dragged === id ? 'border-honey-500 opacity-50' : 'border-cream-200'}`}>
       <span aria-hidden="true" className="text-lg text-charcoal-400">⠿</span><span className="text-charcoal-500">{index + 1}.</span>{HOME_BLOCK_LABELS[id]}
+      {!visible[id] && <span className="ml-auto rounded-full bg-cream-100 px-2 py-0.5 text-[11px] font-semibold text-charcoal-500">Đang ẩn</span>}
     </li>)}</ol>
   </section>;
 }
 
-export function SiteContentManager({ initialContent, collections, products, bestSellers, saleProducts, feedback, feedbackTotal, canEditContact = true }: {
+export function SiteContentManager({ initialContent, invalidKeys: initialInvalidKeys, collections, products, feedback, feedbackTotal, canEditContact = true }: {
   /** Hotline, Zalo, Messenger: chỉ quản trị viên được đổi (đổi sang tài khoản lạ là lừa được khách). */
   canEditContact?: boolean;
+  /** Nội dung như website đang dùng; khóa trong invalidKeys có dữ liệu hỏng mà website đang bỏ qua. */
   initialContent: Record<string, unknown>;
+  invalidKeys: SiteContentKey[];
+  /** Bộ sưu tập bật "Hiện ở trang chủ". */
   collections: Collection[];
-  products: ProductOption[];
-  bestSellers: ProductCardData[];
-  saleProducts: ProductCardData[];
+  /** Mọi sản phẩm đang bán, mới nhất trước như trang chủ. */
+  products: ProductCardData[];
   feedback: PublicFeedback[];
   feedbackTotal: number;
 }) {
   const [draft, setDraft] = useState<ContentDraft>(() => toDraft(initialContent));
+  const [invalidKeys, setInvalidKeys] = useState<SiteContentKey[]>(initialInvalidKeys);
   const [dirty, setDirty] = useState<ContentKey[]>([]);
-  const [editing, setEditing] = useState<ContentKey | null>(null);
+  const [editing, setEditing] = useState<EditTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const revisionRef = useRef(0);
 
@@ -239,6 +283,7 @@ export function SiteContentManager({ initialContent, collections, products, best
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || 'Không tải được nội dung'));
       setDraft(toDraft(data.content));
+      setInvalidKeys(Array.isArray(data.invalidKeys) ? data.invalidKeys : []);
       setDirty([]);
       toast.success('Đã hoàn tác các thay đổi chưa lưu', { id });
     } catch (loadError) { toast.error(errorText(loadError, 'Không tải được nội dung'), { id }); }
@@ -249,7 +294,7 @@ export function SiteContentManager({ initialContent, collections, products, best
     setDraft((current) => ({ ...current, [key]: value }));
     setDirty((current) => current.includes(key) ? current : [...current, key]);
   };
-  const toggle = (key: ContentKey) => setEditing((current) => current === key ? null : key);
+  const toggle = (target: EditTarget) => setEditing((current) => current === target ? null : target);
   useUnsavedChangesGuard(dirty.length > 0 || saving);
 
   const saveAll = async () => {
@@ -271,6 +316,8 @@ export function SiteContentManager({ initialContent, collections, products, best
         } catch (saveError) { failed.push(key); errors.push(errorText(saveError, `Không lưu được khối ${key}`)); }
       }));
       const saved = keysToSave.length - failed.length;
+      // Khối vừa lưu đã qua kiểm tra hợp lệ nên website dùng lại được.
+      setInvalidKeys((current) => current.filter((key) => !keysToSave.includes(key) || failed.includes(key)));
       // Trang này dựng từ dữ liệu máy chủ: lần mở sau được làm mới để thấy nội dung mới. Không làm mới ngay vì
       // sẽ dựng lại trang đang sửa.
       if (saved > 0) markAdminPagesStale();
@@ -289,7 +336,16 @@ export function SiteContentManager({ initialContent, collections, products, best
     } finally { setSaving(false); }
   };
 
-  const sections = draft.home_sections;
+  // Bản xem trước dựng bằng đúng quy tắc và thành phần của trang chủ, từ bản nháp đang sửa.
+  const order = draft.home_layout.order;
+  const previewData = {
+    hero: draft.home_hero, sections: draft.home_sections, features: draft.home_features, testimonials: draft.testimonials_section,
+    collections, feedback, feedbackTotal,
+    bestSellers: homeBlockProducts('bestSellers', products, draft.home_sections.bestSellers.productIds),
+    sale: homeBlockProducts('sale', products, draft.home_sections.sale.productIds),
+  };
+  const visible = homeBlockVisibility(previewData);
+  const blocks = renderHomeBlocks(previewData);
 
   return <div className="pb-24">
     {/* Thanh công cụ chỉnh sửa */}
@@ -311,57 +367,20 @@ export function SiteContentManager({ initialContent, collections, products, best
       </div>
     </div>
 
-    <HomeOrderEditor order={draft.home_layout.order} onChange={(order) => update('home_layout', { order })} />
+    {invalidKeys.length > 0 && <p role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      Dữ liệu đã lưu của {invalidKeys.map((key) => CONTENT_KEY_LABELS[key]).join(', ')} không hợp lệ nên website đang bỏ qua. Sửa và lưu lại để website dùng được.
+    </p>}
 
-    {/* Mô phỏng trang chủ bằng chính các khối thật */}
+    <HomeOrderEditor order={order} visible={visible} onChange={(next) => update('home_layout', { order: next })} />
+
+    {/* Mô phỏng trang chủ bằng chính các khối thật, đúng thứ tự trong DOM như trang chủ */}
     <div className="flex flex-col gap-10">
-      {(collections.length > 0 || draft.home_hero.imageUrl) && <EditableSection style={{ order: draft.home_layout.order.indexOf('hero') }} label="Hero trang chủ" active={editing === 'home_hero'} onEdit={() => toggle('home_hero')}>
-        <HeroCarousel collections={collections} hero={draft.home_hero} />
-      </EditableSection>}
-
-      {bestSellers.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('bestSellers') }} label="Sản phẩm bán chạy" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
-        <div className="px-1">
-          {sections.bestSellers.imageUrl && <img src={cloudinaryImage(sections.bestSellers.imageUrl, { width: 1200 })} alt={sections.bestSellers.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.bestSellers.title || 'Sản phẩm bán chạy'}</h2>
-            {sections.bestSellers.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.bestSellers.linkLabel} →</span>}
-          </div>
-          <ProductGrid products={bestSellers} />
-        </div>
-      </EditableSection>}
-
-      {saleProducts.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('sale') }} label="Sản phẩm ưu đãi" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
-        <div className="px-1">
-          {sections.sale.imageUrl && <img src={cloudinaryImage(sections.sale.imageUrl, { width: 1200 })} alt={sections.sale.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.sale.title || 'Sản phẩm ưu đãi'}</h2>
-            {sections.sale.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.sale.linkLabel}</span>}
-          </div>
-          <ProductGrid products={saleProducts} />
-        </div>
-      </EditableSection>}
-
-      {collections.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('collections') }} label="Bộ sưu tập nổi bật" active={editing === 'home_sections'} onEdit={() => toggle('home_sections')}>
-        <div className="px-1">
-          {sections.collections.imageUrl && <img src={cloudinaryImage(sections.collections.imageUrl, { width: 1200 })} alt={sections.collections.imageAlt || ''} className="mb-5 h-40 w-full rounded-2xl object-cover" />}
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              {sections.collections.eyebrow && <p className="text-xs font-bold uppercase tracking-wider text-honey-600">{sections.collections.eyebrow}</p>}
-              <h2 className="text-lg font-bold font-heading text-charcoal-900 sm:text-2xl">{sections.collections.title || 'Bộ sưu tập nổi bật'}</h2>
-            </div>
-            {sections.collections.linkLabel && <span className="text-xs font-bold text-honey-600">{sections.collections.linkLabel} →</span>}
-          </div>
-          <LookbookCarousel collections={collections} />
-        </div>
-      </EditableSection>}
-
-      {draft.home_features.items.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('features') }} label="Ảnh chủ đề" active={editing === 'home_features'} onEdit={() => toggle('home_features')}>
-        <div className="px-1"><FeatureCarousel section={draft.home_features} /></div>
-      </EditableSection>}
-
-      {feedback.length > 0 && <EditableSection style={{ order: draft.home_layout.order.indexOf('testimonials') }} label="Feedback khách hàng" active={editing === 'testimonials_section'} onEdit={() => toggle('testimonials_section')}>
-        <TestimonialsSection feedback={feedback} feedbackTotal={feedbackTotal} section={draft.testimonials_section} />
-      </EditableSection>}
+      {orderHomeBlocks(blocks, order).map((block, index) => {
+        const id = order[index];
+        const target = BLOCK_EDIT_TARGETS[id];
+        return <EditableSection key={id} label={HOME_BLOCK_LABELS[id]} active={editing === target} onEdit={() => toggle(target)}
+          hiddenReason={visible[id] ? undefined : HIDDEN_REASONS[id]}>{block}</EditableSection>;
+      })}
     </div>
 
     {/* Các khối thuộc trang khác */}
@@ -517,12 +536,12 @@ export function SiteContentManager({ initialContent, collections, products, best
     </div>
 
     {/* Drawer chỉnh sửa cho các khối nằm ngay trên trang chủ */}
-    {editing && HOME_SECTION_KEYS.includes(editing) && <div className="fixed inset-0 z-40 flex justify-end">
+    {editing && DRAWER_TITLES[editing] && <div className="fixed inset-0 z-40 flex justify-end">
       <button type="button" aria-label="Đóng bảng chỉnh sửa" onClick={() => setEditing(null)}
         className="flex-1 bg-charcoal-900/30" />
       <aside className="h-full w-full max-w-lg overflow-y-auto bg-white p-5 shadow-2xl">
         <header className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold">{HOME_SECTION_TITLES[editing]}</h2>
+          <h2 className="text-lg font-bold">{DRAWER_TITLES[editing]}</h2>
           <button type="button" onClick={() => setEditing(null)}
             className="min-h-11 rounded-xl border border-cream-300 px-4 text-sm font-semibold">Đóng</button>
         </header>
@@ -548,15 +567,13 @@ export function SiteContentManager({ initialContent, collections, products, best
             onChange={(defaultBadge) => update('home_hero', { ...draft.home_hero, defaultBadge })} />
           </div></div>}
 
-        {editing === 'home_sections' && <div className="space-y-4">
-          <LinkFields legend="Sản phẩm bán chạy" products={products} value={draft.home_sections.bestSellers}
-            onChange={(bestSellers) => update('home_sections', { ...draft.home_sections, bestSellers })} />
-          <LinkFields legend="Sản phẩm ưu đãi" products={products} value={draft.home_sections.sale}
-            onChange={(sale) => update('home_sections', { ...draft.home_sections, sale })} />
-          <LinkFields legend="Bộ sưu tập nổi bật" products={products} eyebrow value={draft.home_sections.collections}
-            onChange={(next) => update('home_sections', { ...draft.home_sections,
-              collections: { ...next, eyebrow: next.eyebrow || '' } })} />
-        </div>}
+        {(editing === 'bestSellers' || editing === 'sale') && <LinkFields key={editing} legend={HOME_BLOCK_LABELS[editing]}
+          products={products} block={editing} value={draft.home_sections[editing]}
+          onChange={(next) => update('home_sections', { ...draft.home_sections, [editing]: next })} />}
+
+        {editing === 'collections' && <LinkFields legend={HOME_BLOCK_LABELS.collections} eyebrow value={draft.home_sections.collections}
+          onChange={(next) => update('home_sections', { ...draft.home_sections,
+            collections: { ...next, eyebrow: next.eyebrow || '' } })} />}
 
         {editing === 'home_features' && <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">

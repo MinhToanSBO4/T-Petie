@@ -57,11 +57,12 @@ export function FeedbackStoryRail({ items, total }: { items: PublicFeedback[]; t
     left: direction * scroller.current.clientWidth * 0.8, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 
   const card = 'block w-[38vw] max-w-[176px] shrink-0 sm:w-44';
+  // Nút trước/sau nằm ở hai lề ngoài dải (dải thụt vào md:mx-14) nên không đè lên thẻ feedback nào.
   const arrow = 'absolute top-[42%] z-10 hidden size-11 -translate-y-1/2 place-items-center rounded-full border border-cream-200 bg-white/95 text-charcoal-800 shadow-soft transition-opacity hover:text-honey-700 md:grid';
 
   return <div className="relative">
     <ul ref={scroller} onScroll={updateEdges} aria-label="Feedback khách hàng"
-      className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-3 pt-1 sm:mx-0 sm:gap-4 sm:scroll-px-0 sm:px-0">
+      className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-3 pt-1 sm:mx-0 sm:gap-4 sm:scroll-px-0 sm:px-0 md:mx-14">
       {items.map((item, index) => {
         const isSeen = seen.has(item.id);
         return <li key={item.id} className="snap-start">
@@ -90,10 +91,10 @@ export function FeedbackStoryRail({ items, total }: { items: PublicFeedback[]; t
       </li>}
     </ul>
     <button type="button" onClick={() => scrollBy(-1)} aria-label="Xem các feedback trước"
-      className={`${arrow} -left-5 ${edges.start ? 'pointer-events-none opacity-0' : 'opacity-100'}`} tabIndex={edges.start ? -1 : 0}>
+      className={`${arrow} left-0 ${edges.start ? 'pointer-events-none opacity-0' : 'opacity-100'}`} tabIndex={edges.start ? -1 : 0}>
       <ChevronLeft className="size-5" /></button>
     <button type="button" onClick={() => scrollBy(1)} aria-label="Xem thêm feedback"
-      className={`${arrow} -right-5 ${edges.end ? 'pointer-events-none opacity-0' : 'opacity-100'}`} tabIndex={edges.end ? -1 : 0}>
+      className={`${arrow} right-0 ${edges.end ? 'pointer-events-none opacity-0' : 'opacity-100'}`} tabIndex={edges.end ? -1 : 0}>
       <ChevronRight className="size-5" /></button>
 
     {open !== null && <FeedbackViewer items={items} startIndex={open} onClose={() => setOpen(null)} onView={markSeen}

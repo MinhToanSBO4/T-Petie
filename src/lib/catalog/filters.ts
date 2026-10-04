@@ -153,12 +153,25 @@ export function activeFilterCount(filters: CatalogFilters) {
     + [filters.inStock, filters.sale, filters.isNew, filters.rating4].filter(Boolean).length;
 }
 
-export const isOnSale = (product: CatalogEntry) => Boolean(product.isSale || (product.originalPrice && product.originalPrice > product.basePrice));
-export function discountOf(product: CatalogEntry) {
+/** Các trường giá đủ để biết sản phẩm có đang giảm giá và giảm bao nhiêu (dữ liệu thẻ sản phẩm cũng có đủ). */
+export type PriceEntry = Pick<CatalogEntry, 'basePrice' | 'originalPrice' | 'discountPercent' | 'isSale'>;
+
+export const isOnSale = (product: PriceEntry) => Boolean(product.isSale || (product.originalPrice && product.originalPrice > product.basePrice));
+export function discountOf(product: PriceEntry) {
   if (product.originalPrice && product.originalPrice > product.basePrice) {
     return Math.round((1 - product.basePrice / product.originalPrice) * 100);
   }
   return product.discountPercent || 0;
+}
+
+type Ranked<T> = { product: T; index: number };
+/** Giảm nhiều nhất trước; bằng nhau thì giữ thứ tự gốc (mới nhất trước). */
+const byDiscount = <T extends PriceEntry>(a: Ranked<T>, b: Ranked<T>) => discountOf(b.product) - discountOf(a.product) || a.index - b.index;
+
+/** Hàng đang giảm giá theo thứ tự mặc định của trang /sale; khối Ưu đãi ở trang chủ dùng đúng thứ tự này. */
+export function onSaleByDiscount<T extends PriceEntry>(products: T[]): T[] {
+  return products.map((product, index) => ({ product, index })).filter(({ product }) => isOnSale(product))
+    .sort(byDiscount).map(({ product }) => product);
 }
 
 /** Giá dùng để lọc: khi đã chọn size thì lấy giá thấp nhất trong các size đó (giá thay đổi theo size), không thì giá khởi điểm. */
@@ -231,7 +244,7 @@ export function sortCatalog<T extends CatalogEntry>(products: T[], sort: SortKey
     'best-seller': (a, b) => Number(Boolean(b.product.isBestSeller)) - Number(Boolean(a.product.isBestSeller)) || a.index - b.index,
     'price-asc': (a, b) => a.product.basePrice - b.product.basePrice || a.index - b.index,
     'price-desc': (a, b) => b.product.basePrice - a.product.basePrice || a.index - b.index,
-    discount: (a, b) => discountOf(b.product) - discountOf(a.product) || a.index - b.index,
+    discount: byDiscount,
     rating: (a, b) => (b.product.rating || 0) - (a.product.rating || 0) || b.product.reviewCount - a.product.reviewCount || a.index - b.index,
   };
   return indexed.sort(compare[sort]).map((item) => item.product);

@@ -53,6 +53,23 @@ export const getSiteContent = unstable_cache(async (): Promise<SiteContentMap> =
   };
 }, ['site-content-map'], { revalidate: 300, tags: [SITE_CONTENT_TAG] });
 
+/**
+ * Nội dung cho trình sửa, đọc thẳng database (không cache): giá trị đã kiểm tra như website đang dùng. Khóa có dữ liệu
+ * hỏng thì website bỏ qua (safeParse), còn trình sửa giữ bản thô để sửa lại và liệt kê trong `invalidKeys`.
+ */
+export async function readSiteContentForEditor() {
+  const rows = await prisma.siteContent.findMany({ where: { key: { in: [...SITE_CONTENT_KEYS] } }, select: { key: true, data: true } });
+  const content: Record<string, unknown> = {};
+  const invalidKeys: SiteContentKey[] = [];
+  for (const key of SITE_CONTENT_KEYS) {
+    const row = rows.find((item) => item.key === key);
+    const parsed = safeParse(key, rows);
+    if (row && !parsed) invalidKeys.push(key);
+    content[key] = parsed ?? row?.data ?? null;
+  }
+  return { content, invalidKeys };
+}
+
 export async function getHomeFeatures(): Promise<HomeFeaturesSection | null> {
   return (await getSiteContent()).home_features;
 }

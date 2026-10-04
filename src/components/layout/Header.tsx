@@ -25,8 +25,10 @@ const SearchDialog = dynamic(() => import('@/components/layout/SearchDialog').th
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { backOfficeHome } from '@/lib/admin/back-office';
 
-export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
+export function Header({ logoUrl, logoAlt, collectionNav = [], homeNav = [] }: {
   logoUrl?: string; logoAlt?: string; collectionNav?: SubNavItem[];
+  /** Các khối đang hiện trên trang chủ, đúng thứ tự và tiêu đề đã cấu hình. */
+  homeNav?: SubNavItem[];
 } = {}) {
   const pathname = usePathname();
   const { totalItems, openMiniCart, cartBounceTrigger } = useCart();
@@ -34,8 +36,8 @@ export function Header({ logoUrl, logoAlt, collectionNav = [] }: {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredNavIndex, setHoveredNavIndex] = useState<number | null>(null);
-  const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections'
-    ? { ...item, children: collectionNav } : item);
+  const navigation = MAIN_NAV_ITEMS.map((item) => item.href === '/collections' ? { ...item, children: collectionNav }
+    : item.href === '/' ? { ...item, children: homeNav } : item);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 

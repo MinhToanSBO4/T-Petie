@@ -22,11 +22,8 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   {
     label: 'Trang Chủ',
     href: '/',
-    children: [
-      { label: 'Bộ Sưu Tập Nổi Bật', href: '/#collections' },
-      { label: 'Sản Phẩm Bán Chạy Nhất', href: '/#best-seller' },
-      { label: 'Ưu Đãi Độc Quyền', href: '/#flash-sale' },
-    ],
+    // Mục con là các khối đang hiện trên trang chủ, theo thứ tự và tiêu đề quản trị viên cấu hình (getHomeNavigation).
+    children: [],
   },
   {
     label: 'Sản Phẩm',

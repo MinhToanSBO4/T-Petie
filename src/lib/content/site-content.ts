@@ -23,6 +23,12 @@ export const HOME_BLOCK_IDS = ['hero', 'bestSellers', 'sale', 'collections', 'fe
 export type HomeBlockId = (typeof HOME_BLOCK_IDS)[number];
 export type HomeLayout = { order: HomeBlockId[] };
 
+/** Tên gọi của từng khối trong trang quản trị; menu dùng khi khối chưa đặt tiêu đề. */
+export const HOME_BLOCK_LABELS: Record<HomeBlockId, string> = {
+  hero: 'Hero trang chủ', bestSellers: 'Sản phẩm bán chạy', sale: 'Sản phẩm ưu đãi',
+  collections: 'Bộ sưu tập nổi bật', features: 'Ảnh chủ đề', testimonials: 'Feedback khách hàng',
+};
+
 /** Trả các khối theo đúng thứ tự đã lưu để DOM, bàn phím và trình đọc màn hình cùng nhất quán. */
 export function orderHomeBlocks<T>(blocks: Record<HomeBlockId, T>, order: readonly HomeBlockId[]): T[] {
   return order.map((id) => blocks[id]);

@@ -16,6 +16,7 @@ import { AuthNotice } from '@/components/auth/AuthNotice';
 import { EmailVerificationProvider } from '@/components/auth/EmailVerification';
 import { PublicChrome } from '@/components/layout/PublicChrome';
 import { getSiteContent } from '@/server/content/site-content';
+import { getHomeNavigation } from '@/server/content/home-navigation';
 import { getCommerceSettings } from '@/server/orders/commerce-settings';
 import { getCollections } from '@/server/catalog/queries';
 import { Suspense } from 'react';
@@ -55,8 +56,10 @@ export default async function RootLayout({
   const ga4Candidate = process.env.NEXT_PUBLIC_GA4_ID || (process.env.VERCEL_ENV === 'production' ? DEFAULT_GA4_ID : '');
   const ga4Id = /^G-[A-Z0-9]+$/.test(ga4Candidate) ? ga4Candidate : undefined;
   // Nhận diện thương hiệu và cấu hình bán hàng lấy từ database, không còn số liệu viết cứng.
-  // Menu bộ sưu tập đọc từ cache máy chủ (làm mới khi admin sửa bộ sưu tập), không gọi API mỗi lần chuyển trang.
-  const [siteContent, commerceSettings, collections] = await Promise.all([getSiteContent(), getCommerceSettings(), getCollections()]);
+  // Menu bộ sưu tập và menu Trang Chủ đọc từ cache máy chủ (làm mới khi admin sửa bộ sưu tập, sản phẩm hay nội dung),
+  // không gọi API mỗi lần chuyển trang.
+  const [siteContent, commerceSettings, collections, homeNav] = await Promise.all([getSiteContent(), getCommerceSettings(),
+    getCollections(), getHomeNavigation()]);
   const brandAssets = siteContent.brand_assets;
   const collectionNav = collections.filter((item) => item.showInMenu)
     .map((item) => ({ label: item.title, href: `/collections/${item.id}` }));
@@ -97,7 +100,7 @@ export default async function RootLayout({
                 <AuthNotice />
                 {/* Khu vực quản trị có khung riêng nên các thành phần của trang khách được ẩn ở đó. */}
                 <PublicChrome
-                  header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} collectionNav={collectionNav} />}
+                  header={<Header logoUrl={brandAssets?.logoUrl} logoAlt={brandAssets?.logoAlt} collectionNav={collectionNav} homeNav={homeNav} />}
                   floating={<>
                     <MiniCart freeShippingThreshold={commerceSettings?.freeShippingThreshold ?? null} />
                     <MobileBottomNav />
