@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export type ErrorIllustrationName = 'dress' | 'spool' | 'parcel' | 'lock';
 
-// Màu lấy từ lớp Tailwind (biến CSS) nên trong khu nội bộ (.admin-theme) minh họa tự chuyển sang tông hồng.
+// Màu lấy từ lớp Tailwind (biến CSS) nên minh họa luôn cùng tông hồng với giao diện.
 // Chuyển động rất nhẹ (váy đung đưa, cuộn chỉ nhấp nhô, lấp lánh) và tắt hẳn khi người dùng chọn giảm chuyển động.
 const MOTION = '@keyframes tp-sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}'
   + '@keyframes tp-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}'

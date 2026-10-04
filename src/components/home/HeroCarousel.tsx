@@ -6,13 +6,14 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import type { Collection } from '@/types/collection';
 import type { HomeHero } from '@/lib/content/site-content';
+import { DEFAULT_THEME_COLOR } from '@/lib/content/collection-colors';
 
 export function HeroCarousel({ collections, hero }: { collections: Collection[]; hero?: HomeHero | null }) {
   // Ảnh do quản trị viên chọn là hero độc lập, kể cả khi chưa có bộ sưu tập hiển thị ở trang chủ.
   const slides = hero?.slides.length
-    ? hero.slides.map((slide) => ({ ...slide, title: slide.title || "T'Petie", bannerImage: slide.imageUrl, themeColor: '#fff8ee', href: slide.href || '/' }))
+    ? hero.slides.map((slide) => ({ ...slide, title: slide.title || "T'Petie", bannerImage: slide.imageUrl, themeColor: DEFAULT_THEME_COLOR, href: slide.href || '/' }))
     : hero?.imageUrl
-    ? [{ id: 'custom-hero', title: hero.imageAlt || "T'Petie", bannerImage: hero.imageUrl, imageAlt: hero.imageAlt, icon: '', description: '', objectPosition: 'center center', themeColor: '#fff8ee', badge: hero.defaultBadge, href: hero.shopHref || '/' }]
+    ? [{ id: 'custom-hero', title: hero.imageAlt || "T'Petie", bannerImage: hero.imageUrl, imageAlt: hero.imageAlt, icon: '', description: '', objectPosition: 'center center', themeColor: DEFAULT_THEME_COLOR, badge: hero.defaultBadge, href: hero.shopHref || '/' }]
     : collections.map((collection) => ({ ...collection, imageAlt: collection.title, icon: '', description: '', objectPosition: 'center center', href: `/collections/${collection.id}` }));
   const [currentIndex, setCurrentIndex] = useState(0);
   const activeIndex = slides.length ? currentIndex % slides.length : 0;

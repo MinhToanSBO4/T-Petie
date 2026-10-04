@@ -399,12 +399,12 @@ export function ProductDetailClient({ product, relatedProducts }: { product: Pro
           )}
 
           {product.orderNote && (
-            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-charcoal-800 space-y-1">
-              <div className="flex items-center space-x-1.5 font-bold text-amber-800">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="p-4 rounded-2xl bg-honey-50 border border-honey-200 text-xs text-charcoal-800 space-y-1">
+              <div className="flex items-center space-x-1.5 font-bold text-honey-800">
+                <AlertTriangle className="w-4 h-4 text-honey-600 shrink-0" />
                 <span>Lưu ý khi đặt / nhận đơn:</span>
               </div>
-              <p className="whitespace-pre-line leading-relaxed text-amber-900">{product.orderNote}</p>
+              <p className="whitespace-pre-line leading-relaxed text-honey-900">{product.orderNote}</p>
             </div>
           )}
 

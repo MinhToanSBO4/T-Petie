@@ -4,6 +4,7 @@ import { prisma } from '@/server/db/client';
 import type { Product } from '@/types/product';
 import type { Collection } from '@/types/collection';
 import { compareSizeLabels } from '@/lib/catalog/filters';
+import { DEFAULT_ACCENT_COLOR, DEFAULT_THEME_COLOR } from '@/lib/content/collection-colors';
 
 // Bộ sưu tập chỉ cần mã và tên: không kéo câu chuyện/lookbook vào từng sản phẩm của danh sách đã cache
 // (Next.js bỏ qua cache cho mục lớn hơn 2 MB).
@@ -93,7 +94,7 @@ export const getCollections = unstable_cache(async (): Promise<Collection[]> => 
   return rows.map((row) => ({
     id: row.slug, title: row.title, subtitle: row.subtitle || '', story: row.story || '',
     bannerImage: row.bannerUrl, lookbookImages: row.lookbookUrls,
-    themeColor: row.themeColor || '#FFF8EE', accentColor: row.accentColor || '#D97706',
+    themeColor: row.themeColor || DEFAULT_THEME_COLOR, accentColor: row.accentColor || DEFAULT_ACCENT_COLOR,
     season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.id),
     showInMenu: row.showInMenu, showOnHome: row.showOnHome,
   }));
