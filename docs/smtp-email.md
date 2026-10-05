@@ -44,12 +44,12 @@ Receipt/status jobs are inserted in the same transaction as order creation or st
 
 Workers claim one due job using `FOR UPDATE SKIP LOCKED` with a 60-second lease. Each SMTP send has a 15-second wall-clock deadline that destroys the actual socket, stable Message-ID and sanitized error code. At most five attempts are made, with exponential backoff starting at one minute. Expired leases recover, including failed final-attempt leases. A dispatch drains due jobs (up to 25 per request, 50 in maintenance) until its 50-second budget, inside the 60-second maxDuration, cannot cover another send.
 
-Delivery does not depend on a frequent scheduler. Four layers, cheapest first:
+Delivery does not depend on a frequent scheduler. Four layers, cheapest first (the GitHub Actions hourly backstop was removed: it failed on every run because the repository `CRON_SECRET`/`SITE_URL` did not match Vercel, and the layers below already cover quiet periods):
 
 1. **Event-driven:** every order creation, status change, undo and auto-completion dispatches after the response with `waitUntil`.
 2. **In-run retry:** backoff is 30 s, 2 min, 10 min, 1 h (five attempts). After a transient failure the same run waits for the next due retry when it fits in the time budget, so short SMTP blips heal in seconds. The extra query only runs after a failure.
 3. **Traffic piggyback:** `/api/products` and `/api/quote` call `kickEmailOutbox()`, at most once per 2 minutes per server instance, after the response. An empty queue costs one indexed query.
-4. **Schedulers:** Vercel Cron runs `/api/cron/maintenance` daily (also expires/purges/redacts). `.github/workflows/email-outbox.yml` calls `/api/cron/email` hourly as a backstop for quiet periods (about 720 short runs a month, free on a public repository). It needs the repository secret `CRON_SECRET` (same value as Vercel) and the repository variable `SITE_URL`. GitHub only runs schedules from the default branch and disables them after 60 days without repository activity, which is why it is a backstop and not the primary path.
+4. **Schedulers:** Vercel Cron runs `/api/cron/maintenance` daily (also expires/purges/redacts). `/api/cron/email` drains the outbox on demand for any external scheduler that sends `Authorization: Bearer <CRON_SECRET>` (none is configured by default); mail left over after a quiet period is sent by the next visit or by the daily maintenance run.
 
 Auto-completion may enqueue while rendering pages but never sends mail during a build.
 

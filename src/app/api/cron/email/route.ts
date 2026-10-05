@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Gửi thư đang chờ và thử lại thư lỗi. Gói Vercel Hobby chỉ cho cron chạy mỗi ngày, nên endpoint này được
- * GitHub Actions gọi mỗi 5 phút (.github/workflows/email-outbox.yml). Hàng đợi trống thì chỉ tốn một truy vấn.
+ * Gửi thư đang chờ và thử lại thư lỗi khi một bộ hẹn giờ ngoài gọi tới. Gói Vercel Hobby chỉ cho cron chạy mỗi
+ * ngày; mặc định thư còn tồn được gửi bởi lượt truy cập của khách và cron bảo trì hằng ngày. Hàng đợi trống thì
+ * chỉ tốn một truy vấn.
  */
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
