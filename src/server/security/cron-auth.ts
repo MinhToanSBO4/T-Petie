@@ -1,7 +1,7 @@
 import 'server-only';
 import { timingSafeEqual } from 'node:crypto';
 
-/** Vercel Cron và bộ hẹn giờ ngoài (GitHub Actions) gửi `Authorization: Bearer <CRON_SECRET>`. */
+/** Vercel Cron và bộ hẹn giờ ngoài gửi `Authorization: Bearer <CRON_SECRET>`. */
 export function cronAuthorized(request: Request) {
   // Bỏ khoảng trắng/xuống dòng thừa khi dán giá trị vào Vercel hoặc GitHub.
   const secret = process.env.CRON_SECRET?.trim();
