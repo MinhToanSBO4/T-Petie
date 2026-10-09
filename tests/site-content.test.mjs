@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderHomeBlocks, parseCategoryPages, parseHomeFeatures, parseHomeFeaturesSection, parseHomeHero, parseHomeLayout, parseHomeSections, parseSizeGuide } from '../src/lib/content/site-content.ts';
+import { SOCIAL_CHANNELS, orderHomeBlocks, parseCategoryPages, parseContactInfo, parseHomeFeatures, socialLinks, parseHomeFeaturesSection, parseHomeHero, parseHomeLayout, parseHomeSections, parseSizeGuide } from '../src/lib/content/site-content.ts';
 
 test('home features are read from structured records and reject unsafe image URLs', () => {
   const record = { id: 'fabric', src: 'https://res.cloudinary.com/demo/image/upload/fabric.jpg', icon: '🌿', title: 'Fabric',
@@ -57,6 +57,20 @@ test('home block image fields only accept images from the managed media library'
     collections: { title: '', linkLabel: '', linkHref: '', eyebrow: '', imageUrl: '', imageAlt: '' },
   }).bestSellers.imageUrl, imageUrl);
   assert.throws(() => parseHomeHero({ shopLabel: '', shopHref: '', lookbookLabel: '', lookbookHref: '', defaultBadge: '', imageUrl: 'https://example.test/image.jpg', imageAlt: '' }));
+});
+
+test('contact info accepts every social channel, stays valid without the newer ones and rejects unsafe links', () => {
+  // Dữ liệu lưu trước khi có Threads/YouTube/… không được làm cả khối liên hệ bị bỏ qua.
+  const legacy = parseContactInfo({ hotline: '035 999 5381', facebookUrl: 'https://www.facebook.com/tpetie' });
+  assert.equal(legacy.threadsUrl, '');
+  assert.equal(legacy.facebookUrl, 'https://www.facebook.com/tpetie');
+  const urls = Object.fromEntries(SOCIAL_CHANNELS.map(({ key }) => [key, `https://example.test/${key}`]));
+  const full = parseContactInfo(urls);
+  assert.deepEqual(socialLinks(full).map((channel) => channel.key), SOCIAL_CHANNELS.map((channel) => channel.key));
+  assert.deepEqual(socialLinks(legacy).map((channel) => channel.name), ['Facebook']);
+  assert.ok(SOCIAL_CHANNELS.some((channel) => channel.key === 'threadsUrl'));
+  assert.throws(() => parseContactInfo({ threadsUrl: 'javascript:alert(1)' }), /Liên kết/);
+  assert.throws(() => parseContactInfo({ youtubeUrl: 'http://insecure.example/a' }), /Liên kết/);
 });
 
 test('links that browsers read as off-site are rejected, and errors name the field', () => {

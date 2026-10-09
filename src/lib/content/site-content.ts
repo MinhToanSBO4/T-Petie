@@ -36,10 +36,33 @@ export function orderHomeBlocks<T>(blocks: Record<HomeBlockId, T>, order: readon
 
 /** Nhận diện thương hiệu dùng chung cho Header, Footer và các trang. */
 export type BrandAssets = { logoUrl: string; logoAlt: string };
+/**
+ * Danh sách mạng xã hội duy nhất của website: parser, form quản trị, footer, dữ liệu có cấu trúc (JSON-LD)
+ * và lựa chọn "biết đến shop từ kênh nào" ở trang thanh toán đều đọc từ đây, nên thêm mạng mới chỉ cần thêm một dòng
+ * (và biểu tượng tương ứng trong SocialIcons, được TypeScript bắt buộc).
+ */
+export const SOCIAL_CHANNELS = [
+  { key: 'facebookUrl', name: 'Facebook', adminLabel: 'Trang Facebook', placeholder: 'https://www.facebook.com/…' },
+  { key: 'tiktokUrl', name: 'TikTok', adminLabel: 'Kênh TikTok', placeholder: 'https://www.tiktok.com/@…' },
+  { key: 'instagramUrl', name: 'Instagram', adminLabel: 'Trang Instagram', placeholder: 'https://www.instagram.com/…' },
+  { key: 'threadsUrl', name: 'Threads', adminLabel: 'Trang Threads', placeholder: 'https://www.threads.com/@…' },
+  { key: 'youtubeUrl', name: 'YouTube', adminLabel: 'Kênh YouTube', placeholder: 'https://www.youtube.com/@…' },
+  { key: 'pinterestUrl', name: 'Pinterest', adminLabel: 'Trang Pinterest', placeholder: 'https://www.pinterest.com/…' },
+  { key: 'xUrl', name: 'X (Twitter)', adminLabel: 'Tài khoản X (Twitter)', placeholder: 'https://x.com/…' },
+] as const;
+export type SocialKey = (typeof SOCIAL_CHANNELS)[number]['key'];
+
 /** Thông tin liên hệ và kênh mạng xã hội hiển thị ở footer, nút chat và trang chính sách. */
 export type ContactInfo = { hotline: string; hotlineHours: string; zaloUrl: string; zaloLabel: string;
-  messengerUrl: string; facebookUrl: string; tiktokUrl: string; instagramUrl: string;
-  commitment: string; madeIn: string; copyrightName: string };
+  messengerUrl: string; commitment: string; madeIn: string; copyrightName: string } & Record<SocialKey, string>;
+
+/** Các mạng xã hội đã cấu hình (bỏ mục để trống), theo thứ tự hiển thị. */
+export function socialLinks(contact?: Partial<Record<SocialKey, string>> | null) {
+  return SOCIAL_CHANNELS.flatMap((channel) => {
+    const url = contact?.[channel.key];
+    return url ? [{ ...channel, url }] : [];
+  });
+}
 
 /** Banner và lời dẫn của trang Ưu đãi. */
 export type SalePageContent = { bannerUrl: string; bannerAlt: string; title: string; description: string };
@@ -216,8 +239,9 @@ export function parseContactInfo(value: unknown): ContactInfo {
   if (hotline && !/^\+?\d[\d .-]{5,18}$/.test(hotline)) throw new SiteContentError('Số hotline chỉ gồm chữ số, khoảng trắng, dấu chấm hoặc gạch');
   return { hotline, hotlineHours: optionalText(row.hotlineHours, 60),
     zaloUrl: optionalHref(row.zaloUrl), zaloLabel: optionalText(row.zaloLabel, 80),
-    messengerUrl: optionalHref(row.messengerUrl), facebookUrl: optionalHref(row.facebookUrl),
-    tiktokUrl: optionalHref(row.tiktokUrl), instagramUrl: optionalHref(row.instagramUrl),
+    messengerUrl: optionalHref(row.messengerUrl),
+    // Dữ liệu cũ chưa có mạng mới thì optionalHref trả '' nên vẫn hợp lệ, không làm cả khối liên hệ bị bỏ qua.
+    ...Object.fromEntries(SOCIAL_CHANNELS.map(({ key }) => [key, optionalHref(row[key])])) as Record<SocialKey, string>,
     commitment: optionalText(row.commitment, 300), madeIn: optionalText(row.madeIn, 80),
     copyrightName: optionalText(row.copyrightName, 80) };
 }
