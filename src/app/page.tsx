@@ -1,5 +1,5 @@
 import React from 'react';
-import { HOME_BLOCK_IDS, orderHomeBlocks } from '@/lib/content/site-content';
+import { HOME_BLOCK_IDS, orderHomeBlocks, socialLinks } from '@/lib/content/site-content';
 import { homeBlockProducts } from '@/lib/content/home-blocks';
 import { getProducts, getCollections } from '@/server/catalog/queries';
 import { renderHomeBlocks } from '@/components/home/HomeBlocks';
@@ -29,7 +29,7 @@ export default async function HomePage() {
   // Tiêu đề trang cho máy tìm kiếm và trình đọc màn hình (các khối trang chủ chỉ có h2); thông tin thương hiệu dạng có cấu trúc.
   const organization = { '@context': 'https://schema.org', '@type': 'Organization', name: "T'Petie", url: siteUrl(),
     ...(content.brand_assets?.logoUrl ? { logo: content.brand_assets.logoUrl } : {}),
-    sameAs: [content.contact_info?.facebookUrl, content.contact_info?.instagramUrl, content.contact_info?.tiktokUrl].filter(Boolean) };
+    sameAs: socialLinks(content.contact_info).map((channel) => channel.url) };
   return <div className="flex flex-col gap-10 sm:gap-14">
     <h1 className="sr-only">T&apos;Petie – thời trang thiết kế cho bé gái</h1>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organization).replace(/</g, '\\u003c') }} />

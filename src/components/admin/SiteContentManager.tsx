@@ -9,8 +9,8 @@ import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { renderHomeBlocks } from '@/components/home/HomeBlocks';
-import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, HOME_BLOCK_LABELS, orderHomeBlocks,
-  type HomeBlockId, type SiteContentKey } from '@/lib/content/site-content';
+import { CATEGORY_PAGE_IDS, CATEGORY_PAGE_LABELS, HOME_BLOCK_IDS, HOME_BLOCK_LABELS, SOCIAL_CHANNELS, orderHomeBlocks,
+  socialLinks, type ContactInfo, type HomeBlockId, type SiteContentKey, type SocialKey } from '@/lib/content/site-content';
 import { HOME_PRODUCT_LIMITS, chosenHomeProducts, homeBlockProducts, homeBlockVisibility,
   type HomeProductBlockId, type HomeSectionId } from '@/lib/content/home-blocks';
 import type { Collection } from '@/types/collection';
@@ -28,8 +28,7 @@ type ContentDraft = {
   home_features: { eyebrow: string; title: string; items: HomeFeatureRow[] };
   testimonials_section: { eyebrow: string; title: string } & ImageDraft;
   brand_assets: { logoUrl: string; logoAlt: string };
-  contact_info: { hotline: string; hotlineHours: string; zaloUrl: string; zaloLabel: string; messengerUrl: string;
-    facebookUrl: string; tiktokUrl: string; instagramUrl: string; commitment: string; madeIn: string; copyrightName: string };
+  contact_info: ContactInfo;
   sale_page: { bannerUrl: string; bannerAlt: string; title: string; description: string };
   about_page: { heroImageUrl: string; heroImageAlt: string; heroTitle: string; heroDescription: string;
     ctaTitle: string; ctaDescription: string; ctaLabel: string; ctaHref: string };
@@ -82,8 +81,8 @@ const emptyDraft = (): ContentDraft => ({
   home_features: { eyebrow: '', title: '', items: [] },
   testimonials_section: { eyebrow: '', title: '', imageUrl: '', imageAlt: '' },
   brand_assets: { logoUrl: '', logoAlt: '' },
-  contact_info: { hotline: '', hotlineHours: '', zaloUrl: '', zaloLabel: '', messengerUrl: '', facebookUrl: '',
-    tiktokUrl: '', instagramUrl: '', commitment: '', madeIn: '', copyrightName: '' },
+  contact_info: { hotline: '', hotlineHours: '', zaloUrl: '', zaloLabel: '', messengerUrl: '', commitment: '', madeIn: '', copyrightName: '',
+    ...Object.fromEntries(SOCIAL_CHANNELS.map(({ key }) => [key, ''])) as Record<SocialKey, string> },
   sale_page: { bannerUrl: '', bannerAlt: '', title: '', description: '' },
   about_page: { heroImageUrl: '', heroImageAlt: '', heroTitle: '', heroDescription: '',
     ctaTitle: '', ctaDescription: '', ctaLabel: '', ctaHref: '' },
@@ -520,15 +519,16 @@ export function SiteContentManager({ initialContent, invalidKeys: initialInvalid
         preview={<div className="space-y-1 text-sm text-charcoal-700">
           <p>Hotline: <strong>{draft.contact_info.hotline || 'chưa có'}</strong>{draft.contact_info.hotlineHours ? ` (${draft.contact_info.hotlineHours})` : ''}</p>
           <p className="text-xs text-charcoal-500">{[draft.contact_info.zaloUrl && 'Zalo', draft.contact_info.messengerUrl && 'Messenger',
-            draft.contact_info.facebookUrl && 'Facebook', draft.contact_info.tiktokUrl && 'TikTok', draft.contact_info.instagramUrl && 'Instagram']
+            ...socialLinks(draft.contact_info).map((channel) => channel.name)]
             .filter(Boolean).join(' · ') || 'Chưa có kênh mạng xã hội'}</p>
         </div>}>
         <div className="grid gap-3 sm:grid-cols-2">
           {([
             ['hotline', 'Số hotline', 20, '035 999 5381'], ['hotlineHours', 'Giờ nhận cuộc gọi', 60, '8:30 – 23:00'],
             ['zaloUrl', 'Liên kết Zalo', 300, 'https://zalo.me/…'], ['zaloLabel', 'Tên hiển thị Zalo', 80, "Zalo Official: T'Petie"],
-            ['messengerUrl', 'Liên kết Messenger (nút chat)', 300, 'https://m.me/…'], ['facebookUrl', 'Trang Facebook', 300, 'https://www.facebook.com/…'],
-            ['tiktokUrl', 'Kênh TikTok', 300, 'https://www.tiktok.com/@…'], ['instagramUrl', 'Trang Instagram', 300, 'https://www.instagram.com/…'],
+            ['messengerUrl', 'Liên kết Messenger (nút chat)', 300, 'https://m.me/…'],
+            // Mỗi mạng xã hội có ô nhập riêng, lấy từ danh sách dùng chung với footer.
+            ...SOCIAL_CHANNELS.map((channel) => [channel.key, channel.adminLabel, 300, channel.placeholder] as const),
             ['madeIn', 'Nhãn xuất xứ', 80, 'Thiết kế & May đo tại Việt Nam'], ['copyrightName', 'Tên bản quyền', 80, "T'Petie Vietnam"],
           ] as const).map(([key, label, maxLength, placeholder]) => <TextField key={key} label={label} value={draft.contact_info[key]}
             maxLength={maxLength} placeholder={placeholder} onChange={(value) => update('contact_info', { ...draft.contact_info, [key]: value })} />)}

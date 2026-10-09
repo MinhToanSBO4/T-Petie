@@ -10,6 +10,7 @@ import { QUOTE_NOTICE_ID, useOrderQuote } from '@/hooks/useOrderQuote';
 import { useCart } from '@/context/CartContext';
 import { trackPurchase } from '@/client/analytics/tracker';
 import { normalizePhone } from '@/lib/account/account-input';
+import { SOCIAL_CHANNELS } from '@/lib/content/site-content';
 import { useAuth } from '@/context/AuthContext';
 import { EmailVerificationBanner, useEmailVerification } from '@/components/auth/EmailVerification';
 
@@ -307,9 +308,7 @@ export default function CheckoutPage() {
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-cream-300 bg-cream-50 focus:outline-none focus:border-honey-500 focus:ring-1 focus:ring-honey-500 transition-shadow text-sm appearance-none"
                   >
                     <option value="">-- Chọn kênh --</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="TikTok">TikTok</option>
-                    <option value="Instagram">Instagram</option>
+                    {SOCIAL_CHANNELS.map((channel) => <option key={channel.key} value={channel.name}>{channel.name}</option>)}
                     <option value="Bạn bè giới thiệu">Bạn bè giới thiệu</option>
                   </select>
                 </div>
