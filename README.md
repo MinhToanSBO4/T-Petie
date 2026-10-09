@@ -171,7 +171,7 @@ The cleanup script removes only the local `.next` directory and rejects symbolic
 
 The database scripts are described in [docs/deploy-vercel.md](docs/deploy-vercel.md).
 
-## Testing and verification
+## Testing and verification 
 
 ```bash
 npm test           # unit tests; no database or network access needed
