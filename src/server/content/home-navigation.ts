@@ -21,4 +21,4 @@ export const getHomeNavigation = unstable_cache(async () => {
     feedback: [],
   });
   return homeNavItems(content.home_layout?.order || HOME_BLOCK_IDS, sections, visible);
-}, ['home-navigation'], { revalidate: 60, tags: ['products', 'collections', SITE_CONTENT_TAG] });
+}, ['home-navigation'], { revalidate: 86400, tags: ['products', 'collections', SITE_CONTENT_TAG] });

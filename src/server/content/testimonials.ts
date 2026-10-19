@@ -17,4 +17,4 @@ export const getPublishedFeedback = unstable_cache(async (): Promise<PublicFeedb
   });
   return rows.map((row) => ({ id: row.id, imageUrl: row.imageUrl, width: row.imageWidth, height: row.imageHeight,
     caption: row.caption, product: row.product?.isActive ? { name: row.product.name, slug: row.product.slug } : null }));
-}, ['published-feedback'], { revalidate: 60, tags: ['testimonials'] });
+}, ['published-feedback'], { revalidate: 86400, tags: ['testimonials'] });

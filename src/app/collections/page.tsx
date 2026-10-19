@@ -6,7 +6,7 @@ import { cloudinaryImage, cloudinarySrcSet } from '@/lib/media/cloudinary-url';
 import { readableAccent } from '@/lib/content/collection-colors';
 import type { Collection } from '@/types/collection';
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "Bộ sưu tập | T'Petie",

@@ -51,7 +51,7 @@ export const getSiteContent = unstable_cache(async (): Promise<SiteContentMap> =
     testimonials_section: safeParse('testimonials_section', rows),
     size_guide: safeParse('size_guide', rows),
   };
-}, ['site-content-map'], { revalidate: 300, tags: [SITE_CONTENT_TAG] });
+}, ['site-content-map'], { revalidate: 86400, tags: [SITE_CONTENT_TAG] });
 
 /**
  * Nội dung cho trình sửa, đọc thẳng database (không cache): giá trị đã kiểm tra như website đang dùng. Khóa có dữ liệu

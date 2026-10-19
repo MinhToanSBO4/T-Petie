@@ -31,7 +31,7 @@ export const getProductReviewSummary = unstable_cache(async (productId: string):
   const fit = { small: 0, fit: 0, large: 0 };
   for (const row of byFit) if (row.sizeFit && row.sizeFit in fit) fit[row.sizeFit as keyof typeof fit] = row._count._all;
   return { average: Math.round(average * 10) / 10, total, counts, withImages, withComments, fit };
-}, ['product-review-summary'], { revalidate: 60, tags: [REVIEWS_TAG] });
+}, ['product-review-summary'], { revalidate: 86400, tags: [REVIEWS_TAG] });
 
 /** Một trang đánh giá đang hiển thị theo bộ lọc, mới nhất trước. Ngày giờ trả về dạng chuỗi để lưu được trong cache. */
 export const getProductReviewPage = unstable_cache(async (productId: string, filter: ReviewFilter, page: number) => {
@@ -47,7 +47,7 @@ export const getProductReviewPage = unstable_cache(async (productId: string, fil
     createdAt: row.createdAt.toISOString(), verified: Boolean(row.orderItemId), edited: row.editCount > 0,
     reply: row.reply ? { content: row.reply, at: (row.repliedAt ?? row.createdAt).toISOString() } : null }));
   return { reviews, total, page, pages: Math.max(1, Math.ceil(total / REVIEWS_PER_PAGE)) };
-}, ['product-review-page-v2'], { revalidate: 60, tags: [REVIEWS_TAG] });
+}, ['product-review-page-v2'], { revalidate: 86400, tags: [REVIEWS_TAG] });
 
 /** Làm mới đánh giá công khai: danh sách và điểm trung bình trên trang sản phẩm, thẻ sản phẩm ở trang chủ. */
 export function invalidateReviews() {
