@@ -88,7 +88,8 @@ Staff sections are listed in `STAFF_SECTIONS` (`src/lib/admin/back-office.ts`) a
 ## Caching
 
 - Server reads of products, collections, reviews, published feedback, site content and sales settings are wrapped in `unstable_cache` with cache tags. Back-office writes revalidate the matching tags and paths (`src/server/content/invalidate.ts` and the individual Route Handlers).
-- Public pages use incremental static regeneration (mostly `revalidate = 60`), so the first request after a save can still return the previous version for a moment.
+- Public pages and cached reads use a 24-hour time-based backstop (`revalidate = 86400`) to keep Supabase egress low: crawlers and uptime monitors no longer trigger a full catalogue read every minute. Freshness comes from on-demand invalidation, so every code path that writes catalogue, review, feedback or site-content data must call `revalidateTag` / the helpers in `src/server/content/invalidate.ts`. Data edited directly in the database (Supabase dashboard, `content:seed`, `media:migrate`) bypasses this and can take up to 24 hours to appear unless the site is redeployed or the matching tag is revalidated.
+- Local development can use its own database through an untracked `.env.local` (see `.env.local.example`), which keeps day-to-day testing off the production Supabase project.
 - The browser's router cache keeps visited pages for 5 minutes (`experimental.staleTimes` in `next.config.mjs`). After a save, back-office editors call `markAdminPagesStale()` (`src/client/admin-freshness.ts`) so the next back-office page opened is refreshed once. Avoid `router.refresh()` on the page being edited: it re-renders the page and discards undo notices and unsaved input.
 
 ## User notifications
