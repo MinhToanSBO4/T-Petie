@@ -5,7 +5,7 @@ import { FeedbackAlbum } from '@/components/feedback/FeedbackAlbum';
 import { getPublishedFeedback } from '@/server/content/testimonials';
 import { getSiteContent } from '@/server/content/site-content';
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "Feedback khách hàng | T'Petie",

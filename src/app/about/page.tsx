@@ -3,7 +3,7 @@ import { AboutContent } from '@/components/about/AboutContent';
 import { getSiteContent } from '@/server/content/site-content';
 import { getCollections } from '@/server/catalog/queries';
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "Về chúng tôi | T'Petie",

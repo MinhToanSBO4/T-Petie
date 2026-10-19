@@ -6,7 +6,7 @@ import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { cloudinaryImage } from '@/lib/media/cloudinary-url';
 import { siteUrl } from '@/lib/site-url';
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 /**
  * Dựng sẵn các trang sản phẩm phổ biến lúc build để khách không gặp độ trễ truy vấn

@@ -55,7 +55,7 @@ function toProduct(row: Awaited<ReturnType<typeof prisma.product.findMany<{ incl
 export const getProducts = unstable_cache(async () => {
   const rows = await prisma.product.findMany({ where: { isActive: true }, include: productInclude, orderBy: { createdAt: 'desc' } });
   return rows.map(toProduct);
-}, ['active-products'], { revalidate: 60, tags: ['products'] });
+}, ['active-products'], { revalidate: 86400, tags: ['products'] });
 
 /**
  * Một sản phẩm theo slug (chấp nhận cả id và sku để tương thích liên kết cũ).
@@ -67,7 +67,7 @@ export const getProductBySlug = unstable_cache(async (slug: string): Promise<Pro
     include: productInclude,
   });
   return row ? toProduct(row) : null;
-}, ['product-by-slug'], { revalidate: 60, tags: ['products'] });
+}, ['product-by-slug'], { revalidate: 86400, tags: ['products'] });
 
 /** Sản phẩm gợi ý: cùng bộ sưu tập trước, sau đó lấp đầy bằng sản phẩm mới nhất. */
 export const getRelatedProducts = unstable_cache(async (productId: string, collectionSlug: string | null, limit: number): Promise<Product[]> => {
@@ -85,7 +85,7 @@ export const getRelatedProducts = unstable_cache(async (productId: string, colle
     take: limit - rows.length,
   });
   return [...rows, ...fill].map(toProduct);
-}, ['related-products'], { revalidate: 60, tags: ['products'] });
+}, ['related-products'], { revalidate: 86400, tags: ['products'] });
 
 export const getCollections = unstable_cache(async (): Promise<Collection[]> => {
   // Chỉ đếm sản phẩm đang bán: số "N thiết kế" khớp với danh sách khách thấy.
@@ -98,4 +98,4 @@ export const getCollections = unstable_cache(async (): Promise<Collection[]> => 
     season: row.season || '', badge: row.badge || '', featuredProductIds: row.products.map((product) => product.id),
     showInMenu: row.showInMenu, showOnHome: row.showOnHome,
   }));
-}, ['active-collections'], { revalidate: 60, tags: ['collections'] });
+}, ['active-collections'], { revalidate: 86400, tags: ['collections'] });

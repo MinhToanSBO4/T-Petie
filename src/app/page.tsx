@@ -9,7 +9,7 @@ import { HOME_FEEDBACK_LIMIT } from '@/lib/content/testimonial-input';
 import { toProductCard } from '@/types/product';
 import { siteUrl } from '@/lib/site-url';
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 export default async function HomePage() {
   const [products, collections, feedback, content] = await Promise.all([
